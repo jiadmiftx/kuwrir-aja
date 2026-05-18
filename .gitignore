@@ -1,0 +1,43 @@
+# ENAK Platform Monorepo
+
+## Dependencies
+node_modules/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+
+## Environment
+.env
+*.env.local
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Build artifacts
+backend/server
+backend/tmp/
+*.exe
+*.dll
+*.so
+*.dylib
+
+## Flutter
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
+
+## Docker volumes
+postgres_data/
+redis_data/
+valhalla_data/
+nominatim_data/

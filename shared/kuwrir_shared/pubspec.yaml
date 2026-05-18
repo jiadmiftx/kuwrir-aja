@@ -1,0 +1,20 @@
+name: kuwrir_shared
+description: Shared package for KUWRIR platform Flutter apps (API client, models, theme)
+version: 0.1.0
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.4.0
+  shared_preferences: ^2.5.0
+  json_annotation: ^4.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  json_serializable: ^6.9.0
+  build_runner: ^2.4.0

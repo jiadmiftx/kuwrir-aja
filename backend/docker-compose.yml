@@ -1,0 +1,64 @@
+services:
+  # PostgreSQL + PostGIS
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: kuwrir-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kuwrir
+      POSTGRES_PASSWORD: kuwrir_secret
+      POSTGRES_DB: kuwrir_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis for cache, pub/sub, and job queues
+  redis:
+    image: redis:7-alpine
+    container_name: kuwrir-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Valhalla routing engine (self-hosted, free)
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: kuwrir-valhalla
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      # Download OSM data for Nusa Tenggara (Lombok included)
+      tile_urls: https://download.geofabrik.de/asia/indonesia/nusa-tenggara-latest.osm.pbf
+      use_tiles_ignore_pbf: "False"
+      build_elevation: "False"
+      build_admins: "True"
+      build_time_zones: "True"
+      force_rebuild: "False"
+    volumes:
+      - valhalla_data:/custom_files
+
+  # Nominatim geocoding (self-hosted, free)
+  nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: kuwrir-nominatim
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    environment:
+      PBF_URL: https://download.geofabrik.de/asia/indonesia/nusa-tenggara-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/asia/indonesia/nusa-tenggara-updates/
+      NOMINATIM_PASSWORD: kuwrir_nominatim
+      IMPORT_STYLE: full
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+    shm_size: 1g
+
+volumes:
+  postgres_data:
+  redis_data:
+  valhalla_data:
+  nominatim_data:
