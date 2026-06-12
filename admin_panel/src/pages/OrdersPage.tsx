@@ -19,15 +19,25 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: XCircle },
 }
 
+interface Order {
+  id: string
+  order_number: string
+  customer_name: string
+  status: string
+  delivery_type: string
+  total: number
+  created_at: string
+  platform_markup?: number
+  delivery_commission?: number
+  Customer?: { name: string }
+  Merchant?: { name: string }
+}
+
 export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('all')
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchOrders()
-  }, [])
 
   const fetchOrders = async () => {
     try {
@@ -43,6 +53,10 @@ export default function OrdersPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchOrders()
+  }, [])
 
   const filtered = orders.filter((o) => {
     const matchSearch =

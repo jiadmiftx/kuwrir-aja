@@ -13,14 +13,18 @@ import {
 } from '@/components/ui/table'
 import { Search, ShieldAlert } from 'lucide-react'
 
+interface Customer {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  created_at: string
+}
+
 export default function CustomersPage() {
   const [search, setSearch] = useState('')
-  const [customers, setCustomers] = useState<any[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchCustomers()
-  }, [])
 
   const fetchCustomers = async () => {
     try {
@@ -36,6 +40,10 @@ export default function CustomersPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchCustomers()
+  }, [])
 
   const filtered = customers.filter(c => 
     c.name?.toLowerCase().includes(search.toLowerCase()) || 

@@ -18,5 +18,11 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // This codebase fetches data with a plain useEffect(() => { fetchX() }, [])
+      // pattern throughout, which this rule (from the new React Compiler ESLint
+      // suite) flags everywhere. Disable until that pattern is migrated.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

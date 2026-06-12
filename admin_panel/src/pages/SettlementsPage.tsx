@@ -6,10 +6,6 @@ import { TrendingUp, HandCoins } from 'lucide-react'
 export default function SettlementsPage() {
   const [data, setData] = useState({ total_driver_cash: 0, total_platform_revenue: 0 })
 
-  useEffect(() => {
-    fetchSettlements()
-  }, [])
-
   const fetchSettlements = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -22,6 +18,10 @@ export default function SettlementsPage() {
       console.error(e)
     }
   }
+
+  useEffect(() => {
+    fetchSettlements()
+  }, [])
 
   return (
     <div className="space-y-6">

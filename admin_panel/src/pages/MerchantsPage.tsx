@@ -40,10 +40,6 @@ export default function MerchantsPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    fetchMerchants()
-  }, [])
-
   const fetchMerchants = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -58,6 +54,10 @@ export default function MerchantsPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchMerchants()
+  }, [])
 
   const filtered = merchants.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())

@@ -13,14 +13,20 @@ import {
 } from '@/components/ui/table'
 import { Search, Bike, Ban } from 'lucide-react'
 
+interface Driver {
+  id: string
+  User?: { name: string; phone: string }
+  vehicle_type: string
+  vehicle_plate: string
+  is_active: boolean
+  total_delivered: number
+  cash_balance: number
+}
+
 export default function DriversPage() {
   const [search, setSearch] = useState('')
-  const [drivers, setDrivers] = useState<any[]>([])
+  const [drivers, setDrivers] = useState<Driver[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchDrivers()
-  }, [])
 
   const fetchDrivers = async () => {
     try {
@@ -36,6 +42,10 @@ export default function DriversPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchDrivers()
+  }, [])
 
   const filtered = drivers.filter(d => 
     d.User?.name?.toLowerCase().includes(search.toLowerCase()) || 
