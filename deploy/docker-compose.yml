@@ -1,0 +1,68 @@
+# Production stack for the VPS.
+#
+# Infra services (postgres, redis) are started ONCE during provisioning and
+# are NOT touched by CI/CD redeploys. CI/CD only runs:
+#   docker compose -f deploy/docker-compose.yml pull backend admin
+#   docker compose -f deploy/docker-compose.yml up -d --no-deps backend admin
+#
+# Valhalla/Nominatim (routing + geocoding) are intentionally NOT included yet —
+# the backend doesn't call them anywhere, and their OSM import is too heavy
+# for this VPS's resources alongside other apps already running on it. Add
+# them later (ideally on a separate host) once routing features land.
+#
+# Host ports for backend/admin are non-standard (8090/8091) because 80 and
+# 8080 are already used by another app on this VPS.
+#
+# See deploy/README.md for full setup instructions.
+
+services:
+  # PostgreSQL + PostGIS
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: kuwrir-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kuwrir
+      POSTGRES_PASSWORD: kuwrir_secret
+      POSTGRES_DB: kuwrir_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis for cache, pub/sub, and job queues
+  redis:
+    image: redis:7-alpine
+    container_name: kuwrir-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  # Go backend API — redeployed by CI/CD on every push to backend/**
+  backend:
+    image: ghcr.io/jiadmiftx/kuwrir-aja/backend:latest
+    container_name: kuwrir-backend
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      SERVER_MODE: release
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - "8090:8080"
+    depends_on:
+      - postgres
+      - redis
+
+  # Admin panel (React, served by nginx) — redeployed by CI/CD on every push to admin_panel/**
+  admin:
+    image: ghcr.io/jiadmiftx/kuwrir-aja/admin:latest
+    container_name: kuwrir-admin
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
