@@ -106,7 +106,7 @@ jobs:
         working-directory: merchant_app
       - uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
-          appId: ${{ secrets.FIREBASE_APP_ID_RESTAURANT }}
+          appId: ${{ secrets.FIREBASE_APP_ID_MERCHANT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: testers
           file: merchant_app/build/app/outputs/flutter-apk/app-release.apk
