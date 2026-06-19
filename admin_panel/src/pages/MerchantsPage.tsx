@@ -4,21 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Search, CheckCircle, XCircle, Eye, MapPin, Star } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2 } from 'lucide-react'
 
 interface Merchant {
   id: string
@@ -33,46 +24,58 @@ interface Merchant {
   created_at: string
 }
 
+const api = (path: string, opts?: RequestInit) =>
+  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }, ...opts })
+
 export default function MerchantsPage() {
   const [search, setSearch] = useState('')
   const [merchants, setMerchants] = useState<Merchant[]>([])
-  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null)
+  const [selected, setSelected] = useState<Merchant | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const fetchMerchants = async () => {
+    setIsLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/v1/admin/merchants', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const res = await api('/api/v1/admin/merchants')
       const data = await res.json()
-      if (res.ok) setMerchants(data)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setIsLoading(false)
-    }
+      if (res.ok) setMerchants(data.merchants ?? data)
+    } catch (e) { console.error(e) }
+    finally { setIsLoading(false) }
   }
 
-  useEffect(() => {
-    fetchMerchants()
-  }, [])
+  useEffect(() => { fetchMerchants() }, [])
 
-  const filtered = merchants.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
+  const verify = async (id: string, verified: boolean) => {
+    setActionLoading(id + (verified ? '-approve' : '-reject'))
+    try {
+      const res = await api(`/api/v1/admin/merchants/${id}/verify`, {
+        method: 'PUT',
+        body: JSON.stringify({ verified }),
+      })
+      if (res.ok) {
+        setMerchants(prev =>
+          prev.map(m => m.id === id ? { ...m, is_verified: verified, is_active: verified } : m)
+        )
+        if (selected?.id === id) setSelected(s => s ? { ...s, is_verified: verified } : s)
+      }
+    } finally { setActionLoading(null) }
+  }
+
+  const filtered = merchants.filter(m =>
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.phone.includes(search)
   )
 
-  const pendingCount = merchants.filter((r) => !r.is_verified).length
+  const pendingCount = merchants.filter(m => !m.is_verified).length
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Merchants</h2>
-          <p className="text-muted-foreground">
-            Manage merchant partners and verification
-          </p>
+          <p className="text-muted-foreground">Manage merchant partners and verification</p>
         </div>
         {pendingCount > 0 && (
           <Badge variant="destructive" className="text-sm px-3 py-1">
@@ -85,53 +88,43 @@ export default function MerchantsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Merchants
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Merchants</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{merchants.length}</div>
-          </CardContent>
+          <CardContent><div className="text-2xl font-bold">{merchants.length}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Verified & Active
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Verified & Active</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {merchants.filter((r) => r.is_verified && r.is_active).length}
+              {merchants.filter(m => m.is_verified && m.is_active).length}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Currently Open
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Currently Open</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {merchants.filter((r) => r.is_open).length}
+              {merchants.filter(m => m.is_open).length}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search + Table */}
+      {/* Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search merchants..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search merchants..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -148,63 +141,65 @@ export default function MerchantsPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                </TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center">No merchants found</TableCell></TableRow>
-              ) : filtered.map((r) => (
-                <TableRow key={r.id}>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No merchants found</TableCell></TableRow>
+              ) : filtered.map(m => (
+                <TableRow key={m.id}>
                   <TableCell>
-                    <div>
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-sm text-muted-foreground">{r.phone}</div>
-                    </div>
+                    <div className="font-medium">{m.name}</div>
+                    <div className="text-sm text-muted-foreground">{m.phone}</div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {r.address}
+                      <MapPin className="h-3 w-3 shrink-0" />{m.address}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm">{r.rating > 0 ? r.rating : '-'}</span>
-                      <span className="text-xs text-muted-foreground">({r.total_reviews})</span>
+                      <span className="text-sm">{m.rating > 0 ? m.rating.toFixed(1) : '-'}</span>
+                      <span className="text-xs text-muted-foreground">({m.total_reviews})</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {r.is_verified ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        Verified
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">Pending</Badge>
-                    )}
+                    {m.is_verified
+                      ? <Badge variant="secondary" className="bg-green-100 text-green-800">Verified</Badge>
+                      : <Badge variant="destructive">Pending</Badge>}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.is_open ? 'default' : 'secondary'}>
-                      {r.is_open ? 'Open' : 'Closed'}
+                    <Badge variant={m.is_open ? 'default' : 'secondary'}>
+                      {m.is_open ? 'Open' : 'Closed'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedMerchant(r)
-                          setDetailOpen(true)
-                        }}
-                      >
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setSelected(m); setDetailOpen(true) }}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {!r.is_verified && (
+                      {!m.is_verified && (
                         <>
-                          <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">
-                            <CheckCircle className="h-4 w-4" />
+                          <Button
+                            variant="ghost" size="sm"
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            disabled={actionLoading === m.id + '-approve'}
+                            onClick={() => verify(m.id, true)}
+                          >
+                            {actionLoading === m.id + '-approve'
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <CheckCircle className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                            <XCircle className="h-4 w-4" />
+                          <Button
+                            variant="ghost" size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            disabled={actionLoading === m.id + '-reject'}
+                            onClick={() => verify(m.id, false)}
+                          >
+                            {actionLoading === m.id + '-reject'
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <XCircle className="h-4 w-4" />}
                           </Button>
                         </>
                       )}
@@ -221,41 +216,44 @@ export default function MerchantsPage() {
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{selectedMerchant?.name}</DialogTitle>
+            <DialogTitle>{selected?.name}</DialogTitle>
           </DialogHeader>
-          {selectedMerchant && (
+          {selected && (
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Phone</span>
-                <span>{selectedMerchant.phone}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Address</span>
-                <span>{selectedMerchant.address}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Rating</span>
-                <span>{selectedMerchant.rating} ({selectedMerchant.total_reviews} reviews)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Registered</span>
-                <span>{selectedMerchant.created_at}</span>
-              </div>
-              <div className="flex justify-between">
+              {[
+                ['Phone', selected.phone],
+                ['Address', selected.address],
+                ['Rating', `${selected.rating} (${selected.total_reviews} reviews)`],
+                ['Joined', new Date(selected.created_at).toLocaleDateString('id-ID')],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span>{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Status</span>
-                <Badge variant={selectedMerchant.is_verified ? 'secondary' : 'destructive'}>
-                  {selectedMerchant.is_verified ? 'Verified' : 'Pending Verification'}
+                <Badge variant={selected.is_verified ? 'secondary' : 'destructive'}>
+                  {selected.is_verified ? 'Verified' : 'Pending Verification'}
                 </Badge>
               </div>
             </div>
           )}
           <DialogFooter>
-            {selectedMerchant && !selectedMerchant.is_verified && (
+            {selected && !selected.is_verified && (
               <div className="flex gap-2">
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={!!actionLoading}
+                  onClick={async () => { await verify(selected.id, true); setDetailOpen(false) }}
+                >
                   <CheckCircle className="mr-2 h-4 w-4" /> Approve
                 </Button>
-                <Button variant="destructive">
+                <Button
+                  variant="destructive"
+                  disabled={!!actionLoading}
+                  onClick={async () => { await verify(selected.id, false); setDetailOpen(false) }}
+                >
                   <XCircle className="mr-2 h-4 w-4" /> Reject
                 </Button>
               </div>

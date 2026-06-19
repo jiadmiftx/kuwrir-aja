@@ -18,6 +18,9 @@ class ApiClient {
     return prefs.getString('auth_token');
   }
 
+  /// Get stored JWT token (public — used for building multipart requests)
+  Future<String?> getToken() => _getToken();
+
   /// Store JWT token
   Future<void> saveToken(String token, String refreshToken) async {
     final prefs = await SharedPreferences.getInstance();

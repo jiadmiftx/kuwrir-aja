@@ -6,7 +6,7 @@ on:
     paths:
       - 'customer_app/**'
       - 'driver_app/**'
-      - 'restaurant_app/**'
+      - 'merchant_app/**'
       - 'shared/**'
       - '.github/workflows/firebase-distribution.yml'
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
     outputs:
       customer: ${{ steps.filter.outputs.customer }}
       driver: ${{ steps.filter.outputs.driver }}
-      restaurant: ${{ steps.filter.outputs.restaurant }}
+      merchant: ${{ steps.filter.outputs.merchant }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -32,9 +32,9 @@ jobs:
             driver:
               - *shared
               - 'driver_app/**'
-            restaurant:
+            merchant:
               - *shared
-              - 'restaurant_app/**'
+              - 'merchant_app/**'
 
   customer:
     needs: changes
@@ -86,9 +86,9 @@ jobs:
           groups: testers
           file: driver_app/build/app/outputs/flutter-apk/app-release.apk
 
-  restaurant:
+  merchant:
     needs: changes
-    if: needs.changes.outputs.restaurant == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.merchant == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,12 +101,12 @@ jobs:
           flutter-version: '3.44.0'
           channel: stable
       - run: flutter pub get
-        working-directory: restaurant_app
+        working-directory: merchant_app
       - run: flutter build apk --release
-        working-directory: restaurant_app
+        working-directory: merchant_app
       - uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_RESTAURANT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: testers
-          file: restaurant_app/build/app/outputs/flutter-apk/app-release.apk
+          file: merchant_app/build/app/outputs/flutter-apk/app-release.apk

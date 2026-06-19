@@ -10,6 +10,7 @@ import {
   LogOut,
   Tag,
   Banknote,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -19,6 +20,7 @@ const navItems = [
   { to: '/orders', icon: ShoppingBag, label: 'Orders' },
   { to: '/merchants', icon: Store, label: 'Merchants' },
   { to: '/drivers', icon: Bike, label: 'Drivers' },
+  { to: '/driver-applications', icon: ClipboardList, label: 'Driver Applications' },
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/promos', icon: Tag, label: 'Promotions' },
   { to: '/settlements', icon: Banknote, label: 'Settlements' },

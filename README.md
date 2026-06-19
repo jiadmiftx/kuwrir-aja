@@ -19,7 +19,7 @@ A full-stack food delivery platform for the Kuta, Lombok tourist area.
 | **Admin Panel** | React + Vite + shadcn/ui | `admin_panel/` |
 | **Customer App** | Flutter | `customer_app/` |
 | **Driver App** | Flutter | `driver_app/` |
-| **Restaurant App** | Flutter | `restaurant_app/` |
+| **Merchant App** | Flutter | `merchant_app/` |
 | **Shared Packages** | Dart | `shared/kuwrir_shared/` |
 
 ## 🚀 Quick Start
@@ -46,7 +46,7 @@ npm run dev
 
 ### 4. Start Mobile Apps
 ```bash
-cd customer_app   # or driver_app, restaurant_app
+cd customer_app   # or driver_app, merchant_app
 flutter pub get
 flutter run
 ```

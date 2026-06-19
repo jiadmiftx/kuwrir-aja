@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.enak" "\0"
-            VALUE "FileDescription", "enak_customer" "\0"
+            VALUE "CompanyName", "KUWRIR" "\0"
+            VALUE "FileDescription", "KUWRIR Customer" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "enak_customer" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.enak. All rights reserved." "\0"
-            VALUE "OriginalFilename", "enak_customer.exe" "\0"
-            VALUE "ProductName", "enak_customer" "\0"
+            VALUE "InternalName", "KUWRIR Customer" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 KUWRIR. All rights reserved." "\0"
+            VALUE "OriginalFilename", "kuwrir_customer.exe" "\0"
+            VALUE "ProductName", "KUWRIR Customer" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

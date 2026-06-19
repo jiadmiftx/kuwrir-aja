@@ -11,7 +11,7 @@ and to wire up the GitHub Actions CI/CD pipelines.
 - **Push to `main` touching `admin_panel/**`** → `.github/workflows/deploy-admin.yml`
   does the same for the admin panel (`ghcr.io/jiadmiftx/kuwrir-aja/admin`),
   restarting only the `admin` container.
-- **Push to `main` touching `customer_app/**`, `driver_app/**`, `restaurant_app/**`
+- **Push to `main` touching `customer_app/**`, `driver_app/**`, `merchant_app/**`
   or `shared/**`** → `.github/workflows/firebase-distribution.yml` builds release
   APKs for the affected app(s) and uploads them to Firebase App Distribution.
   A change in `shared/**` rebuilds all 3 apps.
@@ -40,7 +40,7 @@ Repo → Settings → Secrets and variables → Actions:
 | `FIREBASE_SERVICE_ACCOUNT` | firebase-distribution | Raw JSON of a Firebase service account key |
 | `FIREBASE_APP_ID_CUSTOMER` | firebase-distribution | Firebase App ID for `com.enak.enak_customer` |
 | `FIREBASE_APP_ID_DRIVER` | firebase-distribution | Firebase App ID for `com.enak.enak_driver` |
-| `FIREBASE_APP_ID_RESTAURANT` | firebase-distribution | Firebase App ID for `com.enak.enak_restaurant` |
+| `FIREBASE_APP_ID_RESTAURANT` | firebase-distribution | Firebase App ID for `com.enak.kuwrir_merchant` |
 
 `GITHUB_TOKEN` (used to push to GHCR) is provided automatically by Actions —
 no setup needed, but the repo's package visibility defaults to **private**,
@@ -109,7 +109,7 @@ a local LAN IP.
 2. Add 3 Android apps to the project with these exact package names:
    - `com.enak.enak_customer`
    - `com.enak.enak_driver`
-   - `com.enak.enak_restaurant`
+   - `com.enak.kuwrir_merchant`
    You don't need to download `google-services.json` or add the Firebase SDK
    to the apps — App Distribution only needs the App ID.
 3. For each app, go to **Project settings → General**, scroll to "Your apps",

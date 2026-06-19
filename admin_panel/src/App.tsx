@@ -6,6 +6,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import MerchantsPage from '@/pages/MerchantsPage'
 import OrdersPage from '@/pages/OrdersPage'
 import DriversPage from '@/pages/DriversPage'
+import DriverApplicationsPage from '@/pages/DriverApplicationsPage'
 import CustomersPage from '@/pages/CustomersPage'
 import PromotionsPage from '@/pages/PromotionsPage'
 import SettlementsPage from '@/pages/SettlementsPage'
@@ -25,6 +26,7 @@ export default function App() {
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/merchants" element={<MerchantsPage />} />
                 <Route path="/drivers" element={<DriversPage />} />
+                <Route path="/driver-applications" element={<DriverApplicationsPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/promos" element={<PromotionsPage />} />
                 <Route path="/settlements" element={<SettlementsPage />} />

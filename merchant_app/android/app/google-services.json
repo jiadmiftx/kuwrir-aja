@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "55640900910",
+    "project_id": "kuwrir-3495d",
+    "storage_bucket": "kuwrir-3495d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55640900910:android:b9491c1c4efa75871d26bf",
+        "android_client_info": {
+          "package_name": "com.kuwrir.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55640900910:android:09f0fe4b2bfc50441d26bf",
+        "android_client_info": {
+          "package_name": "com.kuwrir.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55640900910:android:2a08f309a4e7f93a1d26bf",
+        "android_client_info": {
+          "package_name": "com.kuwrir.merchant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

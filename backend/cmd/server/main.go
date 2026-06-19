@@ -13,7 +13,10 @@ import (
 	adminHandler "github.com/kuwrir-platform/backend/internal/handler/admin"
 	authHandler "github.com/kuwrir-platform/backend/internal/handler/auth"
 	customerHandler "github.com/kuwrir-platform/backend/internal/handler/customer"
+	driverregHandler "github.com/kuwrir-platform/backend/internal/handler/driverreg"
+	kasirHandler "github.com/kuwrir-platform/backend/internal/handler/kasir"
 	merchantHandler "github.com/kuwrir-platform/backend/internal/handler/merchant"
+	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
 )
@@ -49,6 +52,16 @@ func main() {
 		&model.DriverDeposit{},
 		&model.MerchantSettlement{},
 		&model.Promotion{},
+		// Phase 6: Registration & Verification
+		&model.DriverApplication{},
+		// Phase 6: POS/Kasir models
+		&model.StockMovement{},
+		&model.PosTransaction{},
+		&model.PosTransactionItem{},
+		&model.MerchantReceivable{},
+		&model.MerchantReceivablePayment{},
+		&model.MerchantPayable{},
+		&model.MerchantPayablePayment{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -59,6 +72,9 @@ func main() {
 	// Setup Gin router
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
+
+	// Serve uploaded files (placeholder — swap for R2 CDN URL later)
+	r.Static("/uploads", "./uploads")
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
@@ -99,6 +115,29 @@ func main() {
 			merchOwnerRoutes.Use(middleware.RoleMiddleware("merchant"))
 			merchH.RegisterRoutes(v1, merchOwnerRoutes)
 
+			// Driver registration & application (driver role, also partially public)
+			driverRegH := driverregHandler.NewHandler(db)
+			driverRegH.RegisterPublicRoutes(v1)
+			driverRegProtected := protected.Group("")
+			driverRegProtected.Use(middleware.RoleMiddleware("driver"))
+			driverRegH.RegisterProtectedRoutes(driverRegProtected)
+
+			// Service (jasa) routes
+			svcH := serviceHandler.NewHandler(db)
+			svcCustRoutes := protected.Group("")
+			svcCustRoutes.Use(middleware.RoleMiddleware("customer"))
+			svcMerchRoutes := protected.Group("")
+			svcMerchRoutes.Use(middleware.RoleMiddleware("merchant"))
+			svcDriverRoutes := protected.Group("")
+			svcDriverRoutes.Use(middleware.RoleMiddleware("driver"))
+			svcH.RegisterRoutes(v1, svcCustRoutes, svcMerchRoutes, svcDriverRoutes)
+
+			// POS / Kasir routes (merchant only)
+			kasirOwnerRoutes := protected.Group("/my-store")
+			kasirOwnerRoutes.Use(middleware.RoleMiddleware("merchant"))
+			kasirH := kasirHandler.NewHandler(db)
+			kasirH.RegisterRoutes(kasirOwnerRoutes)
+
 			// Merchant order management (accept/prepare/ready)
 			merchOrderH := customerHandler.NewRestaurantOrderHandler(db)
 			merchOrderRoutes := protected.Group("")
@@ -134,6 +173,7 @@ func seedSettings(db *gorm.DB) {
 		{Key: "delivery_commission_percentage", Value: "25", Label: "Delivery Commission Percentage (%)"},
 		{Key: "delivery_base_fee_inside_zone", Value: "15000", Label: "Inside Zone Delivery Fee (IDR)"},
 		{Key: "delivery_fee_per_km_outside", Value: "10000", Label: "Outside Zone Fee Per KM (IDR)"},
+		{Key: "service_delivery_fee_round_trip", Value: "20000", Label: "Service Round-Trip Delivery Fee (IDR)"},
 	}
 
 	for _, setting := range defaults {

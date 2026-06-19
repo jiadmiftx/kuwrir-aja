@@ -79,13 +79,16 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
+	// Drivers and merchants start inactive — admin must verify before they can use the platform
+	isActive := req.Role == model.RoleCustomer
+
 	user := model.User{
 		Name:     req.Name,
 		Email:    req.Email,
 		Phone:    req.Phone,
 		Password: string(hashedPassword),
 		Role:     req.Role,
-		IsActive: true,
+		IsActive: isActive,
 	}
 
 	if err := h.db.Create(&user).Error; err != nil {
@@ -93,10 +96,23 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	// Generate tokens
 	token, refreshToken, err := h.generateTokens(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	// Drivers and merchants get a token too — needed to submit their
+	// application/store documents — but the account stays inactive
+	// (and login is blocked) until an admin approves it.
+	if req.Role == model.RoleDriver || req.Role == model.RoleMerchant {
+		c.JSON(http.StatusCreated, gin.H{
+			"user":          user,
+			"token":         token,
+			"refresh_token": refreshToken,
+			"message":       "Account created. Please complete your application and wait for admin verification.",
+			"status":        "pending_application",
+		})
 		return
 	}
 

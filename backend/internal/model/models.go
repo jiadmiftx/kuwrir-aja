@@ -29,6 +29,7 @@ const (
 type OrderStatus string
 
 const (
+	// Food / ecommerce statuses
 	OrderStatusPending   OrderStatus = "pending"
 	OrderStatusConfirmed OrderStatus = "confirmed"
 	OrderStatusPreparing OrderStatus = "preparing"
@@ -36,6 +37,22 @@ const (
 	OrderStatusPickedUp  OrderStatus = "picked_up"
 	OrderStatusDelivered OrderStatus = "delivered"
 	OrderStatusCancelled OrderStatus = "cancelled"
+
+	// Service (jasa) statuses — used when service_type = "service"
+	OrderStatusAwaitingPickup OrderStatus = "awaiting_pickup"   // driver dikirim ke customer untuk jemput barang
+	OrderStatusItemPickedUp   OrderStatus = "item_picked_up"    // barang sudah dijemput dari customer, menuju tempat jasa
+	OrderStatusInService      OrderStatus = "in_service"        // barang sedang dikerjakan di tempat jasa
+	OrderStatusReadyForReturn OrderStatus = "ready_for_return"  // selesai, menunggu driver untuk antar balik
+	OrderStatusReturning      OrderStatus = "returning"         // driver membawa barang kembali ke customer
+	OrderStatusReturned       OrderStatus = "returned"          // barang sudah dikembalikan, customer bayar COD
+)
+
+// MerchantType distinguishes food merchants from service merchants
+type MerchantType string
+
+const (
+	MerchantTypeFood    MerchantType = "food"
+	MerchantTypeService MerchantType = "service"
 )
 
 // DeliveryStatus enum
@@ -58,7 +75,10 @@ type User struct {
 	Password        string     `gorm:"not null" json:"-"`
 	AvatarURL       string     `json:"avatar_url,omitempty"`
 	Role            Role       `gorm:"type:varchar(20);not null;index" json:"role"`
-	IsActive        bool       `gorm:"default:true" json:"is_active"`
+	// No DB-level default: GORM omits zero-value fields with a `default` tag from
+	// INSERT, which would silently force is_active=true even when Register
+	// explicitly sets false for pending driver/merchant accounts.
+	IsActive bool `json:"is_active"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
 
 	// Relations
@@ -93,11 +113,26 @@ type Merchant struct {
 	Longitude    float64   `gorm:"not null" json:"longitude"`
 	Rating       float64   `gorm:"default:0" json:"rating"`
 	TotalReviews int       `gorm:"default:0" json:"total_reviews"`
-	IsActive        bool    `gorm:"default:true" json:"is_active"`
+	IsActive        bool    `gorm:"default:false" json:"is_active"`  // false until admin verifies
 	IsVerified      bool    `gorm:"default:false" json:"is_verified"`
-	IsOpen          bool    `gorm:"default:true" json:"is_open"`
+	IsOpen          bool    `gorm:"default:false" json:"is_open"`
 	CanSelfDeliver  bool    `gorm:"default:false" json:"can_self_deliver"`
-	SelfDeliveryFee float64 `gorm:"default:0" json:"self_delivery_fee"` // 0 = free delivery
+	SelfDeliveryFee float64 `gorm:"default:0" json:"self_delivery_fee"`
+
+	// Verification documents (placeholder: local URLs, later: R2)
+	OwnerKtpURL        string `json:"owner_ktp_url,omitempty"`
+	BusinessLicenseURL string `json:"business_license_url,omitempty"` // SIUP / IUMK
+	StorePhotoURL      string `json:"store_photo_url,omitempty"`
+
+	// Merchant type & service category
+	Type            MerchantType `gorm:"type:varchar(20);default:'food'" json:"type"` // food | service
+	ServiceCategory string       `gorm:"type:varchar(50)" json:"service_category,omitempty"` // laundry | bengkel | cleaning | salon | other
+
+	// Admin review
+	VerificationStatus string     `gorm:"type:varchar(20);default:'pending'" json:"verification_status"` // pending, approved, rejected
+	VerificationNote   string     `json:"verification_note,omitempty"`
+	VerifiedByID       *uuid.UUID `gorm:"type:uuid" json:"verified_by_id,omitempty"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 
 	// Relations
 	Owner      User              `gorm:"foreignKey:UserID" json:"owner,omitempty"`
@@ -119,11 +154,15 @@ type Product struct {
 	CategoryID    uuid.UUID        `gorm:"type:uuid;not null;index" json:"category_id"`
 	Name          string           `gorm:"not null" json:"name"`
 	Description   string           `json:"description,omitempty"`
-	Price         float64          `gorm:"not null" json:"price"` // Base price (merchant's price)
+	Price            float64 `gorm:"not null" json:"price"`            // Base price (merchant's price / harga jual)
+	CostPrice        float64 `gorm:"default:0" json:"cost_price"`      // HPP / harga beli untuk margin analysis
+	PriceUnit        string  `gorm:"type:varchar(20);default:'per_item'" json:"price_unit"` // per_item | per_kg | per_service | per_hour
+	DurationEstimate string  `json:"duration_estimate,omitempty"`      // e.g. "1-2 hari", "3-5 jam"
 	ImageURL      string           `json:"image_url,omitempty"`
 	IsAvailable   bool             `gorm:"default:true" json:"is_available"`
 	TrackStock    bool             `gorm:"default:false" json:"track_stock"`
 	StockQuantity int              `gorm:"default:0" json:"stock_quantity"`
+	MinStock      int              `gorm:"default:0" json:"min_stock"` // Alert when stock falls below this
 	SKU           string           `json:"sku,omitempty"`
 	SortOrder     int              `gorm:"default:0" json:"sort_order"`
 	Variants      []ProductVariant `gorm:"foreignKey:ProductID" json:"variants,omitempty"`
@@ -193,13 +232,25 @@ type Order struct {
 	DistanceKm float64 `json:"distance_km"`
 	Notes      string  `json:"notes,omitempty"`
 
+	// Service-specific fields (service_type = "service")
+	PickupScheduledAt *time.Time `json:"pickup_scheduled_at,omitempty"` // waktu jemput yang diminta customer
+	ServiceNotes      string     `json:"service_notes,omitempty"`       // instruksi khusus (e.g. "pisahkan baju putih")
+	ReturnAddress     string     `json:"return_address,omitempty"`      // alamat antar balik (default = pickup address)
+	ReturnLat         float64    `json:"return_lat,omitempty"`
+	ReturnLng         float64    `json:"return_lng,omitempty"`
+	WeightKg          float64    `gorm:"default:0" json:"weight_kg,omitempty"` // untuk layanan per-kg (laundry)
+
 	// Timestamps
-	PlacedAt    *time.Time `json:"placed_at,omitempty"`
-	ConfirmedAt *time.Time `json:"confirmed_at,omitempty"`
-	ReadyAt     *time.Time `json:"ready_at,omitempty"`
-	PickedUpAt  *time.Time `json:"picked_up_at,omitempty"`
-	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
-	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	PlacedAt        *time.Time `json:"placed_at,omitempty"`
+	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
+	ReadyAt         *time.Time `json:"ready_at,omitempty"`
+	PickedUpAt      *time.Time `json:"picked_up_at,omitempty"`
+	DeliveredAt     *time.Time `json:"delivered_at,omitempty"`
+	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`
+	ItemPickedUpAt  *time.Time `json:"item_picked_up_at,omitempty"`  // barang diambil dari customer
+	InServiceAt     *time.Time `json:"in_service_at,omitempty"`      // mulai dikerjakan
+	ReadyForReturnAt *time.Time `json:"ready_for_return_at,omitempty"` // selesai dikerjakan
+	ReturnedAt      *time.Time `json:"returned_at,omitempty"`        // barang sudah dikembalikan ke customer
 
 	// Relations
 	Customer *User       `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
@@ -287,4 +338,155 @@ type Promotion struct {
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	StartsAt    time.Time `gorm:"not null" json:"starts_at"`
 	ExpiresAt   time.Time `gorm:"not null" json:"expires_at"`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGISTRATION & VERIFICATION MODELS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// DriverApplication stores a driver's onboarding submission for admin review
+type DriverApplication struct {
+	Base
+	UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+
+	// Vehicle info
+	VehicleType  string `gorm:"not null" json:"vehicle_type"`  // motorcycle, bicycle, car
+	VehiclePlate string `gorm:"not null" json:"vehicle_plate"` // e.g. DR 1234 AB
+	VehicleYear  int    `json:"vehicle_year"`
+	VehicleColor string `json:"vehicle_color"`
+	VehicleBrand string `json:"vehicle_brand"`
+
+	// Document URLs (placeholder: local /uploads/, later: R2)
+	KtpURL          string `json:"ktp_url,omitempty"`           // foto KTP
+	SimURL          string `json:"sim_url,omitempty"`           // foto SIM (C/A)
+	StnkURL         string `json:"stnk_url,omitempty"`          // foto STNK
+	SelfieURL       string `json:"selfie_url,omitempty"`        // foto wajah / selfie with KTP
+	VehiclePhotoURL string `json:"vehicle_photo_url,omitempty"` // foto kendaraan
+
+	// Admin review
+	Status       string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, approved, rejected
+	ReviewNote   string     `json:"review_note,omitempty"`
+	ReviewedByID *uuid.UUID `gorm:"type:uuid" json:"reviewed_by_id,omitempty"`
+	ReviewedAt   *time.Time `json:"reviewed_at,omitempty"`
+
+	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POS / KASIR MODELS
+// Inspired by finansial-mac: pemasukan, stok/pergerakan_stok, piutang, hutang
+// ─────────────────────────────────────────────────────────────────────────────
+
+// StockMovement tracks every change to a product's stock (like pergerakan_stok)
+type StockMovement struct {
+	Base
+	ProductID  uuid.UUID `gorm:"type:uuid;not null;index" json:"product_id"`
+	MerchantID uuid.UUID `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	Date       time.Time `gorm:"not null" json:"date"`
+	Type       string    `gorm:"type:varchar(20);not null" json:"type"` // "in","out","opname","void"
+	Quantity   int       `gorm:"not null" json:"quantity"`
+	CostPrice  float64   `gorm:"default:0" json:"cost_price"` // harga beli saat gerakan ini
+	Reason     string    `json:"reason,omitempty"`            // keterangan / alasan
+	Reference  string    `json:"reference,omitempty"`         // nomor transaksi POS atau manual
+
+	Product Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+}
+
+// PosTransaction is a POS sale header (like jurnal + invoice combined for kasir)
+type PosTransaction struct {
+	Base
+	TransactionNumber string     `gorm:"uniqueIndex;not null" json:"transaction_number"` // e.g. POS-260601143022
+	MerchantID        uuid.UUID  `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	Date              time.Time  `gorm:"not null" json:"date"`
+	CustomerName      string     `json:"customer_name,omitempty"`  // opsional, untuk tab/struk
+	CustomerPhone     string     `json:"customer_phone,omitempty"` // opsional
+	PaymentMethod     string     `gorm:"type:varchar(20);not null;default:'cash'" json:"payment_method"` // cash, qris, card, tab
+	Status            string     `gorm:"type:varchar(20);not null;default:'completed'" json:"status"`    // completed, voided
+	Notes             string     `json:"notes,omitempty"`
+
+	// Pricing breakdown
+	Subtotal    float64 `gorm:"not null;default:0" json:"subtotal"`     // sum of item prices
+	Discount    float64 `gorm:"default:0" json:"discount"`              // diskon keseluruhan
+	Tax         float64 `gorm:"default:0" json:"tax"`                   // pajak (jika ada)
+	GrandTotal  float64 `gorm:"not null;default:0" json:"grand_total"`  // yang dibayar pelanggan
+	TotalCost   float64 `gorm:"default:0" json:"total_cost"`            // total HPP semua item
+	GrossProfit float64 `gorm:"default:0" json:"gross_profit"`          // grand_total - total_cost
+
+	// Cash handling
+	CashReceived float64 `gorm:"default:0" json:"cash_received"` // uang yang diterima (untuk cash)
+	CashChange   float64 `gorm:"default:0" json:"cash_change"`   // kembalian
+
+	VoidedAt     *time.Time `json:"voided_at,omitempty"`
+	VoidedReason string     `json:"voided_reason,omitempty"`
+
+	// Relations
+	Merchant *Merchant        `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	Items    []PosTransactionItem `gorm:"foreignKey:TransactionID" json:"items,omitempty"`
+}
+
+// PosTransactionItem is a line item in a POS sale (like invoice_item)
+type PosTransactionItem struct {
+	Base
+	TransactionID uuid.UUID  `gorm:"type:uuid;not null;index" json:"transaction_id"`
+	ProductID     *uuid.UUID `gorm:"type:uuid" json:"product_id,omitempty"` // nullable for custom items
+	ProductName   string     `gorm:"not null" json:"product_name"`           // snapshot
+	SKU           string     `json:"sku,omitempty"`
+	Quantity      int        `gorm:"not null" json:"quantity"`
+	UnitPrice     float64    `gorm:"not null" json:"unit_price"`   // harga jual per unit
+	UnitCost      float64    `gorm:"default:0" json:"unit_cost"`   // HPP per unit
+	Discount      float64    `gorm:"default:0" json:"discount"`    // diskon item
+	Subtotal      float64    `gorm:"not null" json:"subtotal"`     // (unit_price * qty) - discount
+	Notes         string     `json:"notes,omitempty"`
+}
+
+// MerchantReceivable tracks credit/tab sales (like piutang di finansial-mac)
+// Dibuat otomatis saat POS transaction dengan payment_method="tab"
+type MerchantReceivable struct {
+	Base
+	MerchantID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	TransactionID *uuid.UUID `gorm:"type:uuid" json:"transaction_id,omitempty"` // link ke PosTransaction asal
+	CustomerName  string     `gorm:"not null" json:"customer_name"`
+	CustomerPhone string     `json:"customer_phone,omitempty"`
+	Description   string     `json:"description,omitempty"`
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	Amount        float64    `gorm:"not null" json:"amount"`
+	PaidAmount    float64    `gorm:"default:0" json:"paid_amount"`
+	Status        string     `gorm:"type:varchar(20);default:'unpaid'" json:"status"` // unpaid, partial, paid
+
+	Payments []MerchantReceivablePayment `gorm:"foreignKey:ReceivableID" json:"payments,omitempty"`
+}
+
+// MerchantReceivablePayment records a payment against a receivable (like bayar_piutang)
+type MerchantReceivablePayment struct {
+	Base
+	ReceivableID uuid.UUID `gorm:"type:uuid;not null;index" json:"receivable_id"`
+	Date         time.Time `gorm:"not null" json:"date"`
+	Amount       float64   `gorm:"not null" json:"amount"`
+	Method       string    `gorm:"type:varchar(20);default:'cash'" json:"method"` // cash, transfer
+	Notes        string    `json:"notes,omitempty"`
+}
+
+// MerchantPayable tracks purchases on credit from suppliers (like hutang di finansial-mac)
+type MerchantPayable struct {
+	Base
+	MerchantID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"merchant_id"`
+	SupplierName  string     `gorm:"not null" json:"supplier_name"`
+	SupplierPhone string     `json:"supplier_phone,omitempty"`
+	Description   string     `json:"description,omitempty"` // barang yang dibeli
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	Amount        float64    `gorm:"not null" json:"amount"`
+	PaidAmount    float64    `gorm:"default:0" json:"paid_amount"`
+	Status        string     `gorm:"type:varchar(20);default:'unpaid'" json:"status"` // unpaid, partial, paid
+
+	Payments []MerchantPayablePayment `gorm:"foreignKey:PayableID" json:"payments,omitempty"`
+}
+
+// MerchantPayablePayment records a payment against a payable (like bayar_hutang)
+type MerchantPayablePayment struct {
+	Base
+	PayableID uuid.UUID `gorm:"type:uuid;not null;index" json:"payable_id"`
+	Date      time.Time `gorm:"not null" json:"date"`
+	Amount    float64   `gorm:"not null" json:"amount"`
+	Method    string    `gorm:"type:varchar(20);default:'cash'" json:"method"`
+	Notes     string    `json:"notes,omitempty"`
 }

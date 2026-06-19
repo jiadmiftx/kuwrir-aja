@@ -1,6 +1,8 @@
 package merchant
 
 import (
+	"fmt"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/upload"
 )
 
 type Handler struct {
@@ -35,7 +38,8 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 	// Merchant owner routes
 	owner := protected.Group("/my-store")
 	{
-		owner.POST("", h.CreateMerchant)
+		owner.POST("", h.CreateMerchant)          // register + submit docs (multipart)
+		owner.GET("/status", h.GetMerchantStatus) // cek status verifikasi
 		owner.GET("", h.GetMyMerchant)
 		owner.PUT("", h.UpdateMyMerchant)
 		owner.PUT("/toggle-open", h.ToggleOpen)
@@ -192,15 +196,14 @@ func (h *Handler) GetProducts(c *gin.Context) {
 
 // --- Merchant Owner Handlers ---
 
-// CreateMerchant registers a new merchant for the logged-in user
+// CreateMerchant registers a new merchant with documents via multipart/form-data.
+// Accepts both JSON (backward compat, no docs) and multipart (with docs).
+// Merchant starts inactive until admin approves.
+//
+// Multipart fields: name, description, phone, address, latitude, longitude
+// Files: owner_ktp (foto KTP pemilik), business_license (SIUP/IUMK), store_photo
 func (h *Handler) CreateMerchant(c *gin.Context) {
 	userID := c.GetString("user_id")
-
-	var req CreateMerchantRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
 
 	// Check if user already has a merchant
 	var existing model.Merchant
@@ -210,20 +213,63 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 	}
 
 	uid, _ := uuid.Parse(userID)
-	slug := strings.ToLower(strings.ReplaceAll(req.Name, " ", "-"))
+
+	// Support both multipart and JSON
+	var name, description, phone, address string
+	var lat, lng float64
+
+	ct := c.ContentType()
+	if strings.Contains(ct, "multipart") {
+		c.Request.ParseMultipartForm(20 << 20)
+		name = c.PostForm("name")
+		description = c.PostForm("description")
+		phone = c.PostForm("phone")
+		address = c.PostForm("address")
+		lat = parseFloat(c.PostForm("latitude"))
+		lng = parseFloat(c.PostForm("longitude"))
+	} else {
+		var req CreateMerchantRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		name = req.Name
+		description = req.Description
+		phone = req.Phone
+		address = req.Address
+		lat = req.Latitude
+		lng = req.Longitude
+	}
+
+	if name == "" || phone == "" || address == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name, phone, and address are required"})
+		return
+	}
+
+	// Upload documents (placeholder: local disk, later: R2)
+	folder := "merchant-docs"
+	ownerKtpURL := upload.MustSave(getFile(c, "owner_ktp"), folder)
+	bizLicenseURL := upload.MustSave(getFile(c, "business_license"), folder)
+	storePhotoURL := upload.MustSave(getFile(c, "store_photo"), folder)
+
+	slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 
 	merchant := model.Merchant{
-		UserID:      uid,
-		Name:        req.Name,
-		Slug:        slug,
-		Description: req.Description,
-		Phone:       req.Phone,
-		Address:     req.Address,
-		Latitude:    req.Latitude,
-		Longitude:   req.Longitude,
-		IsActive:    true,
-		IsVerified:  false, // Admin must verify
-		IsOpen:      false,
+		UserID:             uid,
+		Name:               name,
+		Slug:               slug,
+		Description:        description,
+		Phone:              phone,
+		Address:            address,
+		Latitude:           lat,
+		Longitude:          lng,
+		IsActive:           false, // inactive until admin approves
+		IsVerified:         false,
+		IsOpen:             false,
+		OwnerKtpURL:        ownerKtpURL,
+		BusinessLicenseURL: bizLicenseURL,
+		StorePhotoURL:      storePhotoURL,
+		VerificationStatus: "pending",
 	}
 
 	if err := h.db.Create(&merchant).Error; err != nil {
@@ -231,7 +277,30 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"merchant": merchant})
+	c.JSON(http.StatusCreated, gin.H{
+		"merchant": merchant,
+		"message":  "Store registered. Admin will review within 1-2 business days.",
+	})
+}
+
+// GetMerchantStatus returns merchant verification status for the pending screen.
+func (h *Handler) GetMerchantStatus(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var merchant model.Merchant
+	if h.db.Where("user_id = ?", userID).First(&merchant).Error != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "no_store",
+			"message": "No store registered yet.",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status":              merchant.VerificationStatus,
+		"is_active":           merchant.IsActive,
+		"is_verified":         merchant.IsVerified,
+		"verification_note":   merchant.VerificationNote,
+		"name":                merchant.Name,
+	})
 }
 
 // GetMyMerchant returns the current user's merchant
@@ -493,7 +562,18 @@ func (h *Handler) DeleteVariant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Variant deleted"})
 }
 
-// --- Helper ---
+// --- Helpers ---
+
+func getFile(c *gin.Context, field string) *multipart.FileHeader {
+	fh, _ := c.FormFile(field)
+	return fh
+}
+
+func parseFloat(s string) float64 {
+	var v float64
+	fmt.Sscanf(s, "%f", &v)
+	return v
+}
 
 func (h *Handler) getMerchantByUser(userID string) (*model.Merchant, error) {
 	var merchant model.Merchant

@@ -58,6 +58,25 @@ func main() {
 		log.Fatalf("Failed to seed merchant user: %v", err)
 	}
 
+	// Create the merchant's store, pre-approved for testing
+	store := model.Merchant{
+		UserID:             merchant.ID,
+		Name:               "Warung Bu Eka",
+		Slug:               "warung-bu-eka",
+		Description:        "Masakan rumahan khas Lombok",
+		Phone:              merchant.Phone,
+		Address:            "Jl. Pantai Kuta, Kuta, Lombok Tengah",
+		Latitude:           -8.8953,
+		Longitude:          116.2833,
+		IsActive:           true,
+		IsVerified:         true,
+		IsOpen:             true,
+		VerificationStatus: "approved",
+	}
+	if err := db.Where("user_id = ?", merchant.ID).FirstOrCreate(&store).Error; err != nil {
+		log.Fatalf("Failed to seed merchant store: %v", err)
+	}
+
 	// Also seed a customer user for testing
 	hashedPassword3, _ := bcrypt.GenerateFromPassword([]byte("customer123"), bcrypt.DefaultCost)
 	customer := model.User{

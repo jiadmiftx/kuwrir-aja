@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'service_jobs_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
   const JobBoardScreen({super.key});
@@ -56,13 +57,19 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Board'),
-        actions: [
-          Row(
-            children: [
-              Text(_isOnline ? 'Online' : 'Offline',
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Job Board'),
+          bottom: const TabBar(tabs: [
+            Tab(icon: Icon(Icons.delivery_dining), text: 'Makanan'),
+            Tab(icon: Icon(Icons.handyman), text: 'Jasa'),
+          ]),
+          actions: [
+            Row(
+              children: [
+                Text(_isOnline ? 'Online' : 'Offline',
                   style: TextStyle(
                     color: _isOnline ? Colors.green : Colors.grey,
                     fontWeight: FontWeight.bold,
@@ -83,7 +90,9 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
           ),
         ],
       ),
-      body: !_isOnline
+      body: TabBarView(children: [
+        // Tab 1: Food delivery orders
+        !_isOnline
           ? const Center(
               child: Text(
                 'You are offline.\nGo online to see available orders.',
@@ -198,6 +207,10 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                           },
                         ),
             ),
+        // Tab 2 — Service jobs (jasa: laundry, bengkel, dll)
+        const ServiceJobsScreen(),
+      ]),
+      ),
     );
   }
 }

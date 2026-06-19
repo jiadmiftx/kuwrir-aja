@@ -1,14 +1,26 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/pending_screen.dart';
 import 'screens/job_board_screen.dart';
 import 'screens/active_delivery_screen.dart';
 import 'screens/wallet_screen.dart';
 
-void main() {
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(
     MultiProvider(
       providers: [
@@ -32,6 +44,8 @@ class KuwrirDriverApp extends StatelessWidget {
       routes: {
         '/': (context) => const InitialRouter(),
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const DriverRegisterScreen(),
+        '/pending': (context) => const DriverPendingScreen(),
         '/job_board': (context) => const JobBoardScreen(),
         '/active_delivery': (context) => const ActiveDeliveryScreen(),
         '/wallet': (context) => const WalletScreen(),
