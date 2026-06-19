@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Daftar Transaksi – FinansialApp{% endblock %}
+{% block page_title %}Daftar Transaksi{% endblock %}
+
+{% block content %}
+<style>
+.dtab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: .52rem 1.2rem;
+  border: 1.5px solid #e2e8f0;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  font-size: .86rem; font-weight: 600;
+  text-decoration: none;
+  background: #f1f5f9;
+  color: #94a3b8;
+  transition: color .12s, background .12s;
+  position: relative; bottom: -1.5px;
+}
+.dtab:hover { background: #e2e8f0; color: #475569; }
+.dtab.active-all   { background: #fff; color: #334155; border-color: #cbd5e1; }
+.dtab.active-masuk { background: #fff; color: #15803d; border-color: #86efac; }
+.dtab.active-keluar{ background: #fff; color: #b91c1c; border-color: #fca5a5; }
+.dtab .cnt {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 16px; padding: 0 4px;
+  border-radius: 20px; font-size: .65rem; font-weight: 700;
+}
+.beban-chip {
+  padding: .3rem .8rem; border-radius: 20px; font-size: .76rem;
+  font-weight: 600; text-decoration: none; border: 1.5px solid #e2e8f0;
+  background: #f8fafc; color: #64748b; transition: all .12s;
+}
+.beban-chip:hover { border-color: #94a3b8; color: #334155; }
+</style>
+
+<div class="card shadow-sm" style="border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden">
+
+  {# ── Tab bar ──────────────────────────────────────── #}
+  <div style="background:#f8fafc;padding:.8rem 1rem 0;border-bottom:1.5px solid #e2e8f0">
+    <div class="d-flex gap-1 align-items-end">
+
+      {# Semua #}
+      <a href="{{ url_for('daftar_transaksi', q=q, date_from=date_from, date_to=date_to) }}"
+         class="dtab {% if tab=='semua' %}active-all{% endif %}">
+        <i class="fas fa-bars" style="font-size:.75rem"></i>
+        Semua
+        {% if tab=='semua' %}
+        <span class="cnt" style="background:#e2e8f0;color:#475569">{{ rows|length }}</span>
+        {% endif %}
+      </a>
+
+      {# Pemasukan #}
+      <a href="{{ url_for('daftar_transaksi', tab='pemasukan', q=q, date_from=date_from, date_to=date_to) }}"
+         class="dtab {% if tab=='pemasukan' %}active-masuk{% endif %}">
+        <i class="fas fa-arrow-trend-up"
+           style="font-size:.78rem;color:{% if tab=='pemasukan' %}#22c55e{% else %}#cbd5e1{% endif %}"></i>
+        Pemasukan
+        {% if tab=='pemasukan' %}
+        <span class="cnt" style="background:#dcfce7;color:#15803d">{{ rows|length }}</span>
+        {% endif %}
+      </a>
+
+      {# Pengeluaran #}
+      <a href="{{ url_for('daftar_transaksi', tab='pengeluaran', q=q, date_from=date_from, date_to=date_to) }}"
+         class="dtab {% if tab=='pengeluaran' %}active-keluar{% endif %}">
+        <i class="fas fa-arrow-trend-down"
+           style="font-size:.78rem;color:{% if tab=='pengeluaran' %}#ef4444{% else %}#cbd5e1{% endif %}"></i>
+        Pengeluaran
+        {% if tab=='pengeluaran' %}
+        <span class="cnt" style="background:#fee2e2;color:#b91c1c">{{ rows|length }}</span>
+        {% endif %}
+      </a>
+
+    </div>
+  </div>
+
+  <div class="card-body" style="padding:1rem">
+
+    {# ── Filter bar ───────────────────────────────────── #}
+    <form method="GET" class="mb-3">
+      <input type="hidden" name="tab"   value="{{ tab }}">
+      <input type="hidden" name="beban" value="{{ beban }}">
+
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+
+        {# Rentang tanggal #}
+        <div class="d-flex align-items-center gap-1">
+          <span style="font-size:.8rem;color:#64748b;white-space:nowrap">
+            <i class="fas fa-calendar-alt" style="font-size:.72rem"></i> Dari
+          </span>
+          <input type="date" name="date_from" value="{{ date_from }}"
+                 class="form-control form-control-sm" style="font-size:.84rem;width:145px">
+          <span style="font-size:.8rem;color:#64748b">s/d</span>
+          <input type="date" name="date_to" value="{{ date_to }}"
+                 class="form-control form-control-sm" style="font-size:.84rem;width:145px">
+        </div>
+
+        {# Search keterangan #}
+        <div class="input-group input-group-sm" style="min-width:190px;max-width:240px">
+          <span class="input-group-text bg-white"><i class="fas fa-search text-muted" style="font-size:.75rem"></i></span>
+          <input type="text" name="q" class="form-control border-start-0"
+                 placeholder="Cari keterangan…" value="{{ q }}" style="font-size:.86rem">
+        </div>
+
+        <button class="btn btn-sm btn-primary px-3">Tampilkan</button>
+
+        {% if q or date_from or date_to %}
+        <a href="{{ url_for('daftar_transaksi', tab=tab, beban=beban) }}"
+           class="btn btn-sm btn-outline-secondary">Reset</a>
+        {% endif %}
+
+      </div>
+    </form>
+
+    {# Beban chips — pengeluaran only #}
+    {% if tab == 'pengeluaran' %}
+    {% set chips = [
+      ('',           'Semua',           '#475569','#f1f5f9','#e2e8f0'),
+      ('bahan_baku', 'Bahan Baku',      '#065f46','#d1fae5','#6ee7b7'),
+      ('operasional','Operasional',     '#1e40af','#dbeafe','#93c5fd'),
+      ('investasi',  'Investasi Aset',  '#92400e','#fef3c7','#fcd34d'),
+      ('pajak',      'Pajak',           '#155e75','#cffafe','#67e8f9'),
+      ('penarikan',  'Penarikan Owner', '#4c1d95','#ede9fe','#c4b5fd'),
+    ] %}
+    <div class="d-flex flex-wrap gap-1 mb-3">
+      {% for val,lbl,color,bg,bord in chips %}
+      <a href="{{ url_for('daftar_transaksi', tab='pengeluaran', beban=val, q=q, date_from=date_from, date_to=date_to) }}"
+         class="beban-chip"
+         style="{% if beban==val %}background:{{ bg }};color:{{ color }};border-color:{{ bord }}{% endif %}">
+        {{ lbl }}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Info rentang aktif #}
+    {% if date_from or date_to %}
+    <div class="mb-2" style="font-size:.8rem;color:#64748b">
+      <i class="fas fa-filter" style="font-size:.7rem"></i>
+      Menampilkan periode:
+      <strong>{{ date_from if date_from else '—' }}</strong>
+      hingga
+      <strong>{{ date_to if date_to else '—' }}</strong>
+    </div>
+    {% endif %}
+
+    {# ── Table ───────────────────────────────────────── #}
+    {% if rows %}
+    <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size:.87rem">
+      <thead>
+        <tr style="background:#f8fafc;border-top:1px solid #f1f5f9">
+          <th style="width:100px;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:600;padding:.6rem .75rem">Tanggal</th>
+          <th style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:600;padding:.6rem .75rem">Keterangan</th>
+          <th style="width:130px;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:600;padding:.6rem .75rem">Jenis</th>
+          <th class="text-end" style="width:150px;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:600;padding:.6rem .75rem">Nominal</th>
+          <th style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+      {% set is_masuk = r.tipe_tx == 'PEMASUKAN' %}
+      <tr>
+        <td style="color:#94a3b8;font-size:.81rem;padding:.6rem .75rem">{{ r.tanggal|tgl }}</td>
+        <td style="font-weight:500;padding:.6rem .75rem">{{ r.keterangan }}</td>
+        <td style="padding:.6rem .75rem">
+          {% set lbl = r.sub_label %}
+          {% if lbl == 'Penjualan' %}
+          <span class="badge" style="background:#dcfce7;color:#15803d;font-size:.71rem;font-weight:600">Penjualan</span>
+          {% elif lbl == 'Bahan Baku' %}
+          <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.71rem;font-weight:600">Bahan Baku</span>
+          {% elif lbl == 'Operasional' %}
+          <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:.71rem;font-weight:600">Operasional</span>
+          {% elif lbl == 'Investasi Aset' %}
+          <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.71rem;font-weight:600">Investasi Aset</span>
+          {% elif lbl == 'Pajak' %}
+          <span class="badge" style="background:#cffafe;color:#155e75;font-size:.71rem;font-weight:600">Pajak</span>
+          {% elif lbl == 'Penarikan Owner' %}
+          <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:.71rem;font-weight:600">Penarikan Owner</span>
+          {% else %}
+          <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:.71rem">{{ lbl }}</span>
+          {% endif %}
+        </td>
+        <td class="text-end" style="font-weight:700;font-size:.9rem;padding:.6rem .75rem;
+            color:{% if is_masuk %}#16a34a{% else %}#dc2626{% endif %}">
+          {{ '+' if is_masuk else '−' }}{{ r.total|rp }}
+        </td>
+        <td style="padding:.4rem .5rem">
+          <a href="{{ url_for('transaksi_detail', id=r.id) }}"
+             class="btn btn-sm btn-outline-secondary py-0 px-2" title="Lihat jurnal">
+            <i class="fas fa-eye" style="font-size:.7rem"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid #e2e8f0;background:#f8fafc">
+          <td colspan="3" style="padding:.65rem .75rem;font-size:.82rem;color:#64748b;font-weight:600;text-align:right">
+            {{ rows|length }} transaksi
+            {% if tab == 'semua' %}
+            &nbsp;·&nbsp;
+            <span style="color:#16a34a">+{{ total_masuk|rp }}</span>
+            &nbsp;
+            <span style="color:#dc2626">−{{ total_keluar|rp }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end" style="padding:.65rem .75rem;font-size:1rem;font-weight:800;
+              color:{% if tab=='pemasukan' %}#16a34a{% elif tab=='pengeluaran' %}#dc2626{% elif total_all>=0 %}#16a34a{% else %}#dc2626{% endif %}">
+            {% if tab == 'semua' %}{{ '+' if total_all >= 0 else '−' }}{{ (total_all|abs)|rp }}
+            {% elif tab == 'pemasukan' %}+{{ total_all|rp }}
+            {% else %}−{{ total_all|rp }}{% endif %}
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+
+    {% else %}
+    <div class="text-center py-5" style="color:#94a3b8">
+      <i class="fas fa-inbox fa-2x mb-3 d-block"></i>
+      <div style="font-size:.9rem">
+        Tidak ada transaksi
+        {% if beban %}untuk kategori <strong>{{ beban }}</strong>{% endif %}
+        {% if q %}yang cocok dengan "<strong>{{ q }}</strong>"{% endif %}
+        {% if date_from or date_to %}pada rentang tanggal yang dipilih{% endif %}
+      </div>
+      {% if beban or q or date_from or date_to %}
+      <a href="{{ url_for('daftar_transaksi', tab=tab) }}" class="btn btn-sm btn-outline-secondary mt-3">Reset filter</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+===============================================================
+  FINANSIAL APP v3.1 by Cliff — Panduan Install di macOS
+===============================================================
+
+PERSIAPAN (hanya 1x di awal)
+------------------------------
+1. Install Python 3 jika belum ada:
+   a. Buka: https://www.python.org/downloads/
+   b. Klik tombol "Download Python 3.x.x"
+   c. Buka file .pkg yang terdownload → ikuti langkah install
+   d. Setelah selesai, buka Terminal dan ketik:
+         python3 --version
+      Jika muncul angka versi (misal: Python 3.12.3) → berhasil ✓
+
+2. Extract file finansial-mac.zip ke folder mana saja.
+   Contoh: Dokumen/FinansialApp/
+
+
+CARA MENJALANKAN APLIKASI (setiap kali pakai)
+----------------------------------------------
+OPSI A — Double-klik (termudah):
+  a. Buka folder FinansialApp
+  b. Klik kanan file "start.command" → pilih "Open"
+  c. Jika muncul peringatan keamanan:
+       Klik "Open" (hanya perlu sekali)
+  d. Terminal terbuka + browser otomatis muncul
+  e. Login: admin / admin123
+
+OPSI B — Via Terminal (jika Opsi A gagal):
+  a. Buka Terminal (Spotlight → ketik "Terminal")
+  b. Ketik perintah berikut satu per satu:
+        cd ~/Dokumen/FinansialApp
+        pip3 install flask openpyxl
+        python3 app.py
+  c. Buka browser → http://127.0.0.1:5000
+  d. Login: admin / admin123
+
+
+MENGHENTIKAN APLIKASI
+----------------------
+  Tekan Ctrl+C di jendela Terminal
+
+
+DATA TERSIMPAN DI MANA?
+------------------------
+  File database ada di: finansial.db (dalam folder yang sama)
+  JANGAN hapus file ini — semua data transaksi ada di sini!
+  Backup rutin: copy file finansial.db ke tempat aman.
+
+
+MASALAH UMUM
+-------------
+"Permission denied" saat buka start.command:
+  → Buka Terminal, ketik:
+       chmod +x ~/Dokumen/FinansialApp/start.command
+  → Lalu double-klik lagi
+
+"No module named flask":
+  → Buka Terminal, ketik:
+       pip3 install flask openpyxl
+  → Jalankan ulang aplikasi
+
+Browser tidak terbuka otomatis:
+  → Buka browser manual → ketik: http://127.0.0.1:5000
+
+Port 5000 sudah dipakai (error "Address already in use"):
+  → Tutup semua instance app yang mungkin masih berjalan
+  → Atau restart Mac
+
+
+CATATAN
+--------
+  - macOS Ventura (13+) ke atas: Python perlu diinstall manual
+    karena Apple menghapus Python dari system default
+  - macOS Monterey / Big Sur: Cek dulu "python3 --version" di Terminal
+  - Segera ganti password di menu Settings setelah login pertama!
+
+===============================================================
+  Finansial App v3.1 by Cliff
+===============================================================

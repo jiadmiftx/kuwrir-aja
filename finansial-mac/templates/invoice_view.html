@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ inv.nomor }} - FinansialApp{% endblock %}
+{% block page_title %}Invoice {{ inv.nomor }}{% endblock %}
+{% block content %}
+
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <a href="/invoice" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Kembali</a>
+  <a href="/invoice/{{ inv.id }}/cetak" target="_blank" class="btn btn-outline-primary btn-sm"><i class="fas fa-print me-1"></i>Cetak / PDF</a>
+  {% if session.role in ('ADMIN','OPERATOR') %}
+  <a href="/invoice/{{ inv.id }}/edit" class="btn btn-outline-warning btn-sm"><i class="fas fa-edit me-1"></i>Edit</a>
+  {% endif %}
+  <div class="ms-auto d-flex gap-2 align-items-center">
+    {% if session.role in ('ADMIN','OPERATOR') and inv.status != 'PAID' %}
+    <form method="POST" action="/invoice/{{ inv.id }}/status" class="d-flex gap-1">
+      <select name="status" class="form-select form-select-sm" style="width:130px">
+        <option value="DRAFT"  {% if inv.status=='DRAFT' %}selected{% endif %}>Draft</option>
+        <option value="SENT"   {% if inv.status=='SENT'  %}selected{% endif %}>Terkirim</option>
+        <option value="PAID"   {% if inv.status=='PAID'  %}selected{% endif %}>Lunas</option>
+      </select>
+      <button class="btn btn-sm btn-primary">Simpan Status</button>
+    </form>
+    {% else %}
+    <span class="badge fs-6 {% if inv.status=='PAID' %}bg-success{% elif inv.status=='SENT' %}bg-info{% else %}bg-secondary{% endif %}">
+      {% if inv.status=='PAID' %}Lunas{% elif inv.status=='SENT' %}Terkirim{% else %}Draft{% endif %}
+    </span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Invoice preview card -->
+<div class="card shadow-sm" style="max-width:860px;margin:auto">
+  <div class="card-body p-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+      <div class="d-flex gap-3 align-items-start">
+        {% if inv_s.inv_logo %}
+        <img src="/static/uploads/{{ inv_s.inv_logo }}" style="height:52px;max-width:130px;object-fit:contain;flex-shrink:0">
+        {% endif %}
+        <div>
+          <div style="font-size:1.4rem;font-weight:900;color:var(--acc)">{{ inv_s.inv_nama }}</div>
+          {% if inv_s.inv_tagline %}<div style="font-size:.75rem;font-weight:600;color:var(--acc);margin-bottom:2px">{{ inv_s.inv_tagline }}</div>{% endif %}
+          {% if inv_s.inv_alamat %}<div class="text-muted" style="font-size:.82rem">{{ inv_s.inv_alamat }}</div>{% endif %}
+          {% if inv_s.inv_telepon %}<div class="text-muted" style="font-size:.82rem"><i class="fas fa-phone me-1"></i>{{ inv_s.inv_telepon }}</div>{% endif %}
+          {% if inv_s.inv_email %}<div class="text-muted" style="font-size:.82rem"><i class="fas fa-envelope me-1"></i>{{ inv_s.inv_email }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="text-end">
+        <div style="font-size:1.8rem;font-weight:900;letter-spacing:-.03em;color:#1e293b">INVOICE</div>
+        <div style="font-family:monospace;font-size:1rem;font-weight:700;color:var(--acc)">{{ inv.nomor }}</div>
+      </div>
+    </div>
+
+    <!-- Meta grid -->
+    <div class="row g-2 mb-4">
+      <div class="col-md-6">
+        <div style="background:var(--card-h);border-radius:8px;padding:.75rem 1rem">
+          <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);margin-bottom:.3rem">Ditagihkan kepada</div>
+          <div class="fw-bold">{{ inv.pelanggan }}</div>
+          {% if inv.alamat_pelanggan %}<div class="text-muted small">{{ inv.alamat_pelanggan }}</div>{% endif %}
+          {% if inv.telepon_pelanggan %}<div class="text-muted small"><i class="fas fa-phone me-1"></i>{{ inv.telepon_pelanggan }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div style="background:var(--card-h);border-radius:8px;padding:.75rem 1rem">
+          <table style="font-size:.85rem;width:100%">
+            <tr><td class="text-muted pe-3">Tanggal</td><td class="fw-semibold">{{ inv.tanggal|tgl }}</td></tr>
+            <tr><td class="text-muted pe-3">Jatuh Tempo</td>
+                <td class="fw-semibold {% if inv.jatuh_tempo and inv.jatuh_tempo < today.strftime('%Y-%m-%d') and inv.status != 'PAID' %}text-danger{% endif %}">
+                  {{ inv.jatuh_tempo|tgl if inv.jatuh_tempo else '—' }}
+                </td></tr>
+            <tr><td class="text-muted pe-3">Term of Payment</td>
+                <td>{{ actual_top }} hari{% set tn = inv.top_note or inv_s.inv_top_note %}{% if tn %} ({{ tn }}){% endif %}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items table -->
+    <table class="table table-sm mb-3" style="font-size:.88rem">
+      <thead>
+        <tr style="background:#1e293b;color:#fff">
+          <th class="ps-3" style="border-radius:6px 0 0 0">#</th>
+          <th>Deskripsi</th>
+          <th class="text-end">Qty</th>
+          <th>Satuan</th>
+          <th class="text-end">Harga Satuan</th>
+          <th class="text-end">Diskon</th>
+          <th class="text-end pe-3" style="border-radius:0 6px 0 0">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr style="border-bottom:1px solid var(--pgb)">
+          <td class="ps-3 text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ it.deskripsi }}</td>
+          <td class="text-end">{{ it.qty|int if it.qty == it.qty|int else it.qty }}</td>
+          <td class="text-muted">{{ it.satuan }}</td>
+          <td class="text-end text-rp">{{ it.harga_satuan|rp }}</td>
+          <td class="text-end text-rp text-muted">{% if it.diskon_item %}{{ it.diskon_item|rp }}{% else %}—{% endif %}</td>
+          <td class="text-end pe-3 fw-bold text-rp">{{ it.subtotal|rp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Total -->
+    <div class="d-flex justify-content-end mb-4">
+      <table style="font-size:.9rem;min-width:280px">
+        <tr>
+          <td class="text-muted pe-4">Subtotal</td>
+          <td class="text-end fw-semibold text-rp">{{ subtotal|rp }}</td>
+        </tr>
+        {% if inv.diskon %}
+        <tr>
+          <td class="text-muted pe-4">Diskon</td>
+          <td class="text-end text-danger text-rp">- {{ inv.diskon|rp }}</td>
+        </tr>
+        {% endif %}
+        {% if inv.ongkir %}
+        <tr>
+          <td class="text-muted pe-4">Ongkir</td>
+          <td class="text-end text-rp">{{ inv.ongkir|rp }}</td>
+        </tr>
+        {% endif %}
+        {% if inv.biaya_lain %}
+        <tr>
+          <td class="text-muted pe-4">Biaya Lain</td>
+          <td class="text-end text-rp">{{ inv.biaya_lain|rp }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td colspan="2"><hr style="margin:.35rem 0"></td>
+        </tr>
+        <tr>
+          <td class="fw-bold pe-4" style="font-size:1rem">TOTAL</td>
+          <td class="text-end fw-black text-rp" style="font-size:1.25rem;font-weight:900;color:var(--acc)">{{ total|rp }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Rekening pembayaran -->
+    {% if inv_s.inv_rek_list %}
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#0369a1;margin-bottom:.4rem">
+        <i class="fas fa-building-columns me-1"></i>Informasi Pembayaran
+      </div>
+      {% for r in inv_s.inv_rek_list %}
+      <div style="font-size:.88rem" class="mb-1">
+        <span class="fw-semibold">{{ r.bank }}</span>
+        &nbsp;{{ r.norek }}{% if r.an %} &nbsp;a.n. <strong>{{ r.an }}</strong>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Catatan -->
+    {% if inv.catatan %}
+    <div class="text-muted" style="font-size:.85rem;border-top:1px solid var(--pgb);padding-top:.75rem">
+      <i class="fas fa-comment-dots me-1"></i>{{ inv.catatan }}
+    </div>
+    {% endif %}
+
+    <!-- Syarat & Ketentuan -->
+    {% if inv_s.inv_terms %}
+    <div style="margin-top:.75rem;border-top:1px solid var(--pgb);padding-top:.75rem">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);margin-bottom:.35rem">
+        <i class="fas fa-scale-balanced me-1"></i>Syarat &amp; Ketentuan
+      </div>
+      <div class="text-muted" style="font-size:.78rem;white-space:pre-line;line-height:1.6">{{ inv_s.inv_terms }}</div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

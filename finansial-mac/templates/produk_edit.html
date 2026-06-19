@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Edit Produk - FinansialApp{% endblock %}
+{% block page_title %}Edit Produk{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-6">
+<div class="card">
+  <div class="card-header py-2 px-3">
+    <i class="fas fa-edit text-primary me-2"></i>
+    <span class="fw-semibold">Edit Produk: {{ p.nama }}</span>
+  </div>
+  <div class="card-body">
+  <form method="POST">
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label fw-semibold">Kode</label>
+        <input type="text" class="form-control bg-light" value="{{ p.kode }}" readonly>
+        <div class="form-text">Kode tidak bisa diubah</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Nama Produk *</label>
+        <input type="text" name="nama" class="form-control" value="{{ p.nama }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Varian</label>
+        <input type="text" name="varian" class="form-control" value="{{ p.varian or '' }}"
+               placeholder="Misal: Merah L">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Satuan</label>
+        <select name="satuan" class="form-select">
+          {% for s in ['pcs','kg','liter','box','lusin','meter','unit','set'] %}
+          <option {% if p.satuan == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Harga Beli (HPP)</label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="harga_beli" class="form-control" value="{{ p.harga_beli }}" min="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Harga Jual</label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="harga_jual" class="form-control" value="{{ p.harga_jual }}" min="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Min. Stok Alert</label>
+        <input type="number" name="min_stok" class="form-control" value="{{ p.min_stok }}" min="0" step="0.01">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Stok Saat Ini</label>
+        <input type="text" class="form-control bg-light" value="{{ p.stok }} {{ p.satuan }}" readonly>
+        <div class="form-text">Ubah stok via menu Gerakan Stok</div>
+      </div>
+      <div class="col-12 d-flex gap-2 justify-content-end">
+        <a href="/stok" class="btn btn-outline-secondary">Batal</a>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save me-1"></i>Simpan Perubahan</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Retur Penjualan - FinansialApp{% endblock %}
+{% block page_title %}Retur Penjualan{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-lg-9">
+
+<div class="alert alert-warning py-2 mb-3" style="font-size:.85rem">
+  <i class="fas fa-circle-info me-1"></i>
+  Retur penjualan mencatat barang/uang yang dikembalikan oleh pelanggan. Jurnalnya:
+  Debit <strong>4150 Retur Penjualan</strong> (kontra-pendapatan), Kredit Kas/Bank/Piutang.
+  Jika ada produk yang masuk balik ke stok, HPP juga ikut dibalik.
+</div>
+
+<ul class="nav nav-tabs mb-3" id="modeTabs">
+  <li class="nav-item">
+    <a class="nav-link active" id="tab-umum" href="#" onclick="switchMode('umum');return false">
+      <i class="fas fa-file-invoice-dollar me-1"></i>Retur Umum (Nominal)</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="tab-produk" href="#" onclick="switchMode('produk');return false">
+      <i class="fas fa-boxes-stacked me-1"></i>Retur per Produk</a>
+  </li>
+</ul>
+
+<!-- ════════════════ FORM RETUR UMUM ════════════════ -->
+<div id="form-umum">
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-rotate-left text-warning"></i>
+    <span class="section-title">Retur Penjualan — Nominal</span>
+  </div>
+  <div class="card-body">
+  <form method="POST">
+    <input type="hidden" name="mode" value="umum">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Tanggal <span class="text-danger">*</span></label>
+        <input type="date" name="tanggal" class="form-control" value="{{ today }}" max="{{ today }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Sumber Pembayaran Retur <span class="text-danger">*</span></label>
+        <select name="sumber" class="form-select" onchange="toggleSumber(this, 'u')">
+          <option value="kas">Refund Tunai (Kas/Bank keluar)</option>
+          <option value="piutang">Potong Piutang (belum dibayar)</option>
+        </select>
+      </div>
+      <div class="col-md-6" id="u_kas_box">
+        <label class="form-label fw-semibold"><i class="fas fa-vault text-success me-1"></i>Rekening Kas/Bank</label>
+        <select name="akun_kas" class="form-select">
+          {% for a in akun_kas %}
+          <option value="{{ a.kode }}">{{ a.kode }} - {{ a.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Nama Pelanggan</label>
+        <input type="text" name="pelanggan" class="form-control" placeholder="Untuk pencarian piutang">
+        <div class="form-text">Wajib diisi jika sumber = potong piutang.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Keterangan <span class="text-danger">*</span></label>
+        <input type="text" name="keterangan" class="form-control" placeholder="Mis: Retur invoice #001 — produk rusak" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Nominal Retur <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="nominal" class="form-control" min="1" step="1" required placeholder="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">HPP yang Dibalik (Opsional)</label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="hpp_balik" class="form-control" min="0" step="1" placeholder="0">
+        </div>
+        <div class="form-text">Isi jika barang fisik masuk balik ke stok. Akan: DR 1130, CR 5100.</div>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-warning" type="submit">
+          <i class="fas fa-rotate-left me-1"></i>Catat Retur Penjualan</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════ FORM RETUR PER PRODUK ════════════════ -->
+<div id="form-produk" style="display:none">
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-boxes-stacked text-warning"></i>
+    <span class="section-title">Retur Penjualan — per Produk</span>
+  </div>
+  <div class="card-body">
+  <form method="POST">
+    <input type="hidden" name="mode" value="produk">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Tanggal <span class="text-danger">*</span></label>
+        <input type="date" name="tanggal" class="form-control" value="{{ today }}" max="{{ today }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Sumber Pembayaran Retur <span class="text-danger">*</span></label>
+        <select name="sumber" class="form-select" onchange="toggleSumber(this, 'p')">
+          <option value="kas">Refund Tunai (Kas/Bank keluar)</option>
+          <option value="piutang">Potong Piutang (belum dibayar)</option>
+        </select>
+      </div>
+      <div class="col-md-6" id="p_kas_box">
+        <label class="form-label fw-semibold"><i class="fas fa-vault text-success me-1"></i>Rekening Kas/Bank</label>
+        <select name="akun_kas" class="form-select">
+          {% for a in akun_kas %}
+          <option value="{{ a.kode }}">{{ a.kode }} - {{ a.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Nama Pelanggan</label>
+        <input type="text" name="pelanggan" class="form-control" placeholder="Untuk pencarian piutang">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">Keterangan <span class="text-danger">*</span></label>
+        <input type="text" name="keterangan" class="form-control" placeholder="Mis: Retur invoice #001" required>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label fw-semibold">Produk yang Diretur</label>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2" id="produk-table">
+            <thead><tr>
+              <th style="width:38%">Produk</th>
+              <th style="width:15%">Qty</th>
+              <th style="width:22%">Harga Jual</th>
+              <th style="width:20%">Subtotal</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="rows-body">
+              <tr>
+                <td>
+                  <select name="produk_id[]" class="form-select form-select-sm" onchange="loadHarga(this)">
+                    <option value="">-- pilih produk --</option>
+                    {% for p in produk_list %}
+                    <option value="{{ p.id }}" data-harga="{{ p.harga_jual }}">{{ p.kode }} — {{ p.nama }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" name="qty[]" class="form-control form-control-sm" min="0" step="any" value="1" oninput="hitungSub(this)"></td>
+                <td>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">Rp</span>
+                    <input type="number" name="harga_jual[]" class="form-control form-control-sm" min="0" step="1" oninput="hitungSub(this)">
+                  </div>
+                </td>
+                <td><span class="sub-display fw-semibold">Rp 0</span></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="hapusRow(this)"><i class="fas fa-trash"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tambahRow()">
+            <i class="fas fa-plus me-1"></i>Tambah Produk</button>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="rounded-3 p-3" style="background:#fef3c7;border:1px solid #fde68a">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-semibold text-warning-emphasis">Total Retur</span>
+            <span class="fs-5 fw-bold text-warning-emphasis" id="total-display">Rp 0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-warning" type="submit">
+          <i class="fas fa-rotate-left me-1"></i>Catat Retur per Produk</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+</div>
+
+<script>
+function switchMode(m){
+  document.getElementById('form-umum').style.display   = m==='umum'?'block':'none';
+  document.getElementById('form-produk').style.display = m==='produk'?'block':'none';
+  document.getElementById('tab-umum').classList.toggle('active', m==='umum');
+  document.getElementById('tab-produk').classList.toggle('active', m==='produk');
+}
+function toggleSumber(sel, prefix){
+  document.getElementById(prefix+'_kas_box').style.display = sel.value==='kas'?'block':'none';
+}
+function loadHarga(sel){
+  const opt = sel.options[sel.selectedIndex];
+  const harga = opt.dataset.harga || 0;
+  const row = sel.closest('tr');
+  row.querySelector('input[name="harga_jual[]"]').value = harga;
+  hitungSub(sel);
+}
+function hitungSub(el){
+  const row = el.closest('tr');
+  const qty  = parseFloat((row.querySelector('input[name="qty[]"]').value||'0').replace(/\./g,'').replace(',','.'))||0;
+  const harga= parseFloat((row.querySelector('input[name="harga_jual[]"]').value||'0').replace(/\./g,'').replace(',','.'))||0;
+  const sub  = qty*harga;
+  row.querySelector('.sub-display').textContent = 'Rp ' + Math.round(sub).toLocaleString('id-ID');
+  hitungTotal();
+}
+function hitungTotal(){
+  let total = 0;
+  document.querySelectorAll('#rows-body tr').forEach(tr=>{
+    const q = parseFloat((tr.querySelector('input[name="qty[]"]').value||'0').replace(/\./g,'').replace(',','.'))||0;
+    const h = parseFloat((tr.querySelector('input[name="harga_jual[]"]').value||'0').replace(/\./g,'').replace(',','.'))||0;
+    total += q*h;
+  });
+  document.getElementById('total-display').textContent = 'Rp ' + Math.round(total).toLocaleString('id-ID');
+}
+function tambahRow(){
+  const body = document.getElementById('rows-body');
+  const first = body.querySelector('tr');
+  const clone = first.cloneNode(true);
+  clone.querySelectorAll('input').forEach(i=>{i.value=i.name==='qty[]'?'1':'';});
+  clone.querySelector('select').value='';
+  clone.querySelector('.sub-display').textContent='Rp 0';
+  body.appendChild(clone);
+  if(window.numFmtInitAll) window.numFmtInitAll();
+}
+function hapusRow(btn){
+  const body = document.getElementById('rows-body');
+  if(body.querySelectorAll('tr').length<=1) return;
+  btn.closest('tr').remove();
+  hitungTotal();
+}
+</script>
+
+</div>
+</div>
+{% endblock %}

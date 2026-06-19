@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice {{ inv.nomor }}</title>
+<style>
+/* ── Global ─────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0;color:#000}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;background:#fff;padding:32px 40px}
+
+/* ── INVOICE MODE — layout ──────────────────────────────────────────── */
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:16px;border-bottom:3px solid #000}
+.company-name{font-size:22px;font-weight:900;margin-bottom:3px}
+.company-sub{font-size:11px;line-height:1.6}
+.inv-title{font-size:32px;font-weight:900;letter-spacing:-.04em;text-align:right}
+.inv-number{font-family:monospace;font-size:14px;font-weight:700;text-align:right}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.meta-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px}
+.meta-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.meta-value{font-size:12px;font-weight:700}
+.meta-sub{font-size:11px;margin-top:2px}
+.meta-row{display:flex;gap:8px;margin-bottom:4px;font-size:11px}
+.meta-row .lbl{min-width:100px}
+.meta-row .val{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+thead tr{background:#1e293b;color:#fff}
+thead th{padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#fff}
+tbody tr{border-bottom:1px solid #e2e8f0}
+tbody td{padding:7px 10px;font-size:12px}
+tfoot td{padding:5px 10px;font-size:12px}
+.text-right{text-align:right}
+.text-center{text-align:center}
+.fw-bold{font-weight:700}
+.total-row td{font-size:14px;font-weight:900;padding:8px 10px;border-top:2px solid #000}
+.total-row .amount{font-size:18px}
+.payment-box{background:#f8fafc;border:1px solid #d1d5db;border-radius:6px;padding:10px 14px;margin-bottom:16px}
+.payment-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.payment-row{font-size:12px;margin-bottom:3px}
+.footer-note{font-size:11px;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:12px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #000}
+.badge-draft{background:#e2e8f0}
+.badge-sent{background:#dbeafe}
+.badge-paid{background:#dcfce7}
+.stamp{display:inline-block;border:3px solid currentColor;border-radius:6px;padding:3px 14px;
+       font-size:14px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+       transform:rotate(-12deg);opacity:.55}
+
+/* ── STRUK MODE — layout ────────────────────────────────────────────── */
+.struk-only{display:none}
+
+body.struk-mode{
+  padding:6px 4px!important;
+  width:var(--struk-w,58mm);
+  max-width:var(--struk-w,58mm);
+  margin:0 auto;
+  font-family:'Courier New',Courier,monospace;
+}
+body.struk-mode .invoice-only{display:none!important}
+body.struk-mode .struk-only{display:block!important}
+
+.struk-center{text-align:center}
+.struk-name{font-size:14px;font-weight:900;letter-spacing:.03em}
+.struk-sub{font-size:9.5px;line-height:1.5}
+.struk-sep{border:none;border-top:1px dashed #555;margin:4px 0}
+.struk-sep-solid{border:none;border-top:1px solid #000;margin:4px 0}
+.struk-meta{font-size:10px;line-height:1.7}
+.struk-item-wrap{margin:3px 0}
+.struk-item-name{font-size:10.5px;font-weight:700;word-break:break-word}
+.struk-item-row{display:flex;justify-content:space-between;font-size:10px}
+.struk-item-dis{font-size:9px;padding-left:4px}
+.struk-sum-row{display:flex;justify-content:space-between;font-size:10.5px;margin:2px 0}
+.struk-grand{display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin:3px 0}
+.struk-sisa{display:flex;justify-content:space-between;font-size:12px;font-weight:900;margin:3px 0}
+.struk-lunas-badge{text-align:center;font-size:13px;font-weight:900;letter-spacing:.1em;padding:3px 0}
+.struk-rek{font-size:9.5px;line-height:1.6}
+.struk-thankyou{text-align:center;font-size:10px;margin-top:4px;font-style:italic}
+
+/* ── Tombol mode struk (screen only) ────────────────────────────────── */
+#struk-bar{display:none;align-items:center;gap:8px;flex-wrap:wrap;
+           background:#fef9c3;border:1px solid #fde047;border-radius:6px;
+           padding:6px 10px;font-size:12px}
+body.struk-mode #struk-bar{display:flex}
+
+/* ── Print media ─────────────────────────────────────────────────────── */
+.print-footer{display:none}
+
+@media print{
+  /* FIX: !important agar override inline style="display:flex" */
+  .no-print{display:none!important}
+
+  /* Invoice mode */
+  body:not(.struk-mode){
+    padding:16mm 18mm;
+  }
+  body:not(.struk-mode) .print-footer{
+    display:flex!important;
+    position:fixed;bottom:6mm;left:18mm;right:18mm;
+    border-top:1px solid #ccc;padding-top:3px;font-size:9px;
+    justify-content:space-between
+  }
+
+  /* Struk mode — override @page size via JS-injected style tag */
+  body.struk-mode{
+    padding:4mm 3mm!important;
+    width:var(--struk-w,58mm)!important;
+    max-width:var(--struk-w,58mm)!important;
+  }
+  @page{size:A4 portrait;margin:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ TOOLBAR (hidden on print) ════════════════════ -->
+<div class="no-print" style="margin-bottom:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  {% if not preview|default(false) %}
+  <button onclick="window.print()"
+          style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">
+    🖨️ Cetak / Save PDF
+  </button>
+  <button onclick="toggleStruk()"
+          id="btnStruk"
+          style="background:#f0fdf4;color:#166534;border:1px solid #86efac;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px">
+    🧾 Struk Mode
+  </button>
+  <button onclick="history.length > 1 ? history.back() : window.close()"
+          style="background:#f1f5f9;color:#475569;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">
+    Tutup
+  </button>
+  {% else %}
+  <div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:8px 14px;font-size:12px;color:#854d0e;flex:1">
+    <strong>👁️ Mode Preview</strong> &mdash; Data di bawah adalah contoh.
+    <a href="/invoice/pengaturan" style="margin-left:8px;color:#1d4ed8;font-weight:600">&#8592; Kembali ke Pengaturan</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Struk width selector (only visible in struk mode, also hidden on print) -->
+<div id="struk-bar" class="no-print">
+  <span style="font-weight:700">🧾 Struk Mode Aktif</span>
+  <span style="color:#555">— Lebar kertas:</span>
+  <label style="cursor:pointer"><input type="radio" name="struk-w" value="58" checked onchange="setStrukWidth(58)"> 58 mm</label>
+  <label style="cursor:pointer"><input type="radio" name="struk-w" value="72" onchange="setStrukWidth(72)"> 72 mm</label>
+  <label style="cursor:pointer"><input type="radio" name="struk-w" value="80" onchange="setStrukWidth(80)"> 80 mm</label>
+  <button onclick="window.print()"
+          style="margin-left:4px;background:#2563eb;color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px">
+    🖨️ Cetak Struk
+  </button>
+  <button onclick="toggleStruk()"
+          style="background:#fee2e2;color:#991b1b;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">
+    ✕ Keluar
+  </button>
+</div>
+
+
+<!-- ═══════════════════ INVOICE MODE CONTENT ═════════════════════════ -->
+<div class="invoice-only">
+
+<!-- Header -->
+<div class="header">
+  <div style="display:flex;align-items:flex-start;gap:14px">
+    {% if inv_s.inv_logo %}
+    <div style="flex-shrink:0;align-self:stretch;display:flex;align-items:center">
+      <img src="/static/uploads/{{ inv_s.inv_logo }}"
+           style="height:100%;max-height:100%;max-width:120px;width:auto;object-fit:contain;display:block">
+    </div>
+    {% endif %}
+    <div>
+      <div class="company-name">{{ inv_s.inv_nama }}</div>
+      {% if inv_s.inv_tagline %}<div style="font-size:10px;font-weight:600;margin-bottom:2px">{{ inv_s.inv_tagline }}</div>{% endif %}
+      <div class="company-sub">
+        {% if inv_s.inv_alamat %}{{ inv_s.inv_alamat }}<br>{% endif %}
+        {% if inv_s.inv_telepon %}☎ {{ inv_s.inv_telepon }}&nbsp;&nbsp;{% endif %}
+        {% if inv_s.inv_email %}✉ {{ inv_s.inv_email }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="inv-title">INVOICE</div>
+    <div class="inv-number">{{ inv.nomor }}</div>
+    <div style="text-align:right;margin-top:6px">
+      {% if pay_stamp == 'LUNAS' %}
+        <span class="stamp" style="color:#16a34a">LUNAS</span>
+      {% elif pay_stamp == 'SEBAGIAN' %}
+        <span class="stamp" style="color:#d97706">SEBAGIAN</span>
+      {% elif pay_stamp == 'BELUM LUNAS' %}
+        <span class="stamp" style="color:#dc2626">BELUM LUNAS</span>
+      {% else %}
+        <span class="badge badge-draft">DRAFT</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Meta -->
+<div class="meta">
+  <div class="meta-box">
+    <div class="meta-label">Ditagihkan Kepada</div>
+    <div class="meta-value">{{ inv.pelanggan }}</div>
+    {% if inv.alamat_pelanggan %}<div class="meta-sub">{{ inv.alamat_pelanggan }}</div>{% endif %}
+    {% if inv.telepon_pelanggan %}<div class="meta-sub">☎ {{ inv.telepon_pelanggan }}</div>{% endif %}
+  </div>
+  <div class="meta-box">
+    <div class="meta-label">Detail Invoice</div>
+    <div class="meta-row"><span class="lbl">Tanggal</span><span class="val">{{ inv.tanggal|tgl }}</span></div>
+    <div class="meta-row"><span class="lbl">Jatuh Tempo</span><span class="val">{{ inv.jatuh_tempo|tgl if inv.jatuh_tempo else '—' }}</span></div>
+    <div class="meta-row"><span class="lbl">Term of Payment</span>
+      <span class="val">{{ actual_top }} hari{% set tn = inv.top_note or inv_s.inv_top_note %}{% if tn %} ({{ tn }}){% endif %}</span></div>
+  </div>
+</div>
+
+<!-- Items table -->
+<table>
+  <thead>
+    <tr>
+      <th style="width:5%">#</th>
+      <th style="width:40%">Deskripsi</th>
+      <th class="text-right" style="width:8%">Qty</th>
+      <th style="width:8%">Sat.</th>
+      <th class="text-right" style="width:16%">Harga Satuan</th>
+      <th class="text-right" style="width:12%">Diskon</th>
+      <th class="text-right" style="width:14%">Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in items %}
+    <tr>
+      <td class="text-center">{{ loop.index }}</td>
+      <td class="fw-bold">{{ it.deskripsi }}</td>
+      <td class="text-right">{{ it.qty|int if it.qty == it.qty|int else it.qty }}</td>
+      <td>{{ it.satuan }}</td>
+      <td class="text-right">{{ it.harga_satuan|rp }}</td>
+      <td class="text-right">{% if it.diskon_item %}{{ it.diskon_item|rp }}{% else %}—{% endif %}</td>
+      <td class="text-right fw-bold">{{ it.subtotal|rp }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><td colspan="7" style="padding:4px 0"><hr style="border:none;border-top:1px solid #e2e8f0"></td></tr>
+    <tr>
+      <td colspan="5" class="text-right">Subtotal</td>
+      <td colspan="2" class="text-right fw-bold">{{ subtotal|rp }}</td>
+    </tr>
+    {% if inv.diskon %}
+    <tr>
+      <td colspan="5" class="text-right">Diskon</td>
+      <td colspan="2" class="text-right">- {{ inv.diskon|rp }}</td>
+    </tr>
+    {% endif %}
+    {% if inv.ongkir %}
+    <tr>
+      <td colspan="5" class="text-right">Ongkir</td>
+      <td colspan="2" class="text-right">{{ inv.ongkir|rp }}</td>
+    </tr>
+    {% endif %}
+    {% if inv.biaya_lain %}
+    <tr>
+      <td colspan="5" class="text-right">Biaya Lain</td>
+      <td colspan="2" class="text-right">{{ inv.biaya_lain|rp }}</td>
+    </tr>
+    {% endif %}
+    <tr class="total-row">
+      <td colspan="5" class="text-right">TOTAL</td>
+      <td colspan="2" class="text-right amount">{{ total|rp }}</td>
+    </tr>
+    {% if show_payment %}
+    {% if pay_dp > 0 %}
+    <tr style="border-top:1px dashed #cbd5e1">
+      <td colspan="4" class="text-right" style="padding-top:7px;font-size:11px;color:#64748b">Uang Muka</td>
+      <td colspan="3" class="text-right fw-bold" style="padding-top:7px;color:#16a34a">{{ pay_dp|rp }}</td>
+    </tr>
+    {% endif %}
+    {% if pay_sisa > 0 %}
+    <tr style="border-top:2px solid #dc2626;{% if pay_dp <= 0 %}border-top-style:dashed;{% endif %}">
+      <td colspan="4" class="text-right fw-bold" style="font-size:13px;padding-top:6px;padding-bottom:4px">Sisa Tagihan</td>
+      <td colspan="3" class="text-right fw-bold" style="font-size:18px;padding-top:6px;padding-bottom:4px;color:#dc2626">{{ pay_sisa|rp }}</td>
+    </tr>
+    {% else %}
+    <tr style="border-top:2px solid #16a34a">
+      <td colspan="4" class="text-right fw-bold" style="font-size:13px;padding-top:6px;padding-bottom:4px;color:#16a34a">✓ Lunas</td>
+      <td colspan="3" class="text-right fw-bold" style="font-size:18px;padding-top:6px;padding-bottom:4px;color:#16a34a">Rp 0</td>
+    </tr>
+    {% endif %}
+    {% endif %}
+  </tfoot>
+</table>
+
+<!-- Rekening pembayaran -->
+{% if inv_s.inv_rek_list %}
+<div class="payment-box">
+  <div class="payment-title">📋 Informasi Pembayaran</div>
+  {% for r in inv_s.inv_rek_list %}
+  <div class="payment-row">
+    <strong>{{ r.bank }}</strong> &nbsp; {{ r.norek }}
+    {% if r.an %} &nbsp;—&nbsp; a.n. <strong>{{ r.an }}</strong>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Catatan -->
+{% if inv.catatan %}
+<div class="footer-note">📝 {{ inv.catatan }}</div>
+{% elif inv_s.inv_catatan %}
+<div class="footer-note">{{ inv_s.inv_catatan }}</div>
+{% endif %}
+
+<!-- Syarat & Ketentuan -->
+{% if inv_s.inv_terms %}
+<div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:10px">
+  <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">Syarat &amp; Ketentuan</div>
+  <div style="font-size:10px;white-space:pre-line;line-height:1.6">{{ inv_s.inv_terms }}</div>
+</div>
+{% endif %}
+
+<!-- Tanda tangan -->
+<div style="display:flex;justify-content:flex-end;margin-top:32px">
+  <div style="text-align:center;min-width:160px">
+    <div style="height:60px"></div>
+    <div style="border-top:1px solid #000;padding-top:4px;font-size:11px">Hormat kami,</div>
+    <div style="font-size:12px;font-weight:700;margin-top:2px">{{ inv_s.inv_nama }}</div>
+  </div>
+</div>
+
+<!-- Custom print footer -->
+<div class="print-footer">
+  <span>{{ inv_s.inv_nama }}{% if inv_s.inv_tagline %} &mdash; {{ inv_s.inv_tagline }}{% endif %}</span>
+  <span>{{ inv.nomor }}</span>
+</div>
+
+</div><!-- end .invoice-only -->
+
+
+<!-- ═══════════════════ STRUK MODE CONTENT ═══════════════════════════ -->
+<div class="struk-only">
+
+  <!-- Kop toko -->
+  <div class="struk-center">
+    <div class="struk-name">{{ inv_s.inv_nama }}</div>
+    {% if inv_s.inv_tagline %}<div class="struk-sub">{{ inv_s.inv_tagline }}</div>{% endif %}
+    {% if inv_s.inv_alamat %}<div class="struk-sub">{{ inv_s.inv_alamat }}</div>{% endif %}
+    {% if inv_s.inv_telepon %}<div class="struk-sub">{{ inv_s.inv_telepon }}</div>{% endif %}
+    {% if inv_s.inv_email %}<div class="struk-sub">{{ inv_s.inv_email }}</div>{% endif %}
+  </div>
+
+  <hr class="struk-sep-solid">
+
+  <!-- Info transaksi -->
+  <div class="struk-meta">
+    <div>No&nbsp;&nbsp;: {{ inv.nomor }}</div>
+    <div>Tgl &nbsp;: {{ inv.tanggal|tgl }}</div>
+    <div>Kpd &nbsp;: {{ inv.pelanggan }}</div>
+    {% if inv.telepon_pelanggan %}<div>Telp : {{ inv.telepon_pelanggan }}</div>{% endif %}
+  </div>
+
+  <hr class="struk-sep">
+
+  <!-- Item-item -->
+  {% for it in items %}
+  <div class="struk-item-wrap">
+    <div class="struk-item-name">{{ it.deskripsi }}</div>
+    <div class="struk-item-row">
+      <span>{{ it.qty|int if it.qty == it.qty|int else it.qty }} {{ it.satuan }} &times; {{ it.harga_satuan|rp }}</span>
+      <span><strong>{{ it.subtotal|rp }}</strong></span>
+    </div>
+    {% if it.diskon_item %}
+    <div class="struk-item-dis">Diskon: -{{ it.diskon_item|rp }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <hr class="struk-sep">
+
+  <!-- Ringkasan harga -->
+  <div class="struk-sum-row"><span>Subtotal</span><span>{{ subtotal|rp }}</span></div>
+  {% if inv.diskon %}
+  <div class="struk-sum-row"><span>Diskon</span><span>-{{ inv.diskon|rp }}</span></div>
+  {% endif %}
+  {% if inv.ongkir %}
+  <div class="struk-sum-row"><span>Ongkir</span><span>{{ inv.ongkir|rp }}</span></div>
+  {% endif %}
+  {% if inv.biaya_lain %}
+  <div class="struk-sum-row"><span>Biaya Lain</span><span>{{ inv.biaya_lain|rp }}</span></div>
+  {% endif %}
+
+  <hr class="struk-sep-solid">
+  <div class="struk-grand"><span>TOTAL</span><span>{{ total|rp }}</span></div>
+
+  {% if show_payment %}
+  {% if pay_dp > 0 %}
+  <hr class="struk-sep">
+  <div class="struk-sum-row"><span>Uang Muka</span><span>{{ pay_dp|rp }}</span></div>
+  {% endif %}
+  {% if pay_sisa > 0 %}
+  <hr class="struk-sep-solid">
+  <div class="struk-sisa"><span>SISA TAGIHAN</span><span>{{ pay_sisa|rp }}</span></div>
+  {% else %}
+  <hr class="struk-sep">
+  <div class="struk-lunas-badge">*** L U N A S ***</div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Rekening -->
+  {% if inv_s.inv_rek_list %}
+  <hr class="struk-sep">
+  <div class="struk-rek">
+    <div style="font-weight:700;margin-bottom:2px">Pembayaran via:</div>
+    {% for r in inv_s.inv_rek_list %}
+    <div>{{ r.bank }}: {{ r.norek }}{% if r.an %} ({{ r.an }}){% endif %}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Catatan -->
+  {% if inv.catatan or inv_s.inv_catatan %}
+  <hr class="struk-sep">
+  <div class="struk-sub">{{ inv.catatan or inv_s.inv_catatan }}</div>
+  {% endif %}
+
+  <hr class="struk-sep">
+  <div class="struk-thankyou">Terima kasih atas kepercayaan Anda!</div>
+  <div style="height:12px"></div>
+
+</div><!-- end .struk-only -->
+
+
+<script>
+var _isStruk = false;
+var _strukW  = 58;
+
+function toggleStruk() {
+  _isStruk = !_isStruk;
+  if (_isStruk) {
+    document.body.classList.add('struk-mode');
+    document.getElementById('btnStruk').textContent = '📄 Invoice Mode';
+    document.getElementById('btnStruk').style.background = '#eff6ff';
+    document.getElementById('btnStruk').style.color = '#1e40af';
+    document.getElementById('btnStruk').style.borderColor = '#93c5fd';
+    setStrukWidth(_strukW);
+  } else {
+    document.body.classList.remove('struk-mode');
+    document.getElementById('btnStruk').textContent = '🧾 Struk Mode';
+    document.getElementById('btnStruk').style.background = '#f0fdf4';
+    document.getElementById('btnStruk').style.color = '#166534';
+    document.getElementById('btnStruk').style.borderColor = '#86efac';
+    // restore @page
+    var s = document.getElementById('struk-page-style');
+    if (s) s.textContent = '@page{size:A4 portrait;margin:0}';
+  }
+}
+
+function setStrukWidth(w) {
+  _strukW = w;
+  document.documentElement.style.setProperty('--struk-w', w + 'mm');
+  // Inject @page rule dynamically
+  var s = document.getElementById('struk-page-style');
+  if (!s) {
+    s = document.createElement('style');
+    s.id = 'struk-page-style';
+    document.head.appendChild(s);
+  }
+  s.textContent = '@media print { @page { size:' + w + 'mm auto; margin:4mm 3mm; } }';
+}
+
+{% if autoprint %}
+window.onload = function() { window.print(); };
+{% endif %}
+</script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Inventory - FinansialApp{% endblock %}
+{% block page_title %}Inventory / Produk{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <form class="d-flex gap-2" method="GET">
+    <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+           placeholder="Cari produk..." style="width:220px">
+    <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-search"></i></button>
+    {% if q %}<a href="/stok" class="btn btn-sm btn-outline-secondary">Reset</a>{% endif %}
+  </form>
+  {% if session.role in ('ADMIN','OPERATOR') %}
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBaru">
+    <i class="fas fa-plus me-1"></i>Tambah Produk</button>
+  {% endif %}
+</div>
+
+<!-- Alert rendah stok -->
+{% set low = produk | selectattr('stok', 'le', produk | map(attribute='min_stok') | list | first if produk else 0) | list %}
+{% set low_list = [] %}
+{% for p in produk %}{% if p.min_stok > 0 and p.stok <= p.min_stok %}{% set _ = low_list.append(p) %}{% endif %}{% endfor %}
+{% if low_list %}
+<div class="alert alert-warning py-2 mb-3">
+  <i class="fas fa-triangle-exclamation me-2"></i>
+  <strong>{{ low_list|length }} produk</strong> memiliki stok di bawah minimum:
+  {% for p in low_list %}<span class="badge bg-warning text-dark ms-1">{{ p.nama }} ({{ p.stok }} {{ p.satuan }})</span>{% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Kode</th>
+            <th>Nama Produk</th>
+            <th>Varian</th>
+            <th>Satuan</th>
+            <th class="text-end">Harga Beli</th>
+            <th class="text-end">Harga Jual</th>
+            <th class="text-center">Stok</th>
+            <th class="text-center">Min. Stok</th>
+            <th class="text-end pe-3">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in produk %}
+          <tr class="{% if p.min_stok > 0 and p.stok <= p.min_stok %}table-warning{% endif %}">
+            <td class="ps-3 text-muted">{{ p.kode }}</td>
+            <td class="fw-semibold">{{ p.nama }}</td>
+            <td class="text-muted">{{ p.varian or '-' }}</td>
+            <td>{{ p.satuan }}</td>
+            <td class="text-end text-rp">{{ p.harga_beli|rp }}</td>
+            <td class="text-end text-rp text-success">{{ p.harga_jual|rp }}</td>
+            <td class="text-center">
+              <span class="fw-bold {% if p.min_stok > 0 and p.stok <= p.min_stok %}text-danger{% elif p.stok == 0 %}text-muted{% else %}text-success{% endif %}">
+                {{ p.stok }}</span>
+              {% if p.min_stok > 0 and p.stok <= p.min_stok %}
+                <i class="fas fa-triangle-exclamation text-warning ms-1" title="Stok di bawah minimum"></i>
+              {% endif %}
+            </td>
+            <td class="text-center text-muted">{{ p.min_stok }}</td>
+            <td class="text-end pe-3">
+              <div class="d-flex gap-1 justify-content-end">
+                {% if session.role in ('ADMIN','OPERATOR') %}
+                <a href="/stok/{{ p.id }}/edit" class="btn btn-xs btn-outline-primary" title="Edit">
+                  <i class="fas fa-edit"></i></a>
+                <button class="btn btn-xs btn-outline-secondary"
+                        onclick="gerakanStok({{ p.id }}, '{{ p.nama }}')" title="Tambah/Kurangi Stok">
+                  <i class="fas fa-layer-group"></i></button>
+                {% endif %}
+                <a href="/stok/{{ p.id }}/riwayat" class="btn btn-xs btn-outline-secondary" title="Riwayat">
+                  <i class="fas fa-history"></i></a>
+                {% if session.role in ('ADMIN','FINANCE') %}
+                <form method="POST" action="/stok/{{ p.id }}/hapus" style="display:inline"
+                      onsubmit="return confirm('Hapus produk ini?')">
+                  <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">
+            {% if q %}Tidak ada produk cocok dengan "{{ q }}"{% else %}Belum ada produk{% endif %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if session.role in ('ADMIN','OPERATOR') %}
+<!-- Modal Tambah Produk -->
+<div class="modal fade" id="modalBaru" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-plus me-2"></i>Tambah Produk Baru</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/stok/produk/baru" id="formTambahProduk">
+        <div class="modal-body">
+
+          <!-- Info produk (shared) -->
+          <div class="row g-2 mb-3">
+            <div class="col-md-2">
+              <label class="form-label small fw-semibold">Kode Produk *</label>
+              <input type="text" name="kode" class="form-control form-control-sm" required placeholder="P001"
+                     title="Jika lebih dari 1 varian, kode akan otomatis jadi P001-1, P001-2, dst.">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small fw-semibold">Nama Produk *</label>
+              <input type="text" name="nama" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Kategori</label>
+              <input type="text" name="kategori" class="form-control form-control-sm"
+                     list="kategoriProdukList" placeholder="Misal: Elektronik, Pakaian">
+              <datalist id="kategoriProdukList">
+                {% set cats = produk | map(attribute='kategori') | select | unique | list %}
+                {% for c in cats %}<option value="{{ c }}">{% endfor %}
+              </datalist>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="button" id="btnTambahVarian" class="btn btn-outline-success btn-sm w-100">
+                <i class="fas fa-plus me-1"></i>Tambah Varian
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Produk tunggal (default) ── -->
+          <div id="singleProductSection">
+            <input type="hidden" name="varian[]" value="">
+            <div class="row g-2">
+              <div class="col-md-2">
+                <label class="form-label small fw-semibold">Satuan</label>
+                <input type="text" name="satuan[]" id="main_satuan" class="form-control form-control-sm" placeholder="pcs" value="pcs">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-semibold">Stok Awal</label>
+                <input type="number" name="stok_awal[]" id="main_stok" class="form-control form-control-sm text-center" min="0" step="0.01" value="0">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">Harga Beli (HPP)</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text px-1">Rp</span>
+                  <input type="number" name="harga_beli[]" id="main_harga_beli" class="form-control" min="0" step="1" value="0">
+                </div>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold">Harga Jual</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text px-1">Rp</span>
+                  <input type="number" name="harga_jual[]" id="main_harga_jual" class="form-control" min="0" step="1" value="0">
+                </div>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-semibold">Min. Stok</label>
+                <input type="number" name="min_stok[]" id="main_min_stok" class="form-control form-control-sm text-center" min="0" step="0.01" value="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Varian (tersembunyi, muncul saat diklik) ── -->
+          <div id="variantSection" style="display:none">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">
+                <i class="fas fa-layer-group me-1"></i>Varian
+                <span id="varianCount" class="badge bg-secondary ms-1" style="font-size:.65rem">0</span>
+              </span>
+              <button type="button" id="btnKembaliTunggal" class="btn btn-link btn-sm text-muted p-0" style="font-size:.75rem">
+                <i class="fas fa-arrow-left me-1"></i>Kembali ke produk tunggal
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered mb-0" style="font-size:.82rem">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:140px">Nama Varian *</th>
+                    <th style="width:80px">Satuan</th>
+                    <th style="width:70px" class="text-center">Stok Awal</th>
+                    <th style="width:120px">Harga Beli (HPP)</th>
+                    <th style="width:120px">Harga Jual</th>
+                    <th style="width:70px" class="text-center">Min. Stok</th>
+                    <th style="width:36px"></th>
+                  </tr>
+                </thead>
+                <tbody id="varianBody"></tbody>
+              </table>
+            </div>
+            <div class="text-muted mt-1" id="kodeInfo" style="font-size:.72rem;display:none">
+              <i class="fas fa-circle-info me-1"></i>Kode akan otomatis: <span id="kodeInfoText"></span>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan Produk</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gerakan Stok -->
+<div class="modal fade" id="modalGerakan" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="gerakanTitle"><i class="fas fa-layer-group me-2"></i>Gerakan Stok</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="formGerakan">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small">Jenis</label>
+            <select name="jenis" class="form-select form-select-sm">
+              <option value="MASUK">+ Masuk</option>
+              <option value="KELUAR">- Keluar</option>
+              <option value="OPNAME">Stok Opname (Set)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Tanggal</label>
+            <input type="date" name="tanggal" class="form-control form-control-sm"
+                   value="{{ today.strftime('%Y-%m-%d') }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Qty</label>
+            <input type="number" name="qty" class="form-control form-control-sm" min="0" step="0.01" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Harga / Unit</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="harga" class="form-control" min="0">
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small">Keterangan</label>
+            <input type="text" name="keterangan" class="form-control form-control-sm">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+{% if session.role in ('ADMIN','OPERATOR') %}
+<script>
+function gerakanStok(id, nama) {
+  document.getElementById('formGerakan').action = '/stok/' + id + '/gerakan';
+  document.getElementById('gerakanTitle').innerHTML = '<i class="fas fa-layer-group me-2"></i>Gerakan Stok: ' + nama;
+  new bootstrap.Modal(document.getElementById('modalGerakan')).show();
+}
+
+// ── Multi-variant product modal ──────────────────────────────────────────────
+(function () {
+  const body        = document.getElementById('varianBody');
+  const badge       = document.getElementById('varianCount');
+  const kodeIn      = document.querySelector('#formTambahProduk [name="kode"]');
+  const kodeInfo    = document.getElementById('kodeInfo');
+  const kodeInfoTxt = document.getElementById('kodeInfoText');
+  const singleSec   = document.getElementById('singleProductSection');
+  const variantSec  = document.getElementById('variantSection');
+  let variantMode   = false;
+
+  function rowCount() { return body ? body.querySelectorAll('tr').length : 0; }
+
+  function setSingleDisabled(disabled) {
+    if (!singleSec) return;
+    singleSec.querySelectorAll('input').forEach(el => el.disabled = disabled);
+  }
+
+  function updateUI() {
+    const n = rowCount();
+    if (badge) badge.textContent = n;
+    if (!kodeInfo || !kodeInfoTxt || !kodeIn) return;
+    if (n > 1) {
+      const base = kodeIn.value.trim() || 'KODE';
+      const samples = Array.from({length: Math.min(n, 3)}, (_, i) => `${base}-${i+1}`).join(', ');
+      kodeInfoTxt.textContent = samples + (n > 3 ? ', …' : '');
+      kodeInfo.style.display = '';
+    } else {
+      kodeInfo.style.display = 'none';
+    }
+  }
+
+  function makeRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" name="varian[]" class="form-control form-control-sm" placeholder="mis. Merah / L / 500ml" required></td>
+      <td><input type="text" name="satuan[]" class="form-control form-control-sm" placeholder="pcs" value="pcs"></td>
+      <td><input type="number" name="stok_awal[]" class="form-control form-control-sm text-center" min="0" step="0.01" value="0"></td>
+      <td><div class="input-group input-group-sm"><span class="input-group-text px-1">Rp</span>
+          <input type="number" name="harga_beli[]" class="form-control" min="0" step="1" value="0"></div></td>
+      <td><div class="input-group input-group-sm"><span class="input-group-text px-1">Rp</span>
+          <input type="number" name="harga_jual[]" class="form-control" min="0" step="1" value="0"></div></td>
+      <td><input type="number" name="min_stok[]" class="form-control form-control-sm text-center" min="0" step="0.01" value="0"></td>
+      <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger del-row" title="Hapus baris">
+          <i class="fas fa-times"></i></button></td>`;
+    return tr;
+  }
+
+  function enterVariantMode() {
+    variantMode = true;
+    setSingleDisabled(true);
+    singleSec.style.display = 'none';
+    variantSec.style.display = '';
+    if (rowCount() === 0) body.appendChild(makeRow());
+    updateUI();
+  }
+
+  function exitVariantMode() {
+    variantMode = false;
+    body.innerHTML = '';
+    setSingleDisabled(false);
+    singleSec.style.display = '';
+    variantSec.style.display = 'none';
+    updateUI();
+  }
+
+  // "Tambah Varian" button
+  const btnAdd = document.getElementById('btnTambahVarian');
+  if (btnAdd) btnAdd.addEventListener('click', () => {
+    if (!variantMode) { enterVariantMode(); }
+    else { body.appendChild(makeRow()); updateUI(); }
+  });
+
+  // "Kembali ke produk tunggal" button
+  const btnBack = document.getElementById('btnKembaliTunggal');
+  if (btnBack) btnBack.addEventListener('click', exitVariantMode);
+
+  // delete row (event delegation) — jika hapus baris terakhir, kembali ke mode tunggal
+  if (body) body.addEventListener('click', e => {
+    const btn = e.target.closest('.del-row');
+    if (!btn) return;
+    if (rowCount() <= 1) { exitVariantMode(); return; }
+    btn.closest('tr').remove();
+    updateUI();
+  });
+
+  // update kode hint on kode input change
+  if (kodeIn) kodeIn.addEventListener('input', updateUI);
+
+  // reset modal on close
+  const modalEl = document.getElementById('modalBaru');
+  if (modalEl) modalEl.addEventListener('hidden.bs.modal', () => {
+    exitVariantMode();
+    document.getElementById('formTambahProduk').reset();
+    const mainSatuan = document.getElementById('main_satuan');
+    if (mainSatuan) mainSatuan.value = 'pcs';
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

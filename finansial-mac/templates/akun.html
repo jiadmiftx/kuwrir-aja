@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Bagan Akun - FinansialApp{% endblock %}
+{% block page_title %}Bagan Akun (Chart of Accounts){% endblock %}
+{% block content %}
+
+<div class="d-flex gap-2 mb-3">
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalBaru">
+    <i class="fas fa-plus me-1"></i>Tambah Akun
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Kode</th>
+            <th>Nama Akun</th>
+            <th>Tipe</th>
+            <th>Subtipe</th>
+            <th>Saldo Normal</th>
+            <th style="width:60px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set tipe_sebelumnya = namespace(v='') %}
+          {% for r in rows %}
+          {% if r.tipe != tipe_sebelumnya.v %}
+          {% set tipe_sebelumnya.v = r.tipe %}
+          <tr class="table-secondary">
+            <td colspan="6" class="ps-3 fw-bold" style="font-size:.8rem;letter-spacing:.05em">
+              {{ r.tipe }}
+            </td>
+          </tr>
+          {% endif %}
+          <tr>
+            <td class="ps-4 text-muted fw-semibold">{{ r.kode }}</td>
+            <td>{{ r.nama }}</td>
+            <td>
+              {% if r.tipe == 'ASET' %}<span class="badge bg-primary">Aset</span>
+              {% elif r.tipe == 'LIABILITAS' %}<span class="badge bg-danger">Liabilitas</span>
+              {% elif r.tipe == 'EKUITAS' %}<span class="badge bg-success">Ekuitas</span>
+              {% elif r.tipe == 'PENDAPATAN' %}<span class="badge bg-info text-dark">Pendapatan</span>
+              {% else %}<span class="badge bg-warning text-dark">Beban</span>{% endif %}
+            </td>
+            <td class="text-muted">{{ r.subtipe or '-' }}</td>
+            <td>
+              {% if r.saldo_normal == 'DEBIT' %}
+              <span class="badge bg-light text-dark border">Debit</span>
+              {% else %}
+              <span class="badge bg-light text-dark border">Kredit</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-3">
+              <form method="post" action="/akun/{{ r.id }}/hapus" style="display:inline"
+                onsubmit="return confirm('Hapus akun {{ r.nama }}?')">
+                <button class="btn btn-outline-danger btn-xs"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Akun Baru -->
+<div class="modal fade" id="modalBaru" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/akun/baru">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="fas fa-plus me-2"></i>Tambah Akun Baru</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label">Kode <span class="text-danger">*</span></label>
+              <input type="text" name="kode" class="form-control" required placeholder="1xxx">
+            </div>
+            <div class="col-8">
+              <label class="form-label">Nama Akun <span class="text-danger">*</span></label>
+              <input type="text" name="nama" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Tipe <span class="text-danger">*</span></label>
+              <select name="tipe" class="form-select" id="selTipe" required>
+                <option value="ASET">Aset</option>
+                <option value="LIABILITAS">Liabilitas</option>
+                <option value="EKUITAS">Ekuitas</option>
+                <option value="PENDAPATAN">Pendapatan</option>
+                <option value="BEBAN">Beban</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Saldo Normal</label>
+              <select name="saldo_normal" class="form-select" id="selSaldo">
+                <option value="DEBIT">Debit</option>
+                <option value="KREDIT">Kredit</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Subtipe / Kelompok</label>
+              <input type="text" name="subtipe" class="form-control" id="inputSubtipe"
+                placeholder="mis. Aset Lancar, Beban Operasional...">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const defaults = {
+  'ASET': { saldo: 'DEBIT', subtipe: 'Aset Lancar' },
+  'LIABILITAS': { saldo: 'KREDIT', subtipe: 'Liabilitas Lancar' },
+  'EKUITAS': { saldo: 'KREDIT', subtipe: 'Ekuitas' },
+  'PENDAPATAN': { saldo: 'KREDIT', subtipe: 'Pendapatan Usaha' },
+  'BEBAN': { saldo: 'DEBIT', subtipe: 'Beban Operasional' },
+};
+document.getElementById('selTipe').addEventListener('change', function() {
+  const d = defaults[this.value];
+  document.getElementById('selSaldo').value = d.saldo;
+  document.getElementById('inputSubtipe').value = d.subtipe;
+});
+</script>
+{% endblock %}

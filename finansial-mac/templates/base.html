@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}FinansialApp{% endblock %}</title>
+<script>try{var _e=document.documentElement;_e.setAttribute('data-theme',localStorage.getItem('theme')||'light');_e.setAttribute('data-display',localStorage.getItem('display')||'classic');}catch(e){}</script>
+<script>
+// ── FORMAT ANGKA OTOMATIS (ribuan pakai titik) ──
+(function(){
+  function addDots(str){
+    // strip existing dots, then add thousand separators
+    str = String(str).replace(/\./g,'');
+    var neg = str.charAt(0)==='-'; if(neg) str=str.slice(1);
+    var parts = str.split(',');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    return (neg?'-':'')+parts.join(',');
+  }
+
+  // Expose: get raw float from a formatted input element
+  window.numVal = function(el){
+    var v = (el && el.value||'').replace(/\./g,'').replace(',','.');
+    return parseFloat(v)||0;
+  };
+
+  function applyFmt(el){
+    var pos  = el.selectionStart;
+    var oldV = el.value;
+    // anchor: non-dot chars before caret
+    var rawBefore = oldV.substring(0,pos).replace(/\./g,'').length;
+    // strip dots, keep digits / comma / minus
+    var stripped = oldV.replace(/\./g,'').replace(/[^\d,\-]/g,'');
+    var newV = addDots(stripped);
+    if(newV===oldV) return;
+    el.value = newV;
+    // restore caret: walk newV counting non-dot chars until we reach rawBefore
+    var cnt=0, newPos=newV.length;
+    if(rawBefore===0){ newPos=0; }
+    else{
+      for(var i=0;i<newV.length;i++){
+        if(newV[i]!=='.') cnt++;
+        if(cnt===rawBefore){ newPos=i+1; break; }
+      }
+    }
+    try{ el.setSelectionRange(newPos,newPos); }catch(e){}
+  }
+
+  function initEl(el){
+    if(el._nf) return;          // already done
+    el._nf = true;
+    el.type      = 'text';
+    el.inputMode = 'numeric';
+    if(el.value) el.value = addDots(el.value.replace(/[^\d,\-]/g,''));
+    el.addEventListener('input',  function(){ applyFmt(this); });
+    el.addEventListener('paste',  function(){ setTimeout(()=>applyFmt(this),0); });
+  }
+
+  function initAll(){
+    document.querySelectorAll('input[type="number"]').forEach(initEl);
+  }
+
+  // strip dots before every form POST so backend receives plain numbers
+  function initForms(){
+    document.querySelectorAll('form').forEach(function(f){
+      if(f._nf) return; f._nf=true;
+      f.addEventListener('submit',function(){
+        f.querySelectorAll('input[data-nf],input._nfx').forEach(function(el){
+          el.value = el.value.replace(/\./g,'').replace(',','.');
+        });
+        // mark formatted inputs a different way since _nf is js property
+        f.querySelectorAll('input[inputmode="numeric"]').forEach(function(el){
+          el.value = el.value.replace(/\./g,'').replace(',','.');
+        });
+      }, true);
+    });
+  }
+
+  // Expose for dynamic content (e.g. rows added by JS)
+  window.numFmtInitAll   = initAll;
+  window.numFmtInitForms = initForms;
+
+  document.addEventListener('DOMContentLoaded',function(){
+    initAll();
+    initForms();
+  });
+})();
+</script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+<style>
+:root{
+  --sb:245px;--sbg:#1e293b;--sbh:#334155;--acc:#16a34a;
+  /* structural */
+  --bg:#e8eef5;--card:#fff;--card-h:#fff;--bdr:#f1f5f9;--bdr-md:#e2e8f0;
+  --tx:#1e293b;--tx2:#475569;--tx3:#94a3b8;--inp:#fff;
+  /* p&l rows */
+  --ph:#f8fafc;--pht:#94a3b8;
+  --pg:#f0fdf4;--pgb:#dcfce7;--pgt:#15803d;--pgp:#16a34a;
+  --pb:#eff6ff;--pbb:#dbeafe;--pbt:#1d4ed8;--pbp:#3b82f6;
+  --pp:#faf5ff;--ppb:#e9d5ff;--ppt:#6d28d9;--ppp:#7c3aed;
+  --pd:#fff;--pdl:#334155;--ps:#fff;--psl:#cbd5e1;--pst:#475569;--pbar:#f1f5f9;
+  /* cashflow */
+  --cfb:#f1f5f9;--cfl:#64748b;
+  --ctpbg:#f0fdf4;--ctpbd:#dcfce7;--ctpl:#15803d;--ctpv:#16a34a;--ctpi:#bbf7d0;
+  --ctnbg:#fef2f2;--ctnbd:#fecaca;--ctnl:#991b1b;--ctnv:#dc2626;--ctni:#fecaca;
+  --csbg:#eff6ff;--csl:#1d4ed8;--csv:#1e40af;--csi:#bfdbfe;
+  /* tagihan */
+  --tb:#f1f5f9;--tl:#64748b;--tv:#1e293b;--ts:#94a3b8;--tch:#cbd5e1;
+  --tdb:#fffbeb;--tdd:#fde68a;--tdt:#92400e;--tdv:#78350f;--tds:#a16207;--tdc:#92400e;
+  --tab:#fff7ed;--tad:#fed7aa;--tat:#c2410c;--tan:#1e293b;--tas:#92400e;
+  /* saldo */
+  --slb:#f1f5f9;--sll:#475569;--sls:#94a3b8
+}
+[data-theme="dark"]{
+  --bg:#0f172a;--card:#1e293b;--card-h:#253347;--bdr:#334155;--bdr-md:#475569;
+  --tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--inp:#253347;
+  --ph:#253347;--pht:#64748b;
+  --pg:rgba(20,83,45,.35);--pgb:#14532d;--pgt:#4ade80;--pgp:#22c55e;
+  --pb:rgba(30,58,95,.35);--pbb:#1e3a5f;--pbt:#93c5fd;--pbp:#60a5fa;
+  --pp:rgba(46,16,101,.35);--ppb:#2e1065;--ppt:#c4b5fd;--ppp:#a78bfa;
+  --pd:#1e293b;--pdl:#cbd5e1;--ps:#1e293b;--psl:#475569;--pst:#94a3b8;--pbar:#334155;
+  --cfb:#334155;--cfl:#94a3b8;
+  --ctpbg:rgba(20,83,45,.3);--ctpbd:#14532d;--ctpl:#4ade80;--ctpv:#22c55e;--ctpi:#166534;
+  --ctnbg:rgba(127,29,29,.3);--ctnbd:#7f1d1d;--ctnl:#fca5a5;--ctnv:#ef4444;--ctni:#7f1d1d;
+  --csbg:rgba(30,58,95,.35);--csl:#93c5fd;--csv:#bfdbfe;--csi:#1d4ed8;
+  --tb:#334155;--tl:#94a3b8;--tv:#f1f5f9;--ts:#64748b;--tch:#475569;
+  --tdb:#451a03;--tdd:#78350f;--tdt:#fde68a;--tdv:#fff;--tds:#fcd34d;--tdc:#fde68a;
+  --tab:#3b1200;--tad:#78350f;--tat:#fdba74;--tan:#f1f5f9;--tas:#fde68a;
+  --slb:#334155;--sll:#cbd5e1;--sls:#64748b
+}
+
+/* ══════════════════════════════════════════════════════════
+   MODERN DISPLAY  (independen dari Light/Dark)
+   2 toggle: data-theme=light|dark  ·  data-display=classic|modern
+   Aksen: HIJAU vibrant (sesuai referensi). Card rounded, soft shadow,
+   sidebar putih saat light, OLED near-black saat dark.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Modern: penataan visual bersama (light + dark) ── */
+[data-display="modern"] .card{
+  border-radius:16px!important;
+  box-shadow:0 2px 14px rgba(15,23,42,.06)!important;
+  border:1px solid var(--bdr)!important;
+}
+[data-display="modern"] .card-header{border-radius:16px 16px 0 0;font-weight:700}
+[data-display="modern"] .btn{border-radius:10px}
+[data-display="modern"] .btn-sm,[data-display="modern"] .btn-xs{border-radius:8px}
+[data-display="modern"] .badge{border-radius:7px;font-weight:600}
+[data-display="modern"] .form-control,[data-display="modern"] .form-select{border-radius:10px}
+[data-display="modern"] .nav-link{border-radius:11px!important;margin:2px 8px;font-weight:600}
+[data-display="modern"] .text-rp{letter-spacing:-.015em}
+[data-display="modern"] .section-title{font-weight:800;letter-spacing:-.01em}
+
+/* ── Modern + LIGHT : putih bersih, sidebar terang, aksen emerald ── */
+[data-theme="light"][data-display="modern"]{
+  --acc:#10b981;
+  --sbg:#ffffff;--sbh:#eef2f6;
+  --bg:#f5f7fa;--card:#ffffff;--card-h:#f9fafb;
+  --bdr:#e9edf2;--bdr-md:#dde3ea;
+}
+/* sidebar terang → teks gelap */
+[data-theme="light"][data-display="modern"] .sidebar,
+[data-theme="light"][data-display="modern"] .offcanvas{border-right:1px solid #e9edf2}
+[data-theme="light"][data-display="modern"] .sb-brand{border-bottom-color:#e9edf2}
+[data-theme="light"][data-display="modern"] .sb-brand .brand-name{color:#0f172a!important}
+[data-theme="light"][data-display="modern"] .sb-brand .brand-sub{color:#94a3b8!important}
+[data-theme="light"][data-display="modern"] .sb-sec{color:#94a3b8!important}
+[data-theme="light"][data-display="modern"] .sb-inner{border-top-color:#eef2f6}
+[data-theme="light"][data-display="modern"] .sidebar .nav-link,
+[data-theme="light"][data-display="modern"] .offcanvas .nav-link{color:#475569!important}
+[data-theme="light"][data-display="modern"] .sidebar .nav-link:hover,
+[data-theme="light"][data-display="modern"] .offcanvas .nav-link:hover{background:#eef2f6;color:#0f172a!important}
+[data-theme="light"][data-display="modern"] .sidebar .nav-link.active,
+[data-theme="light"][data-display="modern"] .offcanvas .nav-link.active{background:#0f172a!important;color:#fff!important}
+
+/* ── Modern + DARK : OLED near-black, aksen hijau terang ── */
+[data-theme="dark"][data-display="modern"]{
+  --acc:#22c55e;
+  --sbg:#0a0a0c;--sbh:#1c1c22;
+  --bg:#08080a;--card:#131317;--card-h:#1b1b20;
+  --bdr:#26262d;--bdr-md:#36363f;
+  --tx:#fafafa;--tx2:#d4d4d8;--tx3:#71717a;--inp:#1b1b20;
+}
+[data-theme="dark"][data-display="modern"] .card{box-shadow:0 2px 16px rgba(0,0,0,.55)!important}
+[data-theme="dark"][data-display="modern"] .topbar{background:#0a0a0c!important;border-bottom-color:#1c1c22!important}
+[data-theme="dark"][data-display="modern"] .sb-brand .brand-name{color:#4ade80!important}
+[data-theme="dark"][data-display="modern"] .sidebar .nav-link.active,
+[data-theme="dark"][data-display="modern"] .offcanvas .nav-link.active{background:#16a34a!important;color:#fff!important}
+
+body{background:var(--bg);font-family:'Segoe UI',sans-serif;font-size:.9rem;transition:background .2s,color .2s}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;top:0;left:0;width:var(--sb);height:100vh;background:var(--sbg);overflow-y:auto;z-index:1000}
+.sb-brand{padding:1.25rem 1rem;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-brand .brand-name{color:#4ade80;font-weight:800;font-size:1.1rem;margin:0;letter-spacing:-.3px;line-height:1.25;word-break:break-word}
+.sb-brand .brand-sub{color:rgba(255,255,255,.35);font-size:.65rem;margin-top:.2rem;display:block;letter-spacing:.02em}
+.sb-sec{padding:.8rem 1rem .25rem;font-size:.6rem;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.15em;margin-top:.5rem;font-weight:700;border-top:1px solid rgba(255,255,255,.1)}
+.sb-sec.sb-first{margin-top:0;border-top:none}
+.sb-inner{margin:4px 6px;border-top:1px solid rgba(255,255,255,.06)}
+.sidebar .nav-link,.offcanvas .nav-link{color:rgba(255,255,255,.65)!important;padding:.46rem .75rem;border-radius:6px;margin:1px 6px;display:flex;align-items:center;gap:.55rem;font-size:.84rem;transition:all .15s;text-decoration:none;min-height:44px}
+.sidebar .nav-link:hover,.offcanvas .nav-link:hover{background:var(--sbh);color:#fff!important}
+.sidebar .nav-link.active,.offcanvas .nav-link.active{background:var(--acc);color:#fff!important}
+.sidebar .nav-link i,.offcanvas .nav-link i{width:16px;text-align:center;font-size:.82rem;flex-shrink:0}
+
+/* ── MOBILE OFFCANVAS SIDEBAR ── */
+#sbCanvas{width:var(--sb);max-width:85vw;background:var(--sbg)}
+#sbCanvas .offcanvas-header{background:var(--sbg);border-bottom:1px solid rgba(255,255,255,.1);padding:.75rem 1rem}
+#sbCanvas .offcanvas-body{background:var(--sbg);padding:0;overflow-y:auto}
+.sb-toggle{color:var(--tx2);border:1px solid var(--bdr-md);border-radius:8px;background:transparent;width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;font-size:1.05rem;flex-shrink:0;cursor:pointer;transition:all .15s}
+.sb-toggle:hover{background:var(--bdr);color:var(--tx)}
+
+/* ── TOPBAR ── */
+.main{margin-left:var(--sb);min-height:100vh;overflow-x:hidden}
+.topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:.5rem}
+.topbar .page-title{margin:0;font-weight:800;color:#0f172a;font-size:1.75rem;letter-spacing:-.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.topbar .page-title small{font-size:.72rem;color:#94a3b8;font-weight:400;margin-left:.6rem;letter-spacing:0;vertical-align:middle}
+
+/* ── CONTENT ── */
+.body-content{padding:1.25rem 1.5rem}
+.card{border:none;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card-header{border-radius:10px 10px 0 0!important;background:#fff;border-bottom:1px solid #f1f5f9;padding:.6rem 1rem}
+.card-header .section-title{font-size:.95rem;font-weight:700;color:#1e293b;margin:0}
+.card-header .section-title i{font-size:.85rem}
+
+/* ── KPI CARDS ── */
+.kpi{border-left:4px solid var(--acc)}
+.kpi.grn{border-color:#10b981}.kpi.red{border-color:#ef4444}
+.kpi.yel{border-color:#f59e0b}.kpi.pur{border-color:#8b5cf6}
+.kpi.orn{border-color:#f97316}
+.kpi-val{font-size:1.3rem;font-weight:700;color:#1e293b}
+.kpi-lbl{font-size:.72rem;color:#64748b;margin-bottom:.25rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.kpi-sub{font-size:.7rem;color:#94a3b8}
+tfoot td{font-weight:600;background:#f8fafc}
+.table-sm td,.table-sm th{padding:.42rem .6rem}
+.btn-xs{padding:2px 7px;font-size:.72rem}
+.badge-lunas{background:#dcfce7;color:#166534;font-size:.7rem}
+.badge-sebagian{background:#fef9c3;color:#854d0e;font-size:.7rem}
+.badge-belum{background:#fee2e2;color:#991b1b;font-size:.7rem}
+.badge-lewat{background:#dc2626;color:#fff;font-size:.7rem}
+.badge-mendekati{background:#f59e0b;color:#fff;font-size:.7rem}
+.badge-belumjt{background:#e0f2fe;color:#0369a1;font-size:.7rem}
+.badge-op{background:#e0f2fe;color:#0369a1}
+.badge-inv{background:#fef3c7;color:#92400e}
+.badge-fin{background:#ede9fe;color:#5b21b6}
+.badge-pem{background:#dcfce7;color:#166534}
+.badge-pen{background:#ffe4e6;color:#9f1239}
+.badge-pel{background:#e0f2fe;color:#0369a1}
+.text-rp{font-variant-numeric:tabular-nums}
+.pnl-row{display:flex;justify-content:space-between;padding:.22rem 0;border-bottom:1px solid #f1f5f9}
+.pnl-row.total-row{font-weight:600;background:#f8fafc;padding:.3rem .5rem;border-radius:6px;margin:.2rem 0}
+.pnl-row.final-row{font-weight:700;font-size:1rem;background:#1e293b;color:#fff;padding:.35rem .5rem;border-radius:6px;margin:.3rem 0}
+.pnl-pct{color:#94a3b8;font-size:.75rem;min-width:50px;text-align:right}
+
+/* ── MOBILE RESPONSIVE ── */
+@media(max-width:767.98px){
+  .main{margin-left:0}
+  .topbar{padding:.5rem .75rem}
+  .topbar .page-title{font-size:1.1rem}
+  .body-content{padding:.75rem}
+  .card-body{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .kpi-val{font-size:1.1rem}
+}
+
+/* ── P&L TABLE ── */
+.pnl-tbl{font-size:.75rem;width:100%;border-collapse:collapse}
+.pnl-tbl td{padding:.3rem .45rem;vertical-align:middle;white-space:nowrap}
+.pnl-tbl td.label-col{white-space:normal;min-width:100px}
+.pnl-th td{background:#1e293b;color:#fff;font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;font-weight:600;padding:.28rem .45rem}
+.pnl-norm td{background:#fff;color:#374151}
+.pnl-deduct td{background:#fafafa;color:#64748b}
+.pnl-ded td{background:#fef2f2!important;color:#111827!important}
+.pnl-sep{border-top:2px solid #475569!important}
+.pnl-result td{background:#14532d;color:#fff;font-weight:700}
+.pnl-result-blue td{background:#1e3a5f;color:#fff;font-weight:700}
+.pnl-result-net td{background:#166534;color:#fff;font-weight:800;font-size:.8rem}
+.pnl-result-kept td{background:#059669;color:#fff;font-weight:800;font-size:.8rem}
+.pnl-bar-bg{height:7px;background:rgba(0,0,0,.12);border-radius:3px;overflow:hidden;width:64px;display:inline-block;vertical-align:middle}
+.pnl-bar-fill{height:100%;border-radius:3px}
+
+/* ── DARK MODE STRUCTURAL ── */
+[data-theme="dark"] .card{background:var(--card)!important;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+[data-theme="dark"] .card-header{background:var(--card-h)!important;border-bottom-color:var(--bdr)!important}
+[data-theme="dark"] .card-footer{background:var(--card)!important;border-top-color:var(--bdr)!important}
+[data-theme="dark"] .topbar{background:var(--card)!important;border-bottom-color:var(--bdr)!important}
+[data-theme="dark"] .topbar .page-title{color:var(--tx)}
+[data-theme="dark"] .section-title{color:var(--tx)!important}
+[data-theme="dark"] .text-muted{color:var(--tx3)!important}
+[data-theme="dark"] .table{color:var(--tx);border-color:var(--bdr);--bs-table-color:var(--tx);--bs-table-bg:transparent}
+/* COMPREHENSIVE: semua sel tabel terbaca di dark mode (kecuali yg punya warna util !important spt text-danger/success) */
+[data-theme="dark"] .table>:not(caption)>*>*{color:var(--tx)}
+[data-theme="dark"] .table-light{--bs-table-bg:var(--card-h);--bs-table-color:var(--tx2)}
+[data-theme="dark"] .table-hover>tbody>tr:hover>*{--bs-table-bg-state:rgba(255,255,255,.04)}
+[data-theme="dark"] .table td,[data-theme="dark"] .table th{border-color:var(--bdr)}
+[data-theme="dark"] .form-control,[data-theme="dark"] .form-select{background:var(--inp)!important;border-color:var(--bdr-md)!important;color:var(--tx)!important}
+[data-theme="dark"] .form-control::placeholder{color:var(--tx3)}
+[data-theme="dark"] .btn-outline-secondary{color:var(--tx2);border-color:var(--bdr-md)}
+[data-theme="dark"] .btn-outline-secondary:hover{background:var(--bdr);color:var(--tx);border-color:var(--bdr-md)}
+[data-theme="dark"] .btn-outline-primary{color:#60a5fa;border-color:#1d4ed8}
+[data-theme="dark"] .btn-outline-primary:hover{background:#1d4ed8;color:#fff}
+[data-theme="dark"] .modal-content{background:var(--card);color:var(--tx)}
+[data-theme="dark"] .modal-header,[data-theme="dark"] .modal-footer{border-color:var(--bdr)}
+[data-theme="dark"] tfoot td{background:var(--card-h)!important}
+[data-theme="dark"] .alert{border-color:var(--bdr)}
+[data-theme="dark"] .badge.bg-secondary{background:#334155!important}
+[data-theme="dark"] .dropdown-menu{background:var(--card);border-color:var(--bdr)}
+[data-theme="dark"] .dropdown-item{color:var(--tx2)}
+[data-theme="dark"] .dropdown-item:hover{background:var(--bdr);color:var(--tx)}
+[data-theme="dark"] .fw-600,.fw-semibold:not(.badge){color:var(--tx)}
+[data-theme="dark"] small.text-muted{color:var(--tx3)!important}
+/* KPI cards */
+[data-theme="dark"] .kpi-val{color:var(--tx)!important}
+[data-theme="dark"] .kpi-lbl{color:var(--tx3)!important}
+[data-theme="dark"] .kpi-sub{color:var(--tx3)!important}
+/* Badges */
+[data-theme="dark"] .badge-lunas{background:#14532d;color:#86efac}
+[data-theme="dark"] .badge-sebagian{background:#451a03;color:#fde68a}
+[data-theme="dark"] .badge-belum{background:#7f1d1d;color:#fca5a5}
+[data-theme="dark"] .badge-lewat{background:#991b1b;color:#fecaca}
+[data-theme="dark"] .badge-mendekati{background:#78350f;color:#fcd34d}
+[data-theme="dark"] .badge-belumjt{background:#1e3a5f;color:#93c5fd}
+[data-theme="dark"] .badge-op{background:#1e3a5f;color:#93c5fd}
+[data-theme="dark"] .badge-inv{background:#451a03;color:#fde68a}
+[data-theme="dark"] .badge-fin{background:#2e1065;color:#c4b5fd}
+[data-theme="dark"] .badge-pem{background:#14532d;color:#86efac}
+[data-theme="dark"] .badge-pen{background:#4c0519;color:#fda4af}
+[data-theme="dark"] .badge-pel{background:#1e3a5f;color:#93c5fd}
+/* P&L rows */
+[data-theme="dark"] .pnl-norm td{background:var(--card)!important;color:var(--tx)!important}
+[data-theme="dark"] .pnl-deduct td{background:var(--card-h)!important;color:var(--tx3)!important}
+[data-theme="dark"] .pnl-ded td{background:rgba(239,68,68,.13)!important;color:var(--tx)!important}
+[data-theme="dark"] .pnl-row{border-bottom-color:var(--bdr)!important}
+[data-theme="dark"] .pnl-row.total-row{background:var(--card-h)!important;color:var(--tx)!important}
+[data-theme="dark"] .pnl-pct{color:var(--tx3)!important}
+/* Input group */
+[data-theme="dark"] .input-group-text{background:var(--card-h)!important;border-color:var(--bdr-md)!important;color:var(--tx2)!important}
+/* Table footer */
+[data-theme="dark"] tfoot td{color:var(--tx)!important}
+/* Card header section title */
+[data-theme="dark"] .card-header{color:var(--tx)!important}
+/* Outline buttons */
+[data-theme="dark"] .btn-outline-danger{color:#fca5a5;border-color:#7f1d1d}
+[data-theme="dark"] .btn-outline-danger:hover{background:#7f1d1d;color:#fca5a5}
+[data-theme="dark"] .btn-outline-success{color:#86efac;border-color:#14532d}
+[data-theme="dark"] .btn-outline-success:hover{background:#14532d;color:#86efac}
+[data-theme="dark"] .btn-outline-warning{color:#fcd34d;border-color:#78350f}
+[data-theme="dark"] .btn-outline-warning:hover{background:#78350f;color:#fcd34d}
+/* fw-bold, fw-semibold text in tables */
+[data-theme="dark"] .fw-bold{color:var(--tx)!important}
+[data-theme="dark"] .fw-semibold{color:var(--tx)!important}
+/* Bootstrap contextual table rows — override di dark mode agar terbaca */
+[data-theme="dark"] .table-primary  {--bs-table-bg:rgba(37,99,235,.25);--bs-table-color:#93c5fd;--bs-table-border-color:rgba(37,99,235,.35)}
+[data-theme="dark"] .table-danger   {--bs-table-bg:rgba(185,28,28,.25);--bs-table-color:#fca5a5;--bs-table-border-color:rgba(185,28,28,.35)}
+[data-theme="dark"] .table-success  {--bs-table-bg:rgba(22,163,74,.25);--bs-table-color:#86efac;--bs-table-border-color:rgba(22,163,74,.35)}
+[data-theme="dark"] .table-warning  {--bs-table-bg:rgba(180,83,9,.25);--bs-table-color:#fcd34d;--bs-table-border-color:rgba(180,83,9,.35)}
+[data-theme="dark"] .table-info     {--bs-table-bg:rgba(8,145,178,.25);--bs-table-color:#67e8f9;--bs-table-border-color:rgba(8,145,178,.35)}
+[data-theme="dark"] .table-secondary{--bs-table-bg:rgba(71,85,105,.3);--bs-table-color:#cbd5e1;--bs-table-border-color:rgba(71,85,105,.4)}
+[data-theme="dark"] .table-light    {--bs-table-bg:var(--card-h);--bs-table-color:var(--tx2)}
+
+/* ════════════════════════════════════════════════════════════
+   DARK MODE: Inline background overrides (global, semua template)
+   Inline style tidak bisa di-override CSS biasa → pakai
+   attribute selector + !important
+   ════════════════════════════════════════════════════════════ */
+
+/* Slate/abu: tab bar, thead/tfoot rows, role legend header */
+[data-theme="dark"] [style*="background:#f8fafc"]{background:var(--card-h)!important;color:var(--tx2)!important}
+[data-theme="dark"] [style*="background:#f1f5f9"]{background:var(--card-h)!important;color:var(--tx3)!important}
+[data-theme="dark"] [style*="background:#e2e8f0"]{background:rgba(71,85,105,.35)!important;color:var(--tx3)!important}
+
+/* Biru muda: Arus Kas Operasional header/footer, Operator role box */
+[data-theme="dark"] [style*="background:#e0f2fe"]{background:rgba(3,105,161,.25)!important;color:#67e8f9!important}
+[data-theme="dark"] [style*="background:#f0f9ff"]{background:rgba(3,105,161,.2)!important;color:#67e8f9!important}
+[data-theme="dark"] [style*="background:#dbeafe"]{background:rgba(30,64,175,.25)!important;color:#93c5fd!important}
+[data-theme="dark"] [style*="background:#eff6ff"]{background:rgba(30,64,175,.2)!important;color:#93c5fd!important}
+
+/* Kuning-amber: Arus Kas Investasi, stok rendah, info box */
+[data-theme="dark"] [style*="background:#fef3c7"]{background:rgba(120,53,15,.3)!important;color:#fcd34d!important}
+[data-theme="dark"] [style*="background:#fffbeb"]{background:rgba(120,53,15,.25)!important;color:#fcd34d!important}
+[data-theme="dark"] [style*="background:#fef9c3"]{background:rgba(120,53,15,.25)!important;color:#fcd34d!important}
+[data-theme="dark"] [style*="background:#fff7ed"]{background:rgba(154,52,18,.2)!important;color:#fdba74!important}
+
+/* Ungu: Arus Kas Pendanaan, Investor role box, Penarikan Owner badge */
+[data-theme="dark"] [style*="background:#ede9fe"]{background:rgba(91,33,182,.25)!important;color:#c4b5fd!important}
+[data-theme="dark"] [style*="background:#f5f3ff"]{background:rgba(91,33,182,.2)!important;color:#c4b5fd!important}
+
+/* Hijau: Finance role box, export info, Penjualan/Bahan Baku badge */
+[data-theme="dark"] [style*="background:#f0fdf4"]{background:rgba(20,83,45,.25)!important;color:#86efac!important}
+[data-theme="dark"] [style*="background:#dcfce7"]{background:rgba(20,83,45,.3)!important;color:#86efac!important}
+[data-theme="dark"] [style*="background:#d1fae5"]{background:rgba(6,78,59,.3)!important;color:#6ee7b7!important}
+
+/* Merah muda: Settings delete section, ikon Pengeluaran */
+[data-theme="dark"] [style*="background:#fff1f2"]{background:rgba(159,18,57,.25)!important;color:#fda4af!important}
+[data-theme="dark"] [style*="background:#fee2e6"]{background:rgba(159,18,57,.2)!important}
+[data-theme="dark"] [style*="background:#ffe4e6"]{background:rgba(159,18,57,.2)!important;color:#fda4af!important}
+
+/* Teal/cyan: Pajak badge */
+[data-theme="dark"] [style*="background:#cffafe"]{background:rgba(22,78,99,.3)!important;color:#67e8f9!important}
+
+/* Indigo: ikon Inventory operator */
+[data-theme="dark"] [style*="background:#eef2ff"]{background:rgba(55,48,163,.2)!important;color:#a5b4fc!important}
+/* Dark amber/brown teks di dalam info box yang jadi anak elemen */
+[data-theme="dark"] [style*="color:#78350f"]{color:#fcd34d!important}
+[data-theme="dark"] [style*="color:#92400e"]{color:#fcd34d!important}
+[data-theme="dark"] [style*="color:#374151"]{color:var(--tx2)!important}
+[data-theme="dark"] [style*="color:#1e40af"]{color:#93c5fd!important}
+[data-theme="dark"] [style*="color:#15803d"]{color:#86efac!important}
+[data-theme="dark"] [style*="color:#4c1d95"]{color:#c4b5fd!important}
+[data-theme="dark"] [style*="color:#0c4a6e"]{color:#67e8f9!important}
+[data-theme="dark"] [style*="color:#075985"]{color:#67e8f9!important}
+/* text-danger, text-success, text-warning keep readable */
+[data-theme="dark"] .text-danger{color:#fca5a5!important}
+[data-theme="dark"] .text-success{color:#86efac!important}
+[data-theme="dark"] .text-warning{color:#fcd34d!important}
+/* form labels */
+[data-theme="dark"] .form-label{color:var(--tx2)!important}
+[data-theme="dark"] label{color:var(--tx2)!important}
+/* select options */
+[data-theme="dark"] select option{background:var(--card);color:var(--tx)}
+/* offcanvas dark */
+[data-theme="dark"] .sb-toggle{border-color:var(--bdr-md);color:var(--tx2)}
+[data-theme="dark"] .sb-toggle:hover{background:var(--bdr);color:var(--tx)}
+
+/* ── theme + display pill switchers ── */
+.theme-pill{display:inline-flex;border:1px solid var(--bdr-md);border-radius:8px;overflow:hidden;background:var(--card-h);flex-shrink:0}
+.theme-pill button{border:none;background:transparent;padding:4px 9px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx3);transition:all .15s;display:flex;align-items:center;gap:4px;line-height:1.4}
+.theme-pill button:hover{color:var(--tx)}
+.theme-pill button.on{background:var(--acc);color:#fff}
+.theme-pill button+button{border-left:1px solid var(--bdr-md)}
+
+/* ── Year dropdown (shared by SDRP + DRP2) ── */
+.drp2-yr-sel{appearance:none;-webkit-appearance:none;border:none;background:transparent;font-size:inherit;font-weight:inherit;color:inherit;cursor:pointer;outline:none;padding:1px 14px 1px 3px;border-radius:3px;border-bottom:1.5px dashed var(--bdr-md);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 2px center;background-size:8px 5px}
+.drp2-yr-sel:hover,.drp2-yr-sel:focus{border-bottom-color:#16a34a;background-color:var(--bdr)}
+
+/* ── Single Date Picker (sdrp) ── */
+.sdrp-trig{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+.sdrp-trig:hover,.sdrp-trig:focus-visible{border-color:#16a34a!important;outline:none}
+.sdrp-panel{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--bdr-md);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:.75rem;width:228px}
+.sdrp-mhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+.sdrp-nav{background:none;border:none;cursor:pointer;color:var(--tx2);font-size:1.15rem;line-height:1;padding:2px 7px;border-radius:4px;transition:background .1s}
+.sdrp-nav:hover{background:var(--bdr)}
+.sdrp-mtitle{font-size:.83rem;font-weight:700;color:var(--tx)}
+.sdrp-daynames{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:.2rem}
+.sdrp-daynames div{text-align:center;font-size:.58rem;font-weight:600;color:var(--tx3);padding:.14rem 0}
+.sdrp-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.sdrp-day,.sdrp-empty{text-align:center;font-size:.77rem;padding:.3rem .1rem;cursor:pointer;border-radius:4px;color:var(--tx);line-height:1.4;user-select:none}
+.sdrp-empty{cursor:default}
+.sdrp-day:hover{background:var(--bdr)}
+.sdrp-today{font-weight:700;color:#16a34a;outline:1.5px solid #16a34a;outline-offset:-1px}
+.sdrp-sel{background:#16a34a!important;color:#fff!important;font-weight:700}
+.sdrp-sel.sdrp-today{outline-color:#fff}
+.sdrp-day-dis{opacity:.28;cursor:not-allowed;color:var(--tx3)!important}
+[data-theme=dark] .sdrp-panel{box-shadow:0 6px 24px rgba(0,0,0,.5)}
+
+/* ── Flatpickr theme integration ── */
+.flatpickr-calendar{border-radius:10px!important;border:1px solid var(--bdr)!important;box-shadow:0 8px 24px rgba(0,0,0,.12)!important;background:var(--card)!important;font-family:inherit!important}
+.flatpickr-months,.flatpickr-weekdays{background:var(--card)!important}
+.flatpickr-month{color:var(--tx1)!important;fill:var(--tx1)!important}
+.flatpickr-weekday{color:var(--tx3)!important;background:var(--card)!important}
+.flatpickr-day{color:var(--tx1)!important;border-radius:7px!important}
+.flatpickr-day:hover{background:var(--card-h)!important;border-color:var(--bdr)!important}
+.flatpickr-day.selected,.flatpickr-day.startRange,.flatpickr-day.endRange{background:#16a34a!important;border-color:#16a34a!important;color:#fff!important}
+.flatpickr-day.inRange{background:#dcfce7!important;border-color:#dcfce7!important;box-shadow:-5px 0 0 #dcfce7,5px 0 0 #dcfce7!important;color:#15803d!important}
+.flatpickr-day.today{border-color:#16a34a!important}
+.flatpickr-day.flatpickr-disabled,.flatpickr-day.flatpickr-disabled:hover{color:var(--tx3)!important;opacity:.4}
+.numInputWrapper span{border-color:var(--bdr)!important}
+.numInputWrapper span:hover{background:var(--card-h)!important}
+.flatpickr-current-month input.cur-year,.flatpickr-current-month .flatpickr-monthDropdown-months{color:var(--tx1)!important;background:var(--card)!important;border:none!important}
+.flatpickr-prev-month,.flatpickr-next-month{fill:var(--tx2)!important}
+.flatpickr-prev-month:hover svg,.flatpickr-next-month:hover svg{fill:#16a34a!important}
+[data-theme=dark] .flatpickr-day.inRange{background:#14532d!important;border-color:#14532d!important;box-shadow:-5px 0 0 #14532d,5px 0 0 #14532d!important;color:#86efac!important}
+/* range picker input styling */
+.drp-input{cursor:pointer;background:var(--card)!important;color:var(--tx1)!important;min-width:200px}
+.drp-input:read-only:focus{border-color:#16a34a;box-shadow:0 0 0 .2rem rgba(22,163,74,.2)}
+</style>
+<script>
+// ── Single Date Picker — auto-replaces every input[type="date"] ──────────────
+(function(){
+  var BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus',
+           'September','Oktober','November','Desember'];
+  var HRN=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+
+  function ymd(d){
+    return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+
+           '-'+d.getDate().toString().padStart(2,'0');
+  }
+  function fromYMD(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+  function dispFmt(d){
+    return d.getDate().toString().padStart(2,'0')+' '+BLN[d.getMonth()]+' '+d.getFullYear();
+  }
+  function calCells(y,m){
+    var first=new Date(y,m,1),dow=first.getDay(),last=new Date(y,m+1,0),cells=[];
+    for(var i=0;i<dow;i++)cells.push(null);
+    for(var n=1;n<=last.getDate();n++)cells.push(new Date(y,m,n));
+    return cells;
+  }
+
+  function initPicker(inp){
+    if(inp._sdrp||inp.readOnly||inp.disabled)return;
+    inp._sdrp=true;
+
+    var raw=inp.value||ymd(new Date());
+    var val=fromYMD(raw);
+    var cy=val.getFullYear(),cm=val.getMonth();
+    var panel=null;
+    var isSmall=inp.className.indexOf('form-control-sm')>=0;
+
+    // wrap + hide native input
+    var wrap=document.createElement('div');
+    wrap.style.cssText='position:relative;display:block';
+    inp.parentNode.insertBefore(wrap,inp);
+    wrap.appendChild(inp);
+    inp.type='hidden';
+
+    // trigger element
+    var trig=document.createElement('div');
+    trig.className='sdrp-trig form-control'+(isSmall?' form-control-sm':'');
+    trig.setAttribute('tabindex','0');
+    function updTrig(){
+      trig.innerHTML='<i class="fas fa-calendar-days" style="color:var(--acc);font-size:.88em;flex-shrink:0"></i>'+
+                     '<span>'+dispFmt(val)+'</span>'+
+                     '<i class="fas fa-chevron-down" style="font-size:.6rem;color:var(--tx3);margin-left:auto"></i>';
+    }
+    updTrig();
+    wrap.insertBefore(trig,inp);
+
+    var MIN_YR=new Date().getFullYear()-30;
+    var maxDate=inp.max?fromYMD(inp.max):null;
+    var minDate=inp.min?fromYMD(inp.min):null;
+
+    function buildPanel(){
+      var maxYr=maxDate?maxDate.getFullYear():new Date().getFullYear()+10;
+      var minYr=minDate?minDate.getFullYear():MIN_YR;
+      var yrOpts='',y2;
+      for(y2=minYr;y2<=maxYr;y2++)
+        yrOpts+='<option value="'+y2+'"'+(y2===cy?' selected':'')+'>'+y2+'</option>';
+
+      var todayStr=ymd(new Date());
+      var cells=calCells(cy,cm);
+      var grid=cells.map(function(d){
+        if(!d)return'<div class="sdrp-empty"></div>';
+        var ds=ymd(d),cls='sdrp-day';
+        var disabled=(maxDate&&d>maxDate)||(minDate&&d<minDate);
+        if(disabled){cls+=' sdrp-day-dis';}
+        else{
+          if(ds===ymd(val))cls+=' sdrp-sel';
+          if(ds===todayStr)cls+=' sdrp-today';
+        }
+        return'<div class="'+cls+'" data-dt="'+ds+'">'+d.getDate()+'</div>';
+      }).join('');
+
+      var atMax=maxDate&&cy>=maxDate.getFullYear()&&cm>=maxDate.getMonth();
+      var atMin=minDate&&cy<=minDate.getFullYear()&&cm<=minDate.getMonth();
+      panel.innerHTML=
+        '<div class="sdrp-mhdr">'+
+          '<button type="button" class="sdrp-nav" id="sdrpP"'+(atMin?' disabled style="opacity:.3;cursor:default"':'')+'>&#8249;</button>'+
+          '<div class="sdrp-mtitle">'+BLN[cm]+
+            ' <select class="drp2-yr-sel" id="sdrpY">'+yrOpts+'</select>'+
+          '</div>'+
+          '<button type="button" class="sdrp-nav" id="sdrpN"'+(atMax?' disabled style="opacity:.3;cursor:default"':'')+'>&#8250;</button>'+
+        '</div>'+
+        '<div class="sdrp-daynames">'+HRN.map(function(h){return'<div>'+h+'</div>';}).join('')+'</div>'+
+        '<div class="sdrp-grid">'+grid+'</div>';
+
+      panel.querySelector('#sdrpP').addEventListener('click',function(e){
+        e.stopPropagation();if(this.disabled)return;cm--;if(cm<0){cm=11;cy--;}buildPanel();});
+      panel.querySelector('#sdrpN').addEventListener('click',function(e){
+        e.stopPropagation();if(this.disabled)return;cm++;if(cm>11){cm=0;cy++;}buildPanel();});
+      panel.querySelector('#sdrpY').addEventListener('change',function(){
+        cy=parseInt(this.value);buildPanel();});
+      panel.querySelectorAll('.sdrp-day').forEach(function(el){
+        el.addEventListener('click',function(e){
+          e.stopPropagation();
+          if(el.classList.contains('sdrp-day-dis'))return;
+          val=fromYMD(el.dataset.dt);
+          cy=val.getFullYear();cm=val.getMonth();
+          inp.value=ymd(val);
+          inp.dispatchEvent(new Event('change',{bubbles:true}));
+          updTrig();closePanel();
+        });
+      });
+    }
+
+    function posPanel(){
+      var r=trig.getBoundingClientRect(),w=232,h=290;
+      var left=r.left,top=r.bottom+4;
+      if(left+w>window.innerWidth-8)left=Math.max(8,window.innerWidth-w-8);
+      if(top+h>window.innerHeight-8)top=Math.max(8,r.top-h-4);
+      panel.style.top=top+'px';panel.style.left=left+'px';
+    }
+
+    function openPanel(){
+      if(panel){closePanel();return;}
+      panel=document.createElement('div');
+      panel.className='sdrp-panel';
+      document.body.appendChild(panel);
+      buildPanel();posPanel();
+      setTimeout(function(){document.addEventListener('mousedown',outer);},0);
+    }
+    function closePanel(){
+      if(panel){panel.remove();panel=null;}
+      document.removeEventListener('mousedown',outer);
+    }
+    function outer(e){
+      if(panel&&!panel.contains(e.target)&&!trig.contains(e.target))closePanel();
+    }
+    trig.addEventListener('click',openPanel);
+    trig.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();openPanel();}
+    });
+  }
+
+  function initAll(){
+    document.querySelectorAll('input[type="date"]').forEach(initPicker);
+  }
+  document.addEventListener('DOMContentLoaded',initAll);
+  window.initSingleDRP=initAll;
+})();
+</script>
+</head>
+<body>
+
+{# ── SIDEBAR NAV MACRO — used in both desktop sidebar and mobile offcanvas ── #}
+{% macro sb_nav() %}
+  <div class="py-2 px-1">
+    {% set role = session.get('role','') %}
+
+    {# ── DASHBOARD ─────────────────────────────────── #}
+    <div class="sb-sec sb-first">Dashboard</div>
+    <a href="/" class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}">
+      <i class="fas fa-house"></i> Dashboard</a>
+    {% if role in ('ADMIN','FINANCE','OPERATOR','DEMO') %}
+    <a href="/pemasukan" class="nav-link {% if request.endpoint=='pemasukan' %}active{% endif %}">
+      <i class="fas fa-arrow-trend-up"></i> Pemasukan</a>
+    <a href="/pengeluaran" class="nav-link {% if request.endpoint=='pengeluaran' %}active{% endif %}">
+      <i class="fas fa-arrow-trend-down"></i> Pengeluaran</a>
+    <a href="/retur-penjualan" class="nav-link {% if request.endpoint=='retur_penjualan' %}active{% endif %}">
+      <i class="fas fa-rotate-left"></i> Retur Penjualan</a>
+    <a href="/retur-pembelian" class="nav-link {% if request.endpoint=='retur_pembelian' %}active{% endif %}">
+      <i class="fas fa-rotate-right"></i> Retur Pembelian</a>
+    {% if role in ('ADMIN','FINANCE','DEMO') %}
+    <a href="/pelunasan" class="nav-link {% if request.endpoint=='pelunasan' %}active{% endif %}">
+      <i class="fas fa-handshake"></i> Pelunasan</a>
+    {% endif %}
+    <a href="/invoice" class="nav-link {% if 'invoice' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-file-invoice"></i> Invoice</a>
+    {% endif %}
+
+    {# ── TRACKER ───────────────────────────────────── #}
+    <div class="sb-sec">Tracker</div>
+    <a href="/daftar-transaksi?tab=semua" class="nav-link {% if request.endpoint=='daftar_transaksi' %}active{% endif %}">
+      <i class="fas fa-list-ul"></i> Daftar Transaksi</a>
+    <a href="/piutang" class="nav-link {% if 'piutang' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-file-invoice-dollar"></i> Piutang</a>
+    <a href="/hutang" class="nav-link {% if 'hutang' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-hand-holding-dollar"></i> Hutang</a>
+    <a href="/stok" class="nav-link {% if 'stok' in (request.endpoint or '') or 'produk' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-boxes-stacked"></i> Inventory</a>
+    {% if role in ('ADMIN','FINANCE','INVESTOR','DEMO') %}
+    <a href="/aset-tetap" class="nav-link {% if request.endpoint=='aset_tetap_list' %}active{% endif %}">
+      <i class="fas fa-building"></i> Aset Tetap</a>
+    <div class="sb-inner"></div>
+    <a href="/laba-rugi" class="nav-link {% if request.endpoint=='laba_rugi' %}active{% endif %}">
+      <i class="fas fa-chart-bar"></i> Laba Rugi</a>
+    <a href="/arus-kas" class="nav-link {% if request.endpoint=='arus_kas' %}active{% endif %}">
+      <i class="fas fa-droplet"></i> Arus Kas</a>
+    <a href="/charts" class="nav-link {% if request.endpoint=='charts' %}active{% endif %}">
+      <i class="fas fa-chart-pie"></i> Grafik</a>
+    <a href="/neraca" class="nav-link {% if request.endpoint=='neraca' %}active{% endif %}">
+      <i class="fas fa-scale-balanced"></i> Neraca</a>
+    <a href="/buku-besar" class="nav-link {% if request.endpoint=='buku_besar' %}active{% endif %}">
+      <i class="fas fa-book-open"></i> Buku Besar</a>
+    {% endif %}
+
+    {# ── LAINNYA ───────────────────────────────────── #}
+    {% if role in ('ADMIN','FINANCE','INVESTOR','DEMO') %}
+    <div class="sb-sec">Lainnya</div>
+    <a href="/transaksi" class="nav-link {% if 'transaksi' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-receipt"></i> Jurnal</a>
+    <a href="/akun" class="nav-link {% if 'akun' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fas fa-list-check"></i> Bagan Akun</a>
+    {% endif %}
+    {% if role == 'ADMIN' %}
+    <a href="/settings" class="nav-link {% if request.endpoint=='settings' %}active{% endif %}">
+      <i class="fas fa-gear"></i> Pengaturan</a>
+    {% endif %}
+    {% if role in ('ADMIN','FINANCE') %}
+    <a href="/log" class="nav-link {% if request.endpoint=='log_aktivitas' %}active{% endif %}">
+      <i class="fas fa-clock-rotate-left"></i> Log Aktivitas</a>
+    {% endif %}
+
+    {# ── BONUS ─────────────────────────────────────── #}
+    {% if role in ('ADMIN','FINANCE','INVESTOR','DEMO') %}
+    <div class="sb-sec" style="color:rgba(250,204,21,.45)">Bonus</div>
+    <a href="/kalkulator-hpp" class="nav-link {% if request.endpoint=='kalkulator_hpp' %}active{% endif %}"
+       style="{% if request.endpoint!='kalkulator_hpp' %}color:rgba(250,204,21,.7)!important{% endif %}">
+      <i class="fas fa-calculator"></i> Kalkulator HPP</a>
+    {% endif %}
+
+    {# Role badge at bottom of sidebar #}
+    <div style="padding:.6rem .75rem;margin-top:.5rem;border-top:1px solid rgba(255,255,255,.08)">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.3);margin-bottom:.3rem">Role</div>
+      {% if role == 'ADMIN' %}
+        <span style="font-size:.72rem;font-weight:700;color:#60a5fa"><i class="fas fa-shield-halved me-1"></i>Admin</span>
+      {% elif role == 'FINANCE' %}
+        <span style="font-size:.72rem;font-weight:700;color:#34d399"><i class="fas fa-coins me-1"></i>Finance</span>
+      {% elif role == 'INVESTOR' %}
+        <span style="font-size:.72rem;font-weight:700;color:#c4b5fd"><i class="fas fa-eye me-1"></i>Investor</span>
+      {% elif role == 'OPERATOR' %}
+        <span style="font-size:.72rem;font-weight:700;color:#67e8f9"><i class="fas fa-pen-to-square me-1"></i>Operator</span>
+      {% elif role == 'DEMO' %}
+        <span style="font-size:.72rem;font-weight:700;color:#fb923c"><i class="fas fa-flask me-1"></i>Demo</span>
+        <div style="font-size:.58rem;color:rgba(251,146,60,.6);margin-top:.2rem">Read-only</div>
+      {% endif %}
+    </div>
+
+    {# Version label #}
+    <div style="padding:.3rem .75rem .8rem;text-align:center">
+      <span style="font-size:.58rem;color:rgba(255,255,255,.18);letter-spacing:.05em;font-weight:500">
+        v.4.0 &nbsp;·&nbsp; 30 Juni 2026
+      </span>
+    </div>
+
+  </div>
+{% endmacro %}
+
+{# ── MOBILE OFFCANVAS SIDEBAR ── #}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="sbCanvas" aria-labelledby="sbCanvasLabel">
+  <div class="offcanvas-header">
+    <div>
+      <div id="sbCanvasLabel" style="color:#4ade80;font-weight:800;font-size:1.05rem;line-height:1.25">
+        <i class="fas fa-chart-line me-2"></i>{{ nama_usaha }}
+      </div>
+      <span style="color:rgba(255,255,255,.35);font-size:.62rem">Sistem Akuntansi Bisnis</span>
+    </div>
+    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+  </div>
+  <div class="offcanvas-body">
+    {{ sb_nav() }}
+  </div>
+</div>
+
+{# ── DESKTOP SIDEBAR — hidden on mobile, shown md+ ── #}
+<nav class="sidebar d-none d-md-block">
+  <div class="sb-brand">
+    <div class="brand-name"><i class="fas fa-chart-line me-2"></i>{{ nama_usaha }}</div>
+    <span class="brand-sub">Sistem Akuntansi Bisnis</span>
+  </div>
+  {{ sb_nav() }}
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    {# Hamburger button — mobile only #}
+    <button class="sb-toggle d-md-none" data-bs-toggle="offcanvas" data-bs-target="#sbCanvas" aria-label="Buka menu">
+      <i class="fas fa-bars"></i>
+    </button>
+    <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+    <div class="d-flex align-items-center gap-2" style="flex-shrink:0">
+      <span class="text-muted d-none d-lg-inline" style="font-size:.78rem">
+        <i class="fas fa-calendar-day me-1"></i>{{ now.strftime('%d %B %Y') }}
+      </span>
+      <!-- Toggle 1: Warna Light / Dark -->
+      <div class="theme-pill" id="sw-theme" title="Mode warna">
+        <button data-v="light" onclick="setTheme('light')" title="Light">
+          <i class="fas fa-sun"></i><span class="d-none d-lg-inline">Light</span></button>
+        <button data-v="dark" onclick="setTheme('dark')" title="Dark">
+          <i class="fas fa-moon"></i><span class="d-none d-lg-inline">Dark</span></button>
+      </div>
+      <!-- Toggle 2: Tampilan Classic / Modern -->
+      <div class="theme-pill" id="sw-display" title="Gaya tampilan">
+        <button data-v="classic" onclick="setDisplay('classic')" title="Classic">
+          <i class="fas fa-table-list"></i><span class="d-none d-lg-inline">Classic</span></button>
+        <button data-v="modern" onclick="setDisplay('modern')" title="Modern">
+          <i class="fas fa-wand-magic-sparkles"></i><span class="d-none d-lg-inline">Modern</span></button>
+      </div>
+      {% if session.get('nama') %}
+      <div class="d-flex align-items-center gap-1">
+        <span class="badge {% if session.role=='ADMIN' %}bg-primary{% elif session.role=='DEMO' %}bg-warning text-dark{% else %}bg-secondary{% endif %} d-none d-sm-inline">
+          {{ session.role }}</span>
+        <span class="text-muted d-none d-sm-inline" style="font-size:.78rem">{{ session.nama }}</span>
+        {% if session.role == 'ADMIN' %}
+        <button onclick="document.getElementById('modalGantiPw').classList.add('show');document.getElementById('modalGantiPw').style.display='block';document.body.classList.add('modal-open')"
+                class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.72rem" title="Ganti Password">
+          <i class="fas fa-key"></i></button>
+        {% endif %}
+        <a href="/logout" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.72rem">
+          <i class="fas fa-sign-out-alt"></i><span class="d-none d-sm-inline ms-1">Keluar</span></a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="body-content">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show py-2 mb-3" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
+{% block scripts %}{% endblock %}
+<script>
+// ── 2 toggle independen: warna (light/dark) + tampilan (classic/modern) ──
+function _syncSwitchers(){
+  const th = document.documentElement.getAttribute('data-theme')   || 'light';
+  const dp = document.documentElement.getAttribute('data-display') || 'classic';
+  document.querySelectorAll('#sw-theme button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.v === th);
+  });
+  document.querySelectorAll('#sw-display button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.v === dp);
+  });
+}
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  _syncSwitchers();
+}
+function setDisplay(d){
+  document.documentElement.setAttribute('data-display', d);
+  localStorage.setItem('display', d);
+  _syncSwitchers();
+}
+// Kompat lama
+function toggleTheme(){
+  setTheme((document.documentElement.getAttribute('data-theme')||'light')==='dark'?'light':'dark');
+}
+document.addEventListener('DOMContentLoaded', _syncSwitchers);
+// Close offcanvas when a nav link inside it is clicked
+document.addEventListener('DOMContentLoaded', function(){
+  var canvas = document.getElementById('sbCanvas');
+  if(canvas){
+    canvas.querySelectorAll('.nav-link').forEach(function(link){
+      link.addEventListener('click', function(){
+        var bsOffcanvas = bootstrap.Offcanvas.getInstance(canvas);
+        if(bsOffcanvas) bsOffcanvas.hide();
+      });
+    });
+  }
+});
+</script>
+
+<!-- Modal Ganti Password -->
+<div class="modal fade" id="modalGantiPw" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-key me-2"></i>Ganti Password</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/ganti-password">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Password Lama *</label>
+            <input type="password" name="pw_lama" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Password Baru * <span class="text-muted fw-normal">(min 6 karakter)</span></label>
+            <input type="password" name="pw_baru" class="form-control form-control-sm" required minlength="6">
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-semibold">Konfirmasi Password Baru *</label>
+            <input type="password" name="pw_konfirm" class="form-control form-control-sm" required minlength="6">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>

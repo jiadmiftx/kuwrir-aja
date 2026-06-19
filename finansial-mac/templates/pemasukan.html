@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+{% block title %}Input Pemasukan - FinansialApp{% endblock %}
+{% block page_title %}Input Pemasukan{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-lg-9">
+
+<ul class="nav nav-tabs mb-3" id="modeTabs">
+  <li class="nav-item">
+    <a class="nav-link active" id="tab-umum" href="#" onclick="switchMode('umum');return false">
+      <i class="fas fa-file-invoice-dollar me-1"></i>Penjualan Umum</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="tab-produk" href="#" onclick="switchMode('produk');return false">
+      <i class="fas fa-boxes-stacked me-1"></i>Penjualan per Produk</a>
+  </li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FORM PENJUALAN UMUM
+═══════════════════════════════════════════════════════════════ -->
+<div id="form-umum">
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-arrow-trend-up text-success"></i>
+    <span class="section-title">Penjualan Umum / Jasa</span>
+  </div>
+  <div class="card-body">
+  <form method="POST">
+    <input type="hidden" name="mode" value="umum">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Tanggal <span class="text-danger">*</span></label>
+        <input type="date" name="tanggal" class="form-control" value="{{ today }}" max="{{ today }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold"><i class="fas fa-vault text-success me-1"></i>Masuk ke Rekening</label>
+        <select name="akun_kas" class="form-select">
+          {% for a in akun_kas %}
+          <option value="{{ a.kode }}">{{ a.kode }} - {{ a.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">Keterangan <span class="text-danger">*</span></label>
+        <input type="text" name="keterangan" class="form-control" placeholder="Misal: Penjualan produk A, Invoice #001" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Nama Pelanggan</label>
+        <input type="text" name="pelanggan" class="form-control" placeholder="Nama pelanggan / customer">
+      </div>
+
+      <!-- Row 1: Nominal + Uang Masuk -->
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Nominal Invoice (Total Penjualan) <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="nominal" id="u_nominal" class="form-control" min="0" step="1"
+                 oninput="calcUmum()" required placeholder="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Uang Masuk (Dibayar Sekarang)</span>
+          <button type="button" onclick="setBayarPenuh()"
+                  class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.7rem">
+            <i class="fas fa-bolt me-1"></i>Bayar Penuh</button>
+        </label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="uang_masuk" id="u_masuk" class="form-control" min="0" step="1"
+                 oninput="calcUmum()" placeholder="0">
+        </div>
+        <div class="form-text">Kosongkan jika belum ada pembayaran</div>
+      </div>
+
+      <!-- Row 2: HPP + Piutang -->
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">HPP / Harga Pokok</label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="number" name="hpp" id="u_hpp" class="form-control" min="0" step="1"
+                 oninput="calcUmum()" placeholder="0">
+        </div>
+        <div class="form-text">
+          Saldo Persediaan (1130): <strong id="u_saldo_persediaan">{{ saldo_persediaan|rp }}</strong>
+          <span id="u_hpp_warning" class="text-danger ms-1" style="display:none">
+            <i class="fas fa-exclamation-triangle fa-xs"></i> Melebihi saldo persediaan
+          </span>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Piutang <small class="text-muted fw-normal">(Auto)</small></label>
+        <div class="input-group">
+          <span class="input-group-text">Rp</span>
+          <input type="text" id="u_piutang_display" class="form-control" readonly
+                 style="background:var(--card-h);color:var(--tx2)" value="0">
+        </div>
+        <div class="form-text">= Total − Uang Masuk</div>
+      </div>
+
+      <!-- Row 3: Diskon / Ongkir / Biaya Transaksi (optional) -->
+      <div class="col-12">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">
+            <i class="fas fa-sliders me-1"></i>Penyesuaian (Opsional)
+          </span>
+          <hr class="flex-fill my-0">
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Diskon</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="diskon" id="u_diskon" class="form-control" min="0" step="1"
+                     oninput="calcUmum()" placeholder="0">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Ongkir</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="ongkir" id="u_ongkir" class="form-control" min="0" step="1"
+                     oninput="calcUmum()" placeholder="0">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Biaya Transaksi</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="biaya_lain" id="u_biaya" class="form-control" min="0" step="1"
+                     oninput="calcUmum()" placeholder="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary panel -->
+      <div class="col-12" id="u_laba_panel">
+        <div class="rounded-3 p-3" style="background:var(--pg);border:1px solid var(--pgb)">
+          <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--pgt);margin-bottom:.65rem">
+            <i class="fas fa-chart-simple me-1"></i>Ringkasan Transaksi (Auto)
+          </div>
+          <div class="row g-0 text-center">
+            <div class="col-6 col-md-3" style="border-right:1px solid var(--pgb);padding:.5rem .5rem .5rem .25rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total Bersih</div>
+              <div style="font-size:.95rem;font-weight:700;color:#0ea5e9" id="u_total_val">—</div>
+              <div style="font-size:.62rem;color:var(--tx3)">setelah penyesuaian</div>
+            </div>
+            <div class="col-6 col-md-3" style="padding:.5rem .25rem .5rem .5rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">HPP</div>
+              <div style="font-size:.95rem;font-weight:700;color:#ef4444" id="u_hpp_val">—</div>
+              <div style="font-size:.62rem;color:var(--tx3)">harga pokok</div>
+            </div>
+            <div class="col-6 col-md-3" style="border-top:1px solid var(--pgb);border-right:1px solid var(--pgb);padding:.5rem .5rem .5rem .25rem" id="u_laba_col">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Laba Kotor</div>
+              <div style="font-size:.95rem;font-weight:700" id="u_laba_val">—</div>
+              <div style="font-size:.62rem;color:var(--tx3)">Total − HPP</div>
+            </div>
+            <div class="col-6 col-md-3" style="border-top:1px solid var(--pgb);padding:.5rem .25rem .5rem .5rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Gross Profit Margin</div>
+              <div style="font-size:1.1rem;font-weight:800" id="u_gpm_val">—</div>
+              <div style="font-size:.62rem;color:var(--tx3)">Laba ÷ Total × 100%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Piutang detail -->
+      <div class="col-12" id="piutang_detail" style="display:none">
+        <div class="card border-warning">
+          <div class="card-body py-2 px-3">
+            <div class="fw-semibold text-warning mb-2">
+              <i class="fas fa-file-invoice-dollar me-1"></i>Detail Piutang
+            </div>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label small">Jatuh Tempo</label>
+                <input type="date" name="jatuh_tempo" class="form-control form-control-sm">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle Invoice (umum) -->
+      <div class="col-12">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" name="buat_invoice" id="inv_toggle_u" value="on">
+          <label class="form-check-label small fw-semibold" for="inv_toggle_u">
+            <i class="fas fa-file-invoice text-primary me-1"></i>Buat Invoice untuk transaksi ini
+          </label>
+        </div>
+        <div id="inv_detail_u" style="display:none;margin-top:.6rem">
+          <div class="card border-primary">
+            <div class="card-body py-2 px-3">
+              <div class="fw-semibold text-primary mb-2" style="font-size:.83rem"><i class="fas fa-file-invoice me-1"></i>Detail Invoice</div>
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <label class="form-label small d-flex justify-content-between align-items-center">
+                    <span>Nama Pelanggan <span class="text-danger">*</span></span>
+                    <button type="button" onclick="samakanPelanggan('u')"
+                            class="btn btn-outline-secondary py-0 px-1" style="font-size:.68rem;line-height:1.4">
+                      <i class="fas fa-copy me-1"></i>Samakan dengan transaksi</button>
+                  </label>
+                  <input type="text" name="inv_pelanggan" id="inv_pelanggan_u" class="form-control form-control-sm" placeholder="Nama customer">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">No. Invoice</label>
+                  <input type="text" name="inv_nomor" class="form-control form-control-sm" placeholder="Otomatis jika kosong">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Telepon Pelanggan</label>
+                  <input type="text" name="inv_telepon_pelanggan" class="form-control form-control-sm" placeholder="08xx...">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Alamat Pelanggan</label>
+                  <input type="text" name="inv_alamat_pelanggan" class="form-control form-control-sm" placeholder="Alamat singkat">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Jatuh Tempo</label>
+                  <input type="date" name="inv_jatuh_tempo" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Catatan Invoice</label>
+                  <input type="text" name="inv_catatan_custom" class="form-control form-control-sm" placeholder="Opsional">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 d-flex gap-2 justify-content-end">
+        <a href="/" class="btn btn-outline-secondary">Batal</a>
+        <button type="submit" class="btn btn-success">
+          <i class="fas fa-save me-1"></i>Simpan Pemasukan</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+</div><!-- /form-umum -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FORM PENJUALAN PER PRODUK
+═══════════════════════════════════════════════════════════════ -->
+<div id="form-produk" style="display:none">
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-boxes-stacked text-primary"></i>
+    <span class="section-title">Penjualan per Produk</span>
+  </div>
+  <div class="card-body">
+  <form method="POST" id="formProduk">
+    <input type="hidden" name="mode" value="produk">
+    <div class="row g-3">
+      <!-- Header fields -->
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Tanggal <span class="text-danger">*</span></label>
+        <input type="date" name="tanggal" class="form-control" value="{{ today }}" max="{{ today }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold"><i class="fas fa-vault text-success me-1"></i>Masuk ke Rekening</label>
+        <select name="akun_kas" class="form-select">
+          {% for a in akun_kas %}
+          <option value="{{ a.kode }}">{{ a.kode }} - {{ a.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Pelanggan</label>
+        <input type="text" name="pelanggan" class="form-control" placeholder="Nama pelanggan">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Keterangan</label>
+        <input type="text" name="keterangan" class="form-control" placeholder="Keterangan tambahan">
+      </div>
+
+      <!-- Product table -->
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">
+            <i class="fas fa-list me-1"></i>Daftar Produk
+            <span id="p_item_count" class="badge bg-secondary ms-1" style="font-size:.65rem">1</span>
+          </span>
+          <button type="button" id="btnTambahItem" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-plus me-1"></i>Tambah Produk
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0" style="font-size:.83rem">
+            <thead class="table-light">
+              <tr>
+                <th style="min-width:200px">Produk</th>
+                <th style="width:90px" class="text-center">Qty</th>
+                <th style="width:60px" class="text-center">Satuan</th>
+                <th style="width:140px">Harga / Unit</th>
+                <th style="width:120px">Diskon Item</th>
+                <th style="width:120px" class="text-end">Subtotal</th>
+                <th style="width:36px"></th>
+              </tr>
+            </thead>
+            <tbody id="p_item_body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Shared adjustments -->
+      <div class="col-12">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">
+            <i class="fas fa-sliders me-1"></i>Penyesuaian Invoice (Opsional)
+          </span>
+          <hr class="flex-fill my-0">
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Ongkir</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="ongkir" id="p_ongkir" class="form-control" min="0" step="1"
+                     value="0" oninput="calcGrandTotal()" placeholder="0">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Biaya Transaksi</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="biaya_lain" id="p_biaya" class="form-control" min="0" step="1"
+                     value="0" oninput="calcGrandTotal()" placeholder="0">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold d-flex justify-content-between align-items-center">
+              <span>Uang Masuk (Dibayar)</span>
+              <button type="button" onclick="setPBayarPenuh()"
+                      class="btn btn-outline-secondary btn-xs py-0 px-1" style="font-size:.68rem">
+                <i class="fas fa-bolt me-1"></i>Penuh</button>
+            </label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="uang_masuk" id="p_masuk" class="form-control" min="0" step="1"
+                     oninput="calcGrandTotal()" placeholder="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="col-12">
+        <div class="rounded-3 p-3" style="background:var(--pg);border:1px solid var(--pgb)">
+          <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--pgt);margin-bottom:.65rem">
+            <i class="fas fa-chart-simple me-1"></i>Ringkasan Invoice (Auto)
+          </div>
+          <div class="row g-0 text-center">
+            <div class="col-6 col-md-3" style="border-right:1px solid var(--pgb);padding:.5rem .5rem .5rem .25rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total Invoice</div>
+              <div style="font-size:.95rem;font-weight:700;color:#0ea5e9" id="p_grand_total_disp">Rp 0</div>
+              <div style="font-size:.62rem;color:var(--tx3)">subtotal + adj.</div>
+            </div>
+            <div class="col-6 col-md-3" style="padding:.5rem .25rem .5rem .5rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">HPP Total</div>
+              <div style="font-size:.95rem;font-weight:700;color:#ef4444" id="p_hpp_total_disp">Rp 0</div>
+              <div style="font-size:.62rem;color:var(--tx3)">akumulasi semua item</div>
+            </div>
+            <div class="col-6 col-md-3" style="border-top:1px solid var(--pgb);border-right:1px solid var(--pgb);padding:.5rem .5rem .5rem .25rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Laba Kotor</div>
+              <div style="font-size:.95rem;font-weight:700" id="p_laba_disp">—</div>
+              <div style="font-size:.62rem;color:var(--tx3)" id="p_margin_disp">—</div>
+            </div>
+            <div class="col-6 col-md-3" style="border-top:1px solid var(--pgb);padding:.5rem .25rem .5rem .5rem">
+              <div style="font-size:.63rem;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Piutang</div>
+              <div style="font-size:.95rem;font-weight:700;color:#f59e0b" id="p_piutang_disp">Rp 0</div>
+              <div style="font-size:.62rem;color:var(--tx3)">Invoice − Uang Masuk</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Piutang detail -->
+      <div class="col-12" id="p_piutang_detail" style="display:none">
+        <div class="card border-warning">
+          <div class="card-body py-2 px-3">
+            <div class="fw-semibold text-warning mb-2">
+              <i class="fas fa-file-invoice-dollar me-1"></i>Detail Piutang
+            </div>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label small">Jatuh Tempo</label>
+                <input type="date" name="jatuh_tempo" class="form-control form-control-sm">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggle Invoice (produk) -->
+      <div class="col-12">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" name="buat_invoice" id="inv_toggle_p" value="on">
+          <label class="form-check-label small fw-semibold" for="inv_toggle_p">
+            <i class="fas fa-file-invoice text-primary me-1"></i>Buat Invoice untuk transaksi ini
+          </label>
+        </div>
+        <div id="inv_detail_p" style="display:none;margin-top:.6rem">
+          <div class="card border-primary">
+            <div class="card-body py-2 px-3">
+              <div class="fw-semibold text-primary mb-2" style="font-size:.83rem"><i class="fas fa-file-invoice me-1"></i>Detail Invoice</div>
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <label class="form-label small d-flex justify-content-between align-items-center">
+                    <span>Nama Pelanggan <span class="text-danger">*</span></span>
+                    <button type="button" onclick="samakanPelanggan('p')"
+                            class="btn btn-outline-secondary py-0 px-1" style="font-size:.68rem;line-height:1.4">
+                      <i class="fas fa-copy me-1"></i>Samakan dengan transaksi</button>
+                  </label>
+                  <input type="text" name="inv_pelanggan" id="inv_pelanggan_p" class="form-control form-control-sm" placeholder="Nama customer">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">No. Invoice</label>
+                  <input type="text" name="inv_nomor" class="form-control form-control-sm" placeholder="Otomatis jika kosong">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Telepon Pelanggan</label>
+                  <input type="text" name="inv_telepon_pelanggan" class="form-control form-control-sm" placeholder="08xx...">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Alamat Pelanggan</label>
+                  <input type="text" name="inv_alamat_pelanggan" class="form-control form-control-sm" placeholder="Alamat singkat">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Jatuh Tempo Invoice</label>
+                  <input type="date" name="inv_jatuh_tempo" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Catatan Invoice</label>
+                  <input type="text" name="inv_catatan_custom" class="form-control form-control-sm" placeholder="Opsional">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 d-flex gap-2 justify-content-end">
+        <a href="/" class="btn btn-outline-secondary">Batal</a>
+        <button type="submit" class="btn btn-success">
+          <i class="fas fa-save me-1"></i>Simpan Penjualan</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+</div><!-- /form-produk -->
+
+</div><!-- col -->
+</div><!-- row -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── produk data for autocomplete ──────────────────────────────────────────────
+const produkData = {
+{% for p in produk_list %}
+  {{ p.id }}: {nama: {{ (p.nama + (' (' + p.varian + ')' if p.varian else ''))|tojson }},
+               hargaBeli: {{ p.harga_beli }}, hargaJual: {{ p.harga_jual }},
+               satuan: {{ p.satuan|tojson }}, stok: {{ p.stok }}},
+{% endfor %}
+};
+
+const produkOptions = `<option value="">-- Pilih Produk --</option>{% for p in produk_list %}<option value="{{ p.id }}">{{ p.kode }} - {{ p.nama }}{% if p.varian %} ({{ p.varian }}){% endif %}</option>{% endfor %}`;
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  document.getElementById('form-umum').style.display   = mode==='umum'    ? 'block' : 'none';
+  document.getElementById('form-produk').style.display = mode==='produk'  ? 'block' : 'none';
+  document.getElementById('tab-umum').classList.toggle('active', mode==='umum');
+  document.getElementById('tab-produk').classList.toggle('active', mode==='produk');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt(n) { return 'Rp ' + Math.round(Math.abs(n)).toLocaleString('id-ID'); }
+// Strip Indonesian thousand-separator dots before parsing (e.g. "2.250.000" → 2250000)
+function parseRp(v) { return parseInt(String(v == null ? '' : v).replace(/\./g, ''), 10) || 0; }
+function nv(el) { return parseRp(((el||{}).value || '0')); }
+
+// ── PENJUALAN UMUM ────────────────────────────────────────────────────────────
+function setBayarPenuh() {
+  const total = calcUmumTotal();
+  document.getElementById('u_masuk').value = Math.round(total);
+  calcUmum();
+}
+
+function calcUmumTotal() {
+  const nominal = nv(document.getElementById('u_nominal'));
+  const diskon  = nv(document.getElementById('u_diskon'));
+  const ongkir  = nv(document.getElementById('u_ongkir'));
+  const biaya   = nv(document.getElementById('u_biaya'));
+  return Math.max(0, nominal - diskon + ongkir + biaya);
+}
+
+const SALDO_PERSEDIAAN = {{ saldo_persediaan|int }};
+
+function calcUmum() {
+  const nominal = nv(document.getElementById('u_nominal'));
+  const masuk   = nv(document.getElementById('u_masuk'));
+  const hpp     = nv(document.getElementById('u_hpp'));
+  const total   = calcUmumTotal();
+
+  // Validasi HPP vs saldo persediaan
+  const warnEl = document.getElementById('u_hpp_warning');
+  if (warnEl) warnEl.style.display = (hpp > SALDO_PERSEDIAAN && hpp > 0) ? 'inline' : 'none';
+
+  // Piutang
+  const piutang = Math.max(0, total - masuk);
+  document.getElementById('u_piutang_display').value = piutang ? Math.round(piutang).toLocaleString('id-ID') : '0';
+  document.getElementById('piutang_detail').style.display = piutang > 0 ? 'block' : 'none';
+
+  // Summary
+  const totalEl = document.getElementById('u_total_val');
+  totalEl.textContent = total > 0 ? fmt(total) : '—';
+
+  const hppEl = document.getElementById('u_hpp_val');
+  hppEl.textContent = total > 0 ? fmt(hpp) : '—';
+
+  const laba = total - hpp;
+  const labaEl = document.getElementById('u_laba_val');
+  if (total > 0) {
+    labaEl.textContent = (laba < 0 ? '-' : '') + fmt(Math.abs(laba));
+    labaEl.style.color = laba >= 0 ? 'var(--pgp)' : '#dc2626';
+  } else { labaEl.textContent = '—'; labaEl.style.color = ''; }
+
+  const gpmEl = document.getElementById('u_gpm_val');
+  if (total > 0) {
+    const gpm = laba / total * 100;
+    gpmEl.textContent = gpm.toFixed(1) + '%';
+    gpmEl.style.color = gpm >= 30 ? '#7c3aed' : gpm >= 0 ? '#d97706' : '#dc2626';
+  } else { gpmEl.textContent = '—'; gpmEl.style.color = ''; }
+}
+
+// ── PENJUALAN PER PRODUK — multi-item ────────────────────────────────────────
+let hppMap = {};  // produk_id → harga_beli
+
+function makeItemRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select name="produk_id[]" class="form-select form-select-sm item-produk" onchange="onProdukChange(this)">
+        ${produkOptions}
+      </select>
+      <div class="form-text item-stok" style="font-size:.7rem"></div>
+    </td>
+    <td>
+      <input type="number" name="qty[]" class="form-control form-control-sm text-center item-qty"
+             min="0.01" step="0.01" value="1" oninput="calcRowSubtotal(this.closest('tr'));calcGrandTotal()">
+    </td>
+    <td class="text-center align-middle item-satuan" style="font-size:.8rem;color:var(--tx3)">pcs</td>
+    <td>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text px-1">Rp</span>
+        <input type="number" name="harga_jual[]" class="form-control item-harga"
+               min="0" step="1" value="0" oninput="calcRowSubtotal(this.closest('tr'));calcGrandTotal()">
+      </div>
+      <div class="form-text item-hpp-info" style="font-size:.68rem"></div>
+    </td>
+    <td>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text px-1">Rp</span>
+        <input type="number" name="diskon_item[]" class="form-control item-diskon"
+               min="0" step="1" value="0" oninput="calcRowSubtotal(this.closest('tr'));calcGrandTotal()">
+      </div>
+    </td>
+    <td class="text-end align-middle fw-semibold item-subtotal" style="color:#0ea5e9;font-size:.83rem">Rp 0</td>
+    <td class="text-center align-middle">
+      <button type="button" class="btn btn-xs btn-outline-danger del-item" title="Hapus">
+        <i class="fas fa-times"></i></button>
+    </td>`;
+  return tr;
+}
+
+function onProdukChange(sel) {
+  const tr  = sel.closest('tr');
+  const pid = parseInt(sel.value);
+  const p   = produkData[pid];
+  if (p) {
+    tr.querySelector('.item-harga').value = p.hargaJual;
+    tr.querySelector('.item-satuan').textContent = p.satuan;
+    tr.querySelector('.item-stok').textContent = 'Stok: ' + p.stok + ' ' + p.satuan;
+    tr.querySelector('.item-hpp-info').textContent = 'HPP: Rp ' + Math.round(p.hargaBeli).toLocaleString('id-ID');
+    hppMap[pid] = p.hargaBeli;
+  } else {
+    tr.querySelector('.item-satuan').textContent = 'pcs';
+    tr.querySelector('.item-stok').textContent = '';
+    tr.querySelector('.item-hpp-info').textContent = '';
+  }
+  calcRowSubtotal(tr);
+  calcGrandTotal();
+}
+
+function calcRowSubtotal(tr) {
+  const qty   = parseFloat(tr.querySelector('.item-qty').value) || 0;
+  const harga = parseRp(tr.querySelector('.item-harga').value);
+  const dis   = parseRp(tr.querySelector('.item-diskon').value);
+  const sub   = Math.max(0, qty * harga - dis);
+  tr.querySelector('.item-subtotal').textContent = 'Rp ' + Math.round(sub).toLocaleString('id-ID');
+}
+
+function calcGrandTotal() {
+  let totalSub = 0, totalHpp = 0;
+  document.querySelectorAll('#p_item_body tr').forEach(tr => {
+    const qty   = parseFloat(tr.querySelector('.item-qty').value) || 0;
+    const harga = parseRp(tr.querySelector('.item-harga').value);
+    const dis   = parseRp(tr.querySelector('.item-diskon').value);
+    const pid   = parseInt(tr.querySelector('.item-produk').value) || 0;
+    totalSub += Math.max(0, qty * harga - dis);
+    totalHpp += qty * (hppMap[pid] || 0);
+  });
+
+  const ongkir = nv(document.getElementById('p_ongkir'));
+  const biaya  = nv(document.getElementById('p_biaya'));
+  const grand  = totalSub + ongkir + biaya;
+  const masuk  = nv(document.getElementById('p_masuk'));
+  const piutang = Math.max(0, grand - masuk);
+
+  document.getElementById('p_grand_total_disp').textContent = fmt(grand);
+  document.getElementById('p_hpp_total_disp').textContent   = totalHpp > 0 ? fmt(totalHpp) : 'Rp 0';
+
+  const laba = grand - totalHpp;
+  const labaEl = document.getElementById('p_laba_disp');
+  const margEl = document.getElementById('p_margin_disp');
+  if (grand > 0) {
+    labaEl.textContent = (laba < 0 ? '-' : '') + fmt(Math.abs(laba));
+    labaEl.style.color = laba >= 0 ? '#16a34a' : '#dc2626';
+    const gpm = laba / grand * 100;
+    margEl.textContent = 'GPM ' + gpm.toFixed(1) + '%';
+    margEl.style.color = gpm >= 30 ? '#7c3aed' : gpm >= 0 ? '#d97706' : '#dc2626';
+  } else { labaEl.textContent = '—'; labaEl.style.color = ''; margEl.textContent = '—'; margEl.style.color = ''; }
+
+  document.getElementById('p_piutang_disp').textContent = fmt(piutang);
+  document.getElementById('p_piutang_detail').style.display = piutang > 0 ? 'block' : 'none';
+
+  // hidden field for submission (grand total)
+  let hid = document.getElementById('p_grand_hidden');
+  if (!hid) { hid = document.createElement('input'); hid.type='hidden'; hid.id='p_grand_hidden'; hid.name='grand_total'; document.getElementById('formProduk').appendChild(hid); }
+  hid.value = Math.round(grand);
+}
+
+function setPBayarPenuh() {
+  const grand = parseFloat((document.getElementById('p_grand_hidden')||{}).value) || 0;
+  document.getElementById('p_masuk').value = Math.round(grand);
+  calcGrandTotal();
+}
+
+function updateItemCount() {
+  const n = document.querySelectorAll('#p_item_body tr').length;
+  document.getElementById('p_item_count').textContent = n;
+}
+
+// Event delegation for delete item
+document.getElementById('p_item_body').addEventListener('click', e => {
+  const btn = e.target.closest('.del-item');
+  if (!btn) return;
+  const rows = document.querySelectorAll('#p_item_body tr');
+  if (rows.length <= 1) return;
+  btn.closest('tr').remove();
+  updateItemCount();
+  calcGrandTotal();
+});
+
+// Tambah Produk button
+document.getElementById('btnTambahItem').addEventListener('click', () => {
+  document.getElementById('p_item_body').appendChild(makeItemRow());
+  updateItemCount();
+});
+
+// Init first row on load
+(function init() {
+  document.getElementById('p_item_body').appendChild(makeItemRow());
+  updateItemCount();
+  calcGrandTotal();
+})();
+
+// ── Invoice toggle ──────────────────────────────────────────────────────────
+document.getElementById('inv_toggle_u').addEventListener('change', function() {
+  document.getElementById('inv_detail_u').style.display = this.checked ? 'block' : 'none';
+});
+document.getElementById('inv_toggle_p').addEventListener('change', function() {
+  document.getElementById('inv_detail_p').style.display = this.checked ? 'block' : 'none';
+});
+
+// ── Samakan nama pelanggan dari form utama ke detail invoice ─────────────────
+function samakanPelanggan(mode) {
+  const src = mode === 'u'
+    ? document.querySelector('#form-umum [name=pelanggan]')
+    : document.querySelector('#form-produk [name=pelanggan]');
+  const dst = document.getElementById('inv_pelanggan_' + mode);
+  if (src && dst && src.value.trim()) {
+    dst.value = src.value.trim();
+    dst.style.background = '#f0fdf4';
+    setTimeout(() => dst.style.background = '', 1200);
+  } else if (dst) {
+    dst.focus();
+  }
+}
+
+// ── Auto-open invoice di new tab jika baru saja disimpan ─────────────────────
+(function() {
+  const params  = new URLSearchParams(window.location.search);
+  const invId   = params.get('new_inv');
+  if (invId) {
+    window.open('/invoice/' + invId + '/cetak', '_blank');
+    history.replaceState({}, '', '/pemasukan');
+  }
+})();
+</script>
+{% endblock %}

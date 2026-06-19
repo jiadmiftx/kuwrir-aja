@@ -1,0 +1,727 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan - FinansialApp{% endblock %}
+{% block page_title %}Pengaturan{% endblock %}
+{% block content %}
+
+<div class="row g-3">
+
+  <!-- Pengaturan Umum -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-gear text-primary"></i>
+        <span class="section-title">Pengaturan Umum</span>
+      </div>
+      <div class="card-body">
+      <form method="POST">
+        <input type="hidden" name="action" value="save_settings">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nama Usaha</label>
+          <input type="text" name="nama_usaha" class="form-control" value="{{ s_nama_usaha }}">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="fas fa-save me-1"></i>Simpan Pengaturan</button>
+      </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-coins text-warning"></i>
+        <span class="section-title">Setoran Modal</span>
+        <span class="badge bg-warning text-dark ms-auto" style="font-size:.7rem">
+          Total: {{ total_modal|rp }}
+        </span>
+      </div>
+      <div class="card-body">
+      <p class="text-muted" style="font-size:.82rem">
+        Catat setiap setoran modal pemilik. Bisa diinput berkali-kali — termasuk di tanggal yang sama.
+        Jurnal: DR Kas/Bank → CR Modal Pemilik (3100).
+      </p>
+      <form method="POST">
+        <input type="hidden" name="action" value="modal">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Tanggal</label>
+            <input type="date" name="modal_tanggal" class="form-control form-control-sm"
+                   value="{{ today.strftime('%Y-%m-%d') }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Akun Penerimaan</label>
+            <select name="akun_kas" class="form-select form-select-sm">
+              {% for a in akun_kas %}
+              <option value="{{ a.kode }}">{{ a.kode }} - {{ a.nama }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Jumlah Modal</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="modal_nominal" class="form-control" min="1" required placeholder="0">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Catatan (opsional)</label>
+            <input type="text" name="modal_catatan" class="form-control form-control-sm"
+                   placeholder="Mis: setoran tunai owner #2" maxlength="80">
+          </div>
+        </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-warning btn-sm">
+            <i class="fas fa-plus me-1"></i>Tambah Setoran Modal</button>
+        </div>
+      </form>
+
+      {% if riwayat_modal %}
+      <hr class="my-3">
+      <div class="fw-semibold mb-2" style="font-size:.82rem">
+        <i class="fas fa-clock-rotate-left me-1"></i>Riwayat Setoran
+      </div>
+      <div class="table-responsive" style="max-height:240px;overflow-y:auto">
+        <table class="table table-sm mb-0" style="font-size:.78rem">
+          <thead style="position:sticky;top:0;background:var(--card-h)">
+            <tr>
+              <th>Tanggal</th>
+              <th>Keterangan</th>
+              <th>Ke Rekening</th>
+              <th class="text-end">Jumlah</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in riwayat_modal %}
+            <tr>
+              <td>{{ r.tanggal|tgl }}</td>
+              <td>{{ r.keterangan }}</td>
+              <td>{{ r.akun_kas_nama or '-' }}</td>
+              <td class="text-end fw-semibold">{{ r.jumlah|rp }}</td>
+              <td>
+                <form method="POST" style="display:inline"
+                      onsubmit="return confirm('Hapus setoran modal {{ r.jumlah|rp }} tanggal {{ r.tanggal }}?')">
+                  <input type="hidden" name="action" value="hapus_modal">
+                  <input type="hidden" name="jurnal_id" value="{{ r.id }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"
+                          title="Hapus"><i class="fas fa-trash fa-xs"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-3" style="font-size:.82rem">
+        <i class="fas fa-inbox fa-lg d-block mb-1 text-secondary"></i>
+        Belum ada setoran modal.
+      </div>
+      {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup & Restore -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="fas fa-database" style="color:#3b82f6"></i>
+        <span class="section-title">Backup & Restore Database</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+
+          <!-- Backup -->
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--card-h);border:1px solid var(--bdr)">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="fas fa-download" style="color:#16a34a;font-size:1rem"></i>
+                <span class="fw-semibold">Backup</span>
+              </div>
+              <p class="text-muted mb-3" style="font-size:.82rem">
+                Unduh seluruh data aplikasi sebagai file <code>.db</code>.
+                Simpan file ini di tempat yang aman sebagai cadangan data.
+              </p>
+              <a href="/backup" class="btn btn-success btn-sm">
+                <i class="fas fa-download me-1"></i>Download Backup</a>
+            </div>
+          </div>
+
+          <!-- Restore -->
+          <div class="col-md-6">
+            <div class="p-3 rounded-3" style="background:var(--card-h);border:1px solid #fca5a5">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="fas fa-upload" style="color:#dc2626;font-size:1rem"></i>
+                <span class="fw-semibold">Restore</span>
+                <span class="badge bg-danger" style="font-size:.6rem">Hati-hati</span>
+              </div>
+              <p class="text-muted mb-3" style="font-size:.82rem">
+                Upload file backup <code>.db</code> untuk mengembalikan data.
+                <strong class="text-danger">Data saat ini akan tertimpa.</strong>
+              </p>
+              <form method="POST" action="/restore" enctype="multipart/form-data"
+                    onsubmit="return confirm('PERHATIAN: Semua data saat ini akan diganti dengan data dari file backup. Lanjutkan?')">
+                <div class="d-flex gap-2 align-items-center">
+                  <input type="file" name="backup_file" accept=".db" required
+                         class="form-control form-control-sm" style="font-size:.8rem">
+                  <button type="submit" class="btn btn-danger btn-sm flex-shrink-0">
+                    <i class="fas fa-upload me-1"></i>Restore</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manajemen User -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-users text-primary"></i>
+          <span class="section-title">Manajemen User</span>
+        </div>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddUser">
+          <i class="fas fa-user-plus me-1"></i>Tambah User</button>
+      </div>
+      {# ── Role legend ─────────────────────────────── #}
+      <div style="padding:.7rem 1rem;border-bottom:1.5px solid #e2e8f0;background:#f8fafc">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span style="font-size:.76rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em">
+            <i class="fas fa-shield-halved me-1"></i>Panduan Hak Akses Role
+          </span>
+          <button class="btn btn-xs btn-outline-secondary py-0 px-2" style="font-size:.7rem"
+                  type="button" data-bs-toggle="collapse" data-bs-target="#roleLegend"
+                  aria-expanded="false">
+            <i class="fas fa-chevron-down" id="roleLegendIcon" style="font-size:.6rem;transition:transform .2s"></i>
+            <span id="roleLegendTxt">Lihat</span>
+          </button>
+        </div>
+        <div class="collapse" id="roleLegend">
+          <div class="row g-2 mt-0">
+
+            {# ADMIN #}
+            <div class="col-md-6 col-lg-3">
+              <div style="border:1.5px solid #bfdbfe;border-radius:8px;padding:.6rem .8rem;background:#eff6ff">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge bg-primary" style="font-size:.68rem">ADMIN</span>
+                  <span style="font-size:.75rem;font-weight:700;color:#1e40af">Super Admin</span>
+                </div>
+                <ul style="font-size:.75rem;color:#1e40af;margin:0;padding-left:1rem;line-height:1.7">
+                  <li>Semua akses Finance & Operator</li>
+                  <li>Manajemen user & ubah role</li>
+                  <li>Pengaturan & backup/restore</li>
+                  <li>Clear data seluruh sistem</li>
+                </ul>
+              </div>
+            </div>
+
+            {# FINANCE #}
+            <div class="col-md-6 col-lg-3">
+              <div style="border:1.5px solid #bbf7d0;border-radius:8px;padding:.6rem .8rem;background:#f0fdf4">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge" style="background:#16a34a;font-size:.68rem">FINANCE</span>
+                  <span style="font-size:.75rem;font-weight:700;color:#15803d">Staf Keuangan</span>
+                </div>
+                <ul style="font-size:.75rem;color:#166534;margin:0;padding-left:1rem;line-height:1.7">
+                  <li>Semua akses Operator</li>
+                  <li>Input hutang & piutang</li>
+                  <li>Buat & kirim invoice</li>
+                  <li>Jurnal manual</li>
+                  <li>Lihat laporan keuangan</li>
+                </ul>
+              </div>
+            </div>
+
+            {# INVESTOR #}
+            <div class="col-md-6 col-lg-3">
+              <div style="border:1.5px solid #ddd6fe;border-radius:8px;padding:.6rem .8rem;background:#f5f3ff">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge" style="background:#5b21b6;font-size:.68rem">INVESTOR</span>
+                  <span style="font-size:.75rem;font-weight:700;color:#4c1d95">Read-Only</span>
+                </div>
+                <ul style="font-size:.75rem;color:#4c1d95;margin:0;padding-left:1rem;line-height:1.7">
+                  <li>Lihat dashboard</li>
+                  <li>Lihat laporan keuangan</li>
+                  <li>Export laporan Excel</li>
+                  <li class="text-danger fw-semibold" style="color:#dc2626!important">Tidak bisa input transaksi</li>
+                </ul>
+              </div>
+            </div>
+
+            {# OPERATOR #}
+            <div class="col-md-6 col-lg-3">
+              <div style="border:1.5px solid #bae6fd;border-radius:8px;padding:.6rem .8rem;background:#f0f9ff">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="badge" style="background:#0369a1;font-size:.68rem">OPERATOR</span>
+                  <span style="font-size:.75rem;font-weight:700;color:#0c4a6e">Kasir / Input</span>
+                </div>
+                <ul style="font-size:.75rem;color:#075985;margin:0;padding-left:1rem;line-height:1.7">
+                  <li>Input pemasukan</li>
+                  <li>Input pengeluaran</li>
+                  <li>Lihat daftar transaksi</li>
+                  <li class="text-danger fw-semibold" style="color:#dc2626!important">Tidak bisa lihat laporan</li>
+                </ul>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Username</th>
+              <th>Nama</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th class="text-end pe-3">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td class="ps-3 fw-semibold">{{ u.username }}</td>
+              <td style="font-size:.82rem">{{ u.nama or '-' }}</td>
+              <td>
+                {% if u.role == 'ADMIN' %}
+                  <span class="badge bg-primary">ADMIN</span>
+                {% elif u.role == 'INVESTOR' %}
+                  <span class="badge" style="background:#5b21b6">INVESTOR</span>
+                {% elif u.role == 'OPERATOR' %}
+                  <span class="badge" style="background:#0369a1">OPERATOR</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ u.role }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.aktif %}
+                  <span class="badge bg-success">Aktif</span>
+                {% else %}
+                  <span class="badge bg-danger">Nonaktif</span>
+                {% endif %}
+              </td>
+              <td class="text-end pe-3">
+                <div class="d-flex gap-1 justify-content-end align-items-center">
+                  {% if u.username != 'admin' %}
+                  <!-- Change role dropdown -->
+                  <div class="dropdown">
+                    <button class="btn btn-xs btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown"
+                            title="Ubah Role" style="font-size:.65rem">
+                      <i class="fas fa-user-gear"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;font-size:.8rem">
+                      {% for r, lbl in [('ADMIN','Admin'),('FINANCE','Finance'),('INVESTOR','Investor'),('OPERATOR','Operator')] %}
+                      <li>
+                        <form method="POST" style="margin:0">
+                          <input type="hidden" name="action" value="change_role">
+                          <input type="hidden" name="user_id" value="{{ u.id }}">
+                          <input type="hidden" name="new_role" value="{{ r }}">
+                          <button type="submit" class="dropdown-item {% if u.role==r %}fw-bold{% endif %}"
+                                  {% if u.role==r %}style="color:#16a34a"{% endif %}>
+                            {% if u.role==r %}<i class="fas fa-check me-1"></i>{% endif %}{{ lbl }}</button>
+                        </form>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  <form method="POST" style="display:inline">
+                    <input type="hidden" name="action" value="toggle_user">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button class="btn btn-xs {% if u.aktif %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                            title="{% if u.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}">
+                      {% if u.aktif %}<i class="fas fa-ban"></i>{% else %}<i class="fas fa-check"></i>{% endif %}
+                    </button>
+                  </form>
+                  <button class="btn btn-xs btn-outline-secondary" title="Reset Password"
+                          onclick="resetPw({{ u.id }}, '{{ u.username }}')">
+                    <i class="fas fa-key"></i></button>
+                  <form method="POST" style="display:inline"
+                        onsubmit="return confirm('Hapus user {{ u.username }}?')">
+                    <input type="hidden" name="action" value="delete_user">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted" style="font-size:.72rem">Super Admin</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manajemen Rekening -->
+  <div class="col-12" id="rekening">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-vault text-primary"></i>
+          <span class="section-title">Rekening Kas & Bank</span>
+        </div>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddRekening">
+          <i class="fas fa-plus me-1"></i>Tambah Rekening</button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Kode</th>
+              <th>Nama Rekening</th>
+              <th>No. Rekening</th>
+              <th class="text-end">Saldo Saat Ini</th>
+              <th class="text-end pe-3">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rek in rekening_list %}
+            <tr>
+              <td class="ps-3 text-muted" style="font-size:.78rem">{{ rek.kode }}</td>
+              <td class="fw-semibold">
+                {% if 'Kas' in rek.nama %}<i class="fas fa-money-bill-wave text-success me-1"></i>
+                {% else %}<i class="fas fa-building-columns text-primary me-1"></i>{% endif %}
+                {{ rek.nama }}
+              </td>
+              <td class="text-muted">{{ rek.no_rekening or '-' }}</td>
+              <td class="text-end text-rp fw-semibold {% if rek.saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                {{ rek.saldo|rp }}
+              </td>
+              <td class="text-end pe-3">
+                <div class="d-flex gap-1 justify-content-end">
+                  <button class="btn btn-xs btn-outline-primary"
+                          onclick="editRekening({{ rek.id }}, '{{ rek.nama|replace("'", "\\'") }}', '{{ rek.no_rekening or "" }}')">
+                    <i class="fas fa-pen"></i></button>
+                  {% if rek.kode not in ('1100','1110') %}
+                  <form method="POST" style="display:inline"
+                        onsubmit="return confirm('Hapus rekening {{ rek.nama }}? Hanya bisa dihapus jika belum ada transaksi.')">
+                    <input type="hidden" name="action" value="hapus_rekening">
+                    <input type="hidden" name="akun_id" value="{{ rek.id }}">
+                    <button class="btn btn-xs btn-outline-danger"><i class="fas fa-trash"></i></button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link to Invoice Customization -->
+  <div class="col-12">
+    <div class="card" style="border-left:3px solid #2563eb">
+      <div class="card-body py-2 px-3">
+        <div class="d-flex align-items-center gap-3">
+          <i class="fas fa-file-invoice text-primary fa-lg"></i>
+          <div class="flex-grow-1">
+            <div class="fw-semibold" style="font-size:.88rem">Kustomisasi Invoice</div>
+            <div class="text-muted" style="font-size:.75rem">Logo, tagline, syarat &amp; ketentuan, rekening pembayaran, prefix nomor, dan ToP</div>
+          </div>
+          <a href="/invoice/pengaturan" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-arrow-right me-1"></i>Atur Invoice</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link to Aset Tetap page -->
+  <div class="col-12">
+    <div class="card" style="border-left:3px solid #16a34a">
+      <div class="card-body py-2 px-3 d-flex align-items-center gap-3">
+        <i class="fas fa-building text-success fa-lg"></i>
+        <div>
+          <div class="fw-semibold" style="font-size:.88rem">Daftar Aset Tetap</div>
+          <div class="text-muted" style="font-size:.75rem">Lihat detail aset, progress penyusutan, dan penyusutan terealisasi</div>
+        </div>
+        <a href="/aset-tetap" class="btn btn-outline-success btn-sm ms-auto">
+          <i class="fas fa-arrow-right me-1"></i>Lihat Aset Tetap</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Tambah User -->
+<div class="modal fade" id="modalAddUser" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-user-plus me-2"></i>Tambah User</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <input type="hidden" name="action" value="add_user">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Username *</label>
+              <input type="text" name="username" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Nama Lengkap</label>
+              <input type="text" name="nama" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Password *</label>
+              <input type="password" name="password" class="form-control form-control-sm" required minlength="6">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Role</label>
+              <select name="role" class="form-select form-select-sm">
+                <option value="OPERATOR">Operator (Input bulan ini)</option>
+                <option value="INVESTOR">Investor (Lihat laporan)</option>
+                <option value="FINANCE">Finance (Full akses keuangan)</option>
+                <option value="ADMIN">Admin (Full akses + user mgmt)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm">Tambah User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tambah Rekening -->
+<div class="modal fade" id="modalAddRekening" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-vault me-2"></i>Tambah Rekening Kas / Bank</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <input type="hidden" name="action" value="add_rekening">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Jenis *</label>
+              <select name="rek_jenis" class="form-select form-select-sm">
+                <option value="Bank">Bank</option>
+                <option value="Kas">Kas</option>
+                <option value="E-Wallet">E-Wallet</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Nama Rekening *</label>
+              <input type="text" name="rek_nama" class="form-control form-control-sm"
+                     placeholder="BCA, Mandiri, GoPay..." required>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">No. Rekening / Keterangan</label>
+              <input type="text" name="rek_no" class="form-control form-control-sm"
+                     placeholder="1234-5678-9012 (opsional)">
+            </div>
+          </div>
+          <div class="alert alert-info py-2 mt-3 mb-0" style="font-size:.78rem">
+            <i class="fas fa-info-circle me-1"></i>
+            Rekening yang ditambah akan muncul sebagai pilihan di form Input Pemasukan, Pengeluaran, dan Pelunasan.
+            Saldo awal bisa dicatat via <strong>Setoran Modal</strong>.
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>Tambah Rekening</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Rekening -->
+<div class="modal fade" id="modalEditRekening" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-pen me-2"></i>Edit Rekening</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <input type="hidden" name="action" value="edit_rekening">
+        <input type="hidden" name="akun_id" id="editRekeningId">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Nama Rekening *</label>
+            <input type="text" name="rek_nama" id="editRekeningNama"
+                   class="form-control form-control-sm" required>
+            <div class="form-text">Contoh: Kas Toko, Bank BCA, Mandiri Bisnis</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-semibold">No. Rekening / Keterangan</label>
+            <input type="text" name="rek_no" id="editRekeningNo"
+                   class="form-control form-control-sm"
+                   placeholder="1234-5678-9012 (opsional)">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Reset Password -->
+<div class="modal fade" id="modalResetPw" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-key me-2"></i>Reset Password</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <input type="hidden" name="action" value="reset_password">
+        <input type="hidden" name="user_id" id="resetUserId">
+        <div class="modal-body">
+          <p class="text-muted small mb-2">Reset password untuk: <strong id="resetUsername"></strong></p>
+          <label class="form-label small fw-semibold">Password Baru *</label>
+          <input type="password" name="new_password" class="form-control form-control-sm" required minlength="6">
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-warning btn-sm">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ZONA BERBAHAYA ══ -->
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card border-danger">
+      <div class="card-header d-flex align-items-center gap-2" style="background:#fff1f2;border-color:#fca5a5">
+        <i class="fas fa-triangle-exclamation text-danger"></i>
+        <span class="fw-bold text-danger">Zona Berbahaya</span>
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+          <div>
+            <div class="fw-semibold text-danger mb-1">Hapus Semua Data Transaksi</div>
+            <div class="text-muted" style="font-size:.85rem">
+              Menghapus seluruh jurnal, transaksi, piutang, hutang, produk, dan invoice secara permanen.<br>
+              <strong>Aksi ini tidak dapat dibatalkan.</strong>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-danger btn-sm"
+                  onclick="showClearModal()">
+            <i class="fas fa-trash-can me-1"></i>Clear Data
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Clear Data (2-step confirmation) -->
+<div class="modal fade" id="modalClearData" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-danger">
+      <div class="modal-header" style="background:#fff1f2;border-color:#fca5a5">
+        <h5 class="modal-title text-danger">
+          <i class="fas fa-triangle-exclamation me-2"></i>Peringatan Keras
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger py-2 mb-3" style="font-size:.88rem">
+          Kamu akan <strong>menghapus SEMUA data transaksi</strong> secara permanen.
+          Tindakan ini <strong>tidak bisa dibatalkan</strong> dan tidak ada undo.
+        </div>
+        <form id="formClearData" method="POST" action="/admin/clear-data">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:.88rem">
+              Langkah 1 — Ketik <code>HAPUS SEMUA DATA</code> untuk konfirmasi:
+            </label>
+            <input type="text" name="konfirmasi" id="inputKonfirmasi"
+                   class="form-control form-control-sm" autocomplete="off"
+                   placeholder="Ketik: HAPUS SEMUA DATA">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" style="font-size:.88rem">
+              Langkah 2 — Masukkan password admin kamu:
+            </label>
+            <input type="password" name="password" id="inputPassword"
+                   class="form-control form-control-sm" placeholder="Password">
+          </div>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="checkSadar" onchange="updateClearBtn()">
+            <label class="form-check-label text-danger fw-semibold" for="checkSadar" style="font-size:.85rem">
+              Saya sadar bahwa semua data akan hilang permanen
+            </label>
+          </div>
+
+          <button type="button" id="btnClearFinal" class="btn btn-danger w-100" disabled
+                  onclick="submitClear()">
+            <i class="fas fa-trash-can me-1"></i>Ya, Hapus Semua Data Sekarang
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function showClearModal() {
+  document.getElementById('inputKonfirmasi').value = '';
+  document.getElementById('inputPassword').value = '';
+  document.getElementById('checkSadar').checked = false;
+  document.getElementById('btnClearFinal').disabled = true;
+  new bootstrap.Modal(document.getElementById('modalClearData')).show();
+}
+function updateClearBtn() {
+  var ok = document.getElementById('checkSadar').checked &&
+           document.getElementById('inputKonfirmasi').value.trim() === 'HAPUS SEMUA DATA' &&
+           document.getElementById('inputPassword').value.trim().length > 0;
+  document.getElementById('btnClearFinal').disabled = !ok;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  document.getElementById('inputKonfirmasi').addEventListener('input', updateClearBtn);
+  document.getElementById('inputPassword').addEventListener('input', updateClearBtn);
+});
+function submitClear() {
+  if (!confirm('Ini konfirmasi TERAKHIR.\nSemua data akan dihapus permanen.\nLanjutkan?')) return;
+  document.getElementById('formClearData').submit();
+}
+document.getElementById('roleLegend').addEventListener('show.bs.collapse', function(){
+  document.getElementById('roleLegendIcon').style.transform = 'rotate(180deg)';
+  document.getElementById('roleLegendTxt').textContent = 'Tutup';
+});
+document.getElementById('roleLegend').addEventListener('hide.bs.collapse', function(){
+  document.getElementById('roleLegendIcon').style.transform = '';
+  document.getElementById('roleLegendTxt').textContent = 'Lihat';
+});
+function resetPw(uid, username) {
+  document.getElementById('resetUserId').value = uid;
+  document.getElementById('resetUsername').textContent = username;
+  new bootstrap.Modal(document.getElementById('modalResetPw')).show();
+}
+function editRekening(id, nama, no) {
+  document.getElementById('editRekeningId').value = id;
+  document.getElementById('editRekeningNama').value = nama;
+  document.getElementById('editRekeningNo').value = no;
+  new bootstrap.Modal(document.getElementById('modalEditRekening')).show();
+}
+</script>
+{% endblock %}
