@@ -52,7 +52,7 @@ jobs:
           channel: stable
       - run: flutter pub get
         working-directory: customer_app
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
         working-directory: customer_app
       - uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
@@ -76,7 +76,7 @@ jobs:
           channel: stable
       - run: flutter pub get
         working-directory: driver_app
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
         working-directory: driver_app
       - uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
@@ -100,7 +100,7 @@ jobs:
           channel: stable
       - run: flutter pub get
         working-directory: merchant_app
-      - run: flutter build apk --release --split-per-abi
+      - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
         working-directory: merchant_app
       - uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:

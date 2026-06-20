@@ -23,6 +23,9 @@ jobs:
       - run: npx tsc -b
         working-directory: admin_panel
 
+      - run: npm test
+        working-directory: admin_panel
+
       - run: npm run lint
         working-directory: admin_panel
 

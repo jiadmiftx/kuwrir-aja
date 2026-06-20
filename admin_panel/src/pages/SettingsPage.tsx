@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Save, Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { calcPreviewFees, calcSelfDeliverFees } from '@/lib/fee-calc'
 
 const token = () => localStorage.getItem('token')
 const apiFetch = (path: string, opts?: RequestInit) =>
@@ -180,23 +181,23 @@ export default function SettingsPage() {
   const tax = parseFloat(settings.find((s) => s.key === 'tax_percentage')?.value || '11')
   const insideFee = parseFloat(settings.find((s) => s.key === 'delivery_base_fee_inside_zone')?.value || '15000')
 
-  // Platform delivery scenario
   const baseFood = 50000
-  const platformUjrah = baseFood * (markup / 100)
-  const foodWithMarkup = baseFood + platformUjrah
-  const taxAmount = foodWithMarkup * (tax / 100)
-  const appServiceFeeAmt = insideFee * (serviceFee / 100)
-  const deliveryCommissionAmt = insideFee * (commission / 100)
-  const driverEarning = insideFee - deliveryCommissionAmt   // driver tidak kena potong app fee
-  const total = foodWithMarkup + taxAmount + insideFee + appServiceFeeAmt  // customer bayar app fee
-  // Merchant gets BASE price only (transparent ujrah model)
+  const feeSettings = {
+    platformMarkupPct: markup,
+    deliveryCommissionPct: commission,
+    selfDeliverCommissionPct: selfDeliverComm,
+    appServiceFeePct: serviceFee,
+    taxPct: tax,
+    insideZoneFee: insideFee,
+  }
+  const preview = calcPreviewFees(baseFood, feeSettings)
+  const { platformUjrah, foodWithMarkup, taxAmount, appServiceFeeAmt, deliveryCommissionAmt, driverEarning, total, kuwrirRevenue } = preview
   const merchantReceives = baseFood
-  const kuwrirRevenue = platformUjrah + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
 
-  // Self-deliver scenario
   const selfDeliverFee = 10000
-  const selfDeliverCommAmt = selfDeliverFee * (selfDeliverComm / 100)
-  const merchantDeliveryEarning = selfDeliverFee - selfDeliverCommAmt
+  const selfPreview = calcSelfDeliverFees(foodWithMarkup, taxAmount, selfDeliverFee, feeSettings)
+  const selfDeliverCommAmt = selfPreview.selfCommissionAmt
+  const merchantDeliveryEarning = selfPreview.merchantDeliveryEarning
 
   return (
     <div className="space-y-6">

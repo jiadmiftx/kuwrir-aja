@@ -20,6 +20,9 @@ jobs:
       # Scoped to ./cmd/... (matches the Dockerfile's build target) because the
       # backend-root seed_admin.go/seed_driver.go scripts both declare `package
       # main`, which conflicts under `go build ./...`.
+      - run: go test ./internal/...
+        working-directory: backend
+
       - run: go build ./cmd/...
         working-directory: backend
 
