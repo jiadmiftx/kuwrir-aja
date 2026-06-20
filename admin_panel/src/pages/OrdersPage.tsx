@@ -46,7 +46,7 @@ export default function OrdersPage() {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
-      if (res.ok) setOrders(data)
+      if (res.ok) setOrders(data.orders ?? [])
     } catch (e) {
       console.error(e)
     } finally {
