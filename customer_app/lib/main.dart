@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/merchant_detail_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/order_tracking_screen.dart';
@@ -51,14 +53,15 @@ class KuwrirCustomerApp extends StatelessWidget {
           theme: KuwrirTheme.light,
           darkTheme: KuwrirTheme.dark,
           themeMode: ThemeMode.light,
-          home: const CustomerHome(),
+          home: const _SplashRouter(),
           onGenerateRoute: (settings) {
             switch (settings.name) {
               case '/login':
-                return MaterialPageRoute(
-                    builder: (_) => const Scaffold(
-                          body: Center(child: Text('Login screen')),
-                        ));
+                return MaterialPageRoute(builder: (_) => const CustomerLoginScreen());
+              case '/register':
+                return MaterialPageRoute(builder: (_) => const CustomerRegisterScreen());
+              case '/home':
+                return MaterialPageRoute(builder: (_) => const CustomerHome());
               case '/search':
                 return MaterialPageRoute(builder: (_) => const SearchScreen());
               case '/merchant':
@@ -82,6 +85,45 @@ class KuwrirCustomerApp extends StatelessWidget {
                 return null;
             }
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SplashRouter extends StatefulWidget {
+  const _SplashRouter();
+
+  @override
+  State<_SplashRouter> createState() => _SplashRouterState();
+}
+
+class _SplashRouterState extends State<_SplashRouter> {
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final token = await ApiClient().isAuthenticated();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, token ? '/home' : '/login');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delivery_dining, size: 72, color: KuwrirColors.primary),
+            SizedBox(height: 16),
+            Text('KUWRIR', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            SizedBox(height: 24),
+            CircularProgressIndicator(),
+          ],
         ),
       ),
     );
