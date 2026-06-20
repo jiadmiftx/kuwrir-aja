@@ -37,12 +37,39 @@ class _StoreScreenState extends State<StoreScreen> {
                 icon: const Icon(Icons.refresh),
                 onPressed: () => context.read<StoreCubit>().load(),
               ),
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Keluar',
+                onPressed: () => _confirmLogout(context),
+              ),
             ],
           ),
           body: _buildBody(context, state),
         );
       },
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar?'),
+        content: const Text('Anda akan keluar dari akun merchant ini.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final nav = Navigator.of(context);
+    await ApiClient().clearTokens();
+    nav.pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   Widget _buildBody(BuildContext context, StoreState state) {

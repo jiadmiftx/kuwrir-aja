@@ -49,7 +49,7 @@ class KuwrirMerchantApp extends StatelessWidget {
           theme: KuwrirTheme.light,
           darkTheme: KuwrirTheme.dark,
           themeMode: ThemeMode.light,
-          initialRoute: '/login',
+          home: const _SplashRouter(),
           routes: {
             '/login':    (_) => const MerchantLoginScreen(),
             '/register': (_) => const MerchantRegisterScreen(),
@@ -111,6 +111,72 @@ class _MerchantHomeState extends State<MerchantHome> {
             label: 'Store',
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Splash Router ────────────────────────────────────────────────────────────
+// Checks saved token on startup; routes to /home, /pending, or /login.
+
+class _SplashRouter extends StatefulWidget {
+  const _SplashRouter();
+
+  @override
+  State<_SplashRouter> createState() => _SplashRouterState();
+}
+
+class _SplashRouterState extends State<_SplashRouter> {
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final api = ApiClient();
+    final hasToken = await api.isAuthenticated();
+    if (!mounted) return;
+
+    if (!hasToken) {
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    // Validate token + check merchant status
+    try {
+      final res = await api.get('/auth/me');
+      if (!mounted) return;
+      final role = res['user']?['role'];
+      final isActive = res['user']?['is_active'] ?? false;
+
+      if (role != 'merchant') {
+        await api.clearTokens();
+        if (mounted) Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+      Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
+    } catch (_) {
+      await api.clearTokens();
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.store, size: 72, color: KuwrirColors.primary),
+            SizedBox(height: 16),
+            Text('KUWRIR Merchant',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            SizedBox(height: 24),
+            CircularProgressIndicator(),
+          ],
+        ),
       ),
     );
   }
@@ -185,7 +251,7 @@ class KasirHub extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(icon, color: color, size: 22),
               ),
               const SizedBox(height: 10),

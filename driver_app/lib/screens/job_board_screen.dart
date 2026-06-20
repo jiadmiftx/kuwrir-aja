@@ -64,6 +64,11 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                   icon: const Icon(Icons.account_balance_wallet),
                   onPressed: () => Navigator.pushNamed(context, '/wallet'),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Keluar',
+                  onPressed: () => _confirmLogout(context),
+                ),
               ],
             ),
             body: TabBarView(children: [
@@ -74,6 +79,28 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar?'),
+        content: const Text('Anda akan keluar dari akun driver ini.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final nav = Navigator.of(context);
+    await ApiClient().clearTokens();
+    nav.pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   Widget _buildFoodTab(BuildContext context, JobBoardState state) {
