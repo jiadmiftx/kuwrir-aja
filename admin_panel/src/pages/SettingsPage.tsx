@@ -83,10 +83,6 @@ export default function SettingsPage() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    fetchZones()
-  }, [])
-
   const fetchZones = () => {
     setZonesLoading(true)
     apiFetch('/api/v1/admin/delivery-zones')
@@ -95,6 +91,10 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setZonesLoading(false))
   }
+
+  useEffect(() => {
+    fetchZones()
+  }, [])
 
   const updateValue = (key: string, value: string) => {
     setSettings((prev) => prev.map((s) => (s.key === key ? { ...s, value } : s)))
