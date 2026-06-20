@@ -58,7 +58,6 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_CUSTOMER }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
           file: customer_app/build/app/outputs/flutter-apk/app-release.apk
 
   driver:
@@ -83,7 +82,6 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_DRIVER }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
           file: driver_app/build/app/outputs/flutter-apk/app-release.apk
 
   merchant:
@@ -108,5 +106,4 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_APP_ID_MERCHANT }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
           file: merchant_app/build/app/outputs/flutter-apk/app-release.apk
