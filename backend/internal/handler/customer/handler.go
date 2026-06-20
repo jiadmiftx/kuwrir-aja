@@ -156,24 +156,25 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 
 	if merchant.CanSelfDeliver {
 		// Self-delivery: merchant delivers themselves
-		// Platform still takes a small commission (Ujrah on delivery service)
+		// Platform still takes a commission (Ujrah on delivery service)
 		deliveryType = "self"
 		deliveryFee = merchant.SelfDeliveryFee
 		selfDeliverCommission := deliveryFee * (settings.SelfDeliverCommissionPct / 100.0)
 		merchantDeliveryEarning = deliveryFee - selfDeliverCommission
 		deliveryCommission = selfDeliverCommission
 		driverEarning = 0
-		appServiceFee = 0
 	} else {
 		// Platform delivery: KUWRIR driver delivers
-		// App service fee is charged to customer separately — driver is not penalised
-		appServiceFee = deliveryFee * (settings.AppServiceFeePct / 100.0)
 		deliveryCommission = deliveryFee * (settings.DeliveryCommissionPct / 100.0)
 		driverEarning = deliveryFee - deliveryCommission
 		if driverEarning < 0 {
 			driverEarning = 0
 		}
 	}
+
+	// App service fee is always charged to customer — applies to ALL delivery types.
+	// Customer uses the platform regardless of who delivers (discovery, tracking, payments).
+	appServiceFee = deliveryFee * (settings.AppServiceFeePct / 100.0)
 
 	// Merchant receives their base product price only (platform service fee stays with platform)
 	merchantPayout := totalBasePrice
