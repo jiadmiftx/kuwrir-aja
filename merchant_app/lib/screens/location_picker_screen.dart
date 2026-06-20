@@ -13,14 +13,19 @@ class LocationPickerScreen extends StatefulWidget {
 }
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
-  late final MapController _mapCtrl;
-  LatLng _picked = const LatLng(-8.8953, 116.2833); // default Praya Lombok Tengah
+  final _mapCtrl = MapController();
+  bool _mapReady = false;
+
+  LatLng _picked = const LatLng(-8.8953, 116.2833);
 
   @override
   void initState() {
     super.initState();
-    _mapCtrl = MapController();
     if (widget.initial != null) _picked = widget.initial!;
+  }
+
+  void _onMapReady() {
+    _mapReady = true;
     _getUserLocation();
   }
 
@@ -31,13 +36,21 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.deniedForever) return;
+
       final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-      final loc = LatLng(pos.latitude, pos.longitude);
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
       if (!mounted) return;
+
+      final loc = LatLng(pos.latitude, pos.longitude);
       setState(() => _picked = loc);
-      _mapCtrl.move(loc, 16);
+      if (_mapReady) _mapCtrl.move(loc, 16);
     } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _mapCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,6 +73,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               initialCenter: _picked,
               initialZoom: 15,
               onTap: (_, loc) => setState(() => _picked = loc),
+              onMapReady: _onMapReady,
             ),
             children: [
               TileLayer(
@@ -111,6 +125,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             right: 16,
             bottom: 100,
             child: FloatingActionButton.small(
+              heroTag: 'gps_btn',
               onPressed: _getUserLocation,
               child: const Icon(Icons.my_location),
             ),

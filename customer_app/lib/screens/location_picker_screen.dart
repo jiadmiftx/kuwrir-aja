@@ -14,18 +14,21 @@ class LocationPickerScreen extends StatefulWidget {
 }
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
-  late final MapController _mapCtrl;
-  LatLng _picked = const LatLng(-8.7185, 116.3516); // default Kuta Lombok
+  final _mapCtrl = MapController();
+  bool _mapReady = false;
+
+  LatLng _picked = const LatLng(-8.7185, 116.3516);
   String _address = 'Pilih lokasi di peta';
   bool _resolving = false;
 
   @override
   void initState() {
     super.initState();
-    _mapCtrl = MapController();
-    if (widget.initial != null) {
-      _picked = widget.initial!;
-    }
+    if (widget.initial != null) _picked = widget.initial!;
+  }
+
+  void _onMapReady() {
+    _mapReady = true;
     _getUserLocation();
   }
 
@@ -38,40 +41,49 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (perm == LocationPermission.deniedForever) return;
 
       final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
+      if (!mounted) return;
+
       final loc = LatLng(pos.latitude, pos.longitude);
       setState(() => _picked = loc);
-      _mapCtrl.move(loc, 16);
+      if (_mapReady) _mapCtrl.move(loc, 16);
       await _resolveAddress(loc);
     } catch (_) {}
   }
 
   Future<void> _resolveAddress(LatLng loc) async {
+    if (!mounted) return;
     setState(() => _resolving = true);
     try {
-      final placemarks =
-          await placemarkFromCoordinates(loc.latitude, loc.longitude);
+      final placemarks = await placemarkFromCoordinates(loc.latitude, loc.longitude);
+      if (!mounted) return;
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        final parts = [
-          p.street,
-          p.subLocality,
-          p.locality,
-          p.subAdministrativeArea,
-        ].where((s) => s != null && s.isNotEmpty).toList();
+        final parts = [p.street, p.subLocality, p.locality, p.subAdministrativeArea]
+            .where((s) => s != null && s.isNotEmpty)
+            .toList();
         setState(() => _address = parts.join(', '));
       }
     } catch (_) {
-      setState(() => _address =
-          '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}');
+      if (!mounted) return;
+      setState(() =>
+          _address = '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}');
     } finally {
-      setState(() => _resolving = false);
+      if (mounted) setState(() => _resolving = false);
     }
   }
 
   void _onTap(TapPosition _, LatLng loc) {
     setState(() => _picked = loc);
     _resolveAddress(loc);
+  }
+
+  void _centerOnUser() => _getUserLocation();
+
+  @override
+  void dispose() {
+    _mapCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -81,8 +93,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         title: const Text('Pilih Lokasi Pengiriman'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(
-                context, {'latlng': _picked, 'address': _address}),
+            onPressed: () =>
+                Navigator.pop(context, {'latlng': _picked, 'address': _address}),
             child: const Text('Pilih', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
@@ -95,6 +107,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               initialCenter: _picked,
               initialZoom: 15,
               onTap: _onTap,
+              onMapReady: _onMapReady,
             ),
             children: [
               TileLayer(
@@ -107,23 +120,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     point: _picked,
                     width: 48,
                     height: 48,
-                    child: const Icon(Icons.location_pin,
-                        color: Colors.red, size: 48),
+                    child: const Icon(Icons.location_pin, color: Colors.red, size: 48),
                   ),
                 ],
               ),
             ],
           ),
 
-          // Center crosshair hint
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 48),
-              child: Icon(Icons.add, color: Colors.black38, size: 32),
-            ),
-          ),
-
-          // Bottom address bar
+          // Bottom address card
           Positioned(
             left: 0, right: 0, bottom: 0,
             child: Container(
@@ -160,7 +164,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             right: 16,
             bottom: 120,
             child: FloatingActionButton.small(
-              onPressed: _getUserLocation,
+              heroTag: 'gps_btn',
+              onPressed: _centerOnUser,
               child: const Icon(Icons.my_location),
             ),
           ),
