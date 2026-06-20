@@ -1,37 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
-// ─── Mock data models ────────────────────────────────────────────────────────
-
-class _Product {
-  final String id;
-  final String name;
-  final String category;
-  final double price;
-  final double costPrice;
-  final bool trackStock;
-  int stock;
-  bool isAvailable;
-
-  _Product({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.price,
-    required this.costPrice,
-    this.trackStock = false,
-    this.stock = 0,
-    this.isAvailable = true,
-  });
-}
-
+// Local cart item wraps the shared Product model
 class _CartItem {
-  final _Product product;
-  int qty;
-  double discount;
-  String notes;
+  final Product product;
+  int qty = 1;
+  double discount = 0;
 
-  _CartItem({required this.product, this.qty = 1, this.discount = 0, this.notes = ''});
+  _CartItem({required this.product});
 
   double get subtotal => qty * product.price - discount;
   double get totalCost => qty * product.costPrice;
@@ -49,35 +25,63 @@ class KasirScreen extends StatefulWidget {
 class _KasirScreenState extends State<KasirScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _api = ApiClient();
 
-  // Mock products — in production fetched from GET /my-store/pos/products
-  final List<_Product> _products = [
-    _Product(id: '1', name: 'Nasi Campur', category: 'Makanan', price: 35000, costPrice: 18000, trackStock: false),
-    _Product(id: '2', name: 'Ayam Bakar', category: 'Makanan', price: 45000, costPrice: 22000, trackStock: false),
-    _Product(id: '3', name: 'Gado-Gado', category: 'Makanan', price: 28000, costPrice: 12000, trackStock: false),
-    _Product(id: '4', name: 'Es Teh Manis', category: 'Minuman', price: 8000, costPrice: 2500, trackStock: true, stock: 30),
-    _Product(id: '5', name: 'Es Jeruk', category: 'Minuman', price: 10000, costPrice: 3000, trackStock: true, stock: 25),
-    _Product(id: '6', name: 'Kopi Hitam', category: 'Minuman', price: 12000, costPrice: 3500, trackStock: true, stock: 20),
-    _Product(id: '7', name: 'Sate Ayam', category: 'Makanan', price: 38000, costPrice: 20000, trackStock: false),
-    _Product(id: '8', name: 'Pisang Goreng', category: 'Snack', price: 15000, costPrice: 6000, trackStock: true, stock: 5),
-  ];
+  // Product data from API
+  List<ProductCategory> _categories = [];
+  bool _loading = true;
+  String? _error;
 
   final List<_CartItem> _cart = [];
   String _selectedCategory = 'Semua';
   String _paymentMethod = 'cash';
   final _cashReceivedCtrl = TextEditingController();
   final _customerNameCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
   double _orderDiscount = 0;
 
-  List<String> get _categories {
-    final cats = _products.map((p) => p.category).toSet().toList()..sort();
-    return ['Semua', ...cats];
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
+    _loadMenu();
   }
 
-  List<_Product> get _filteredProducts {
-    if (_selectedCategory == 'Semua') return _products.where((p) => p.isAvailable).toList();
-    return _products.where((p) => p.category == _selectedCategory && p.isAvailable).toList();
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _cashReceivedCtrl.dispose();
+    _customerNameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMenu() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final cats = await _api.getMyStoreMenu();
+      setState(() { _categories = cats; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  // All products flattened
+  List<Product> get _allProducts =>
+      _categories.expand((c) => c.products).toList();
+
+  List<String> get _categoryNames {
+    final names = _categories.map((c) => c.name).toList();
+    return ['Semua', ...names];
+  }
+
+  List<Product> get _filteredProducts {
+    final available = _allProducts.where((p) => p.isAvailable).toList();
+    if (_selectedCategory == 'Semua') return available;
+    final cat = _categories.firstWhere(
+      (c) => c.name == _selectedCategory,
+      orElse: () => const ProductCategory(id: '', merchantId: '', name: ''),
+    );
+    return cat.products.where((p) => p.isAvailable).toList();
   }
 
   double get _subtotal => _cart.fold(0, (s, i) => s + i.subtotal);
@@ -89,32 +93,30 @@ class _KasirScreenState extends State<KasirScreen>
     return (received - _grandTotal).clamp(0, double.infinity);
   }
 
-  void _addToCart(_Product product) {
-    if (product.trackStock && product.stock <= 0) {
+  void _addToCart(Product p) {
+    if (p.trackStock && p.stockQuantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Stok ${product.name} habis'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Stok ${p.name} habis'), backgroundColor: Colors.red),
       );
       return;
     }
     setState(() {
-      final existing = _cart.indexWhere((i) => i.product.id == product.id);
-      if (existing >= 0) {
-        if (product.trackStock && _cart[existing].qty >= product.stock) {
+      final idx = _cart.indexWhere((i) => i.product.id == p.id);
+      if (idx >= 0) {
+        if (p.trackStock && _cart[idx].qty >= p.stockQuantity) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Stok ${product.name} hanya ${product.stock}'), backgroundColor: Colors.orange),
+            SnackBar(content: Text('Stok ${p.name} hanya ${p.stockQuantity}'), backgroundColor: Colors.orange),
           );
           return;
         }
-        _cart[existing].qty++;
+        _cart[idx].qty++;
       } else {
-        _cart.add(_CartItem(product: product));
+        _cart.add(_CartItem(product: p));
       }
     });
   }
 
-  void _removeFromCart(int index) {
-    setState(() => _cart.removeAt(index));
-  }
+  void _removeFromCart(int index) => setState(() => _cart.removeAt(index));
 
   void _updateQty(int index, int delta) {
     setState(() {
@@ -128,7 +130,6 @@ class _KasirScreenState extends State<KasirScreen>
       _orderDiscount = 0;
       _cashReceivedCtrl.clear();
       _customerNameCtrl.clear();
-      _notesCtrl.clear();
       _paymentMethod = 'cash';
     });
   }
@@ -138,12 +139,11 @@ class _KasirScreenState extends State<KasirScreen>
 
     if (_paymentMethod == 'tab' && _customerNameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama pelanggan wajib diisi untuk transaksi Tab'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Nama pelanggan wajib diisi untuk Tab'), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -156,8 +156,10 @@ class _KasirScreenState extends State<KasirScreen>
             if (_orderDiscount > 0) _summaryRow('Diskon', -_orderDiscount, color: Colors.green),
             const Divider(),
             _summaryRow('Total', _grandTotal, bold: true),
-            _summaryRow('HPP', _totalCost, color: Colors.grey),
-            _summaryRow('Laba Kotor', _grossProfit, color: KuwrirColors.primary),
+            if (_totalCost > 0) ...[
+              _summaryRow('HPP', _totalCost, color: Colors.grey),
+              _summaryRow('Laba Kotor', _grossProfit, color: KuwrirColors.primary),
+            ],
             const SizedBox(height: 8),
             Row(children: [
               const Icon(Icons.payment, size: 16),
@@ -177,21 +179,9 @@ class _KasirScreenState extends State<KasirScreen>
       ),
     );
 
-    if (confirmed != true) return;
-
-    // TODO: POST /api/v1/my-store/pos/transactions
-    // For now: show success and clear cart
-    if (!mounted) return;
-
-    // Decrement mock stock
-    for (final item in _cart) {
-      if (item.product.trackStock) {
-        item.product.stock -= item.qty;
-      }
-    }
+    if (confirmed != true || !mounted) return;
 
     final txNumber = 'POS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-
     _clearCart();
     _showReceipt(txNumber);
   }
@@ -200,11 +190,11 @@ class _KasirScreenState extends State<KasirScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green),
-            const SizedBox(width: 8),
-            const Text('Transaksi Berhasil'),
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Transaksi Berhasil'),
           ],
         ),
         content: Column(
@@ -228,45 +218,28 @@ class _KasirScreenState extends State<KasirScreen>
   }
 
   Widget _summaryRow(String label, double amount, {bool bold = false, Color? color}) {
-    final style = TextStyle(
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-      color: color,
-    );
+    final style = TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: color);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: style),
-          Text(_formatRp(amount), style: style),
+          Text(_fmt(amount), style: style),
         ],
       ),
     );
   }
 
-  String _formatRp(double v) {
+  String _fmt(double v) {
     final abs = v.abs();
-    final formatted = abs.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+$)'),
-      (m) => '${m[1]}.',
+    final s = abs.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]}.',
     );
-    return v < 0 ? '-Rp $formatted' : 'Rp $formatted';
+    return v < 0 ? '-Rp $s' : 'Rp $s';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _cashReceivedCtrl.dispose();
-    _customerNameCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
-  }
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +247,11 @@ class _KasirScreenState extends State<KasirScreen>
       appBar: AppBar(
         title: const Text('Kasir / POS'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Muat ulang produk',
+            onPressed: _loadMenu,
+          ),
           if (_cart.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -292,9 +270,14 @@ class _KasirScreenState extends State<KasirScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Kasir', icon: Icon(Icons.point_of_sale)),
-            Tab(text: 'Keranjang', icon: Icon(Icons.shopping_cart)),
+          tabs: [
+            const Tab(text: 'Produk', icon: Icon(Icons.grid_view)),
+            Tab(
+              text: 'Keranjang',
+              icon: _cart.isNotEmpty
+                  ? Badge(label: Text('${_cart.length}'), child: const Icon(Icons.shopping_cart))
+                  : const Icon(Icons.shopping_cart),
+            ),
           ],
         ),
       ),
@@ -305,32 +288,76 @@ class _KasirScreenState extends State<KasirScreen>
           _buildCart(),
         ],
       ),
-      // Floating cart badge
       floatingActionButton: _cart.isNotEmpty && _tabController.index == 0
           ? FloatingActionButton.extended(
               onPressed: () => _tabController.animateTo(1),
               icon: const Icon(Icons.shopping_cart),
-              label: Text('${_cart.length} item · ${_formatRp(_grandTotal)}'),
+              label: Text('${_cart.length} item · ${_fmt(_grandTotal)}'),
               backgroundColor: KuwrirColors.primary,
             )
           : null,
     );
   }
 
-  // ─── Product Grid ──────────────────────────────────────────────────────────
+  // ─── Product Grid ─────────────────────────────────────────────────────────
 
   Widget _buildProductGrid() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 8),
+            Text('Gagal memuat produk', style: TextStyle(color: Colors.grey[600])),
+            const SizedBox(height: 4),
+            Text(_error!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loadMenu,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_allProducts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text('Belum ada produk', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            const SizedBox(height: 8),
+            const Text('Tambahkan produk di menu "Menu" terlebih dahulu',
+                style: TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _loadMenu,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Muat Ulang'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
-        // Category filter
+        // Category filter chips
         SizedBox(
           height: 48,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            itemCount: _categories.length,
+            itemCount: _categoryNames.length,
             itemBuilder: (_, i) {
-              final cat = _categories[i];
+              final cat = _categoryNames[i];
               final selected = cat == _selectedCategory;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -343,28 +370,33 @@ class _KasirScreenState extends State<KasirScreen>
             },
           ),
         ),
+
         // Product grid
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 1.4,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            itemCount: _filteredProducts.length,
-            itemBuilder: (_, i) => _buildProductCard(_filteredProducts[i]),
-          ),
+          child: _filteredProducts.isEmpty
+              ? Center(
+                  child: Text('Tidak ada produk di kategori "$_selectedCategory"',
+                      style: const TextStyle(color: Colors.grey)))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.4,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: _filteredProducts.length,
+                  itemBuilder: (_, i) => _buildProductCard(_filteredProducts[i]),
+                ),
         ),
       ],
     );
   }
 
-  Widget _buildProductCard(_Product p) {
+  Widget _buildProductCard(Product p) {
     final inCart = _cart.where((i) => i.product.id == p.id).fold(0, (s, i) => s + i.qty);
-    final lowStock = p.trackStock && p.stock <= 3;
-    final noStock = p.trackStock && p.stock <= 0;
+    final lowStock = p.trackStock && p.stockQuantity <= 3 && p.stockQuantity > 0;
+    final noStock = p.trackStock && p.stockQuantity <= 0;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -378,22 +410,38 @@ class _KasirScreenState extends State<KasirScreen>
               Row(
                 children: [
                   Expanded(
-                    child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    child: Text(p.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
                   ),
                   if (inCart > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: KuwrirColors.primary, borderRadius: BorderRadius.circular(12)),
-                      child: Text('$inCart', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      decoration: BoxDecoration(
+                          color: KuwrirColors.primary,
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Text('$inCart',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                 ],
               ),
               const Spacer(),
-              Text(_formatRp(p.price), style: TextStyle(color: KuwrirColors.primary, fontWeight: FontWeight.bold)),
+              Text(_fmt(p.price),
+                  style: TextStyle(
+                      color: noStock ? Colors.grey : KuwrirColors.primary,
+                      fontWeight: FontWeight.bold)),
               if (p.trackStock)
                 Text(
-                  noStock ? 'Habis' : (lowStock ? 'Sisa: ${p.stock}' : 'Stok: ${p.stock}'),
-                  style: TextStyle(fontSize: 11, color: noStock ? Colors.red : (lowStock ? Colors.orange : Colors.grey)),
+                  noStock
+                      ? 'Habis'
+                      : (lowStock ? 'Sisa: ${p.stockQuantity}' : 'Stok: ${p.stockQuantity}'),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: noStock
+                          ? Colors.red
+                          : (lowStock ? Colors.orange : Colors.grey)),
                 ),
             ],
           ),
@@ -402,7 +450,7 @@ class _KasirScreenState extends State<KasirScreen>
     );
   }
 
-  // ─── Cart ──────────────────────────────────────────────────────────────────
+  // ─── Cart ─────────────────────────────────────────────────────────────────
 
   Widget _buildCart() {
     if (_cart.isEmpty) {
@@ -422,7 +470,6 @@ class _KasirScreenState extends State<KasirScreen>
 
     return Column(
       children: [
-        // Cart items
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
@@ -430,102 +477,7 @@ class _KasirScreenState extends State<KasirScreen>
             itemBuilder: (_, i) => _buildCartItem(i),
           ),
         ),
-
-        // Order total + payment panel
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, -2))],
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Order discount
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Diskon Order', style: TextStyle(color: Colors.grey)),
-                  GestureDetector(
-                    onTap: _showDiscountDialog,
-                    child: Text(
-                      _orderDiscount > 0 ? '-${_formatRp(_orderDiscount)}' : 'Tambah',
-                      style: TextStyle(color: KuwrirColors.primary, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(_formatRp(_grandTotal), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
-                ],
-              ),
-              // HPP & margin
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('HPP: ${_formatRp(_totalCost)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                  Text('Laba: ${_formatRp(_grossProfit)}', style: TextStyle(fontSize: 11, color: _grossProfit >= 0 ? Colors.green : Colors.red)),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Payment method
-              const Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildPaymentMethodSelector(),
-              const SizedBox(height: 12),
-
-              // Tab: customer name
-              if (_paymentMethod == 'tab') ...[
-                TextField(
-                  controller: _customerNameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Pelanggan *',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Cash: amount received
-              if (_paymentMethod == 'cash') ...[
-                TextField(
-                  controller: _cashReceivedCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Uang Diterima',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.money),
-                    isDense: true,
-                    suffixText: _cashChange > 0 ? 'Kembalian: ${_formatRp(_cashChange)}' : null,
-                    suffixStyle: const TextStyle(color: Colors.blue),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Process button
-              SizedBox(
-                height: 48,
-                child: FilledButton.icon(
-                  onPressed: _processPayment,
-                  icon: const Icon(Icons.check_circle),
-                  label: Text(
-                    _paymentMethod == 'tab' ? 'Catat Tab (${_formatRp(_grandTotal)})' : 'Bayar ${_formatRp(_grandTotal)}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildPaymentPanel(),
       ],
     );
   }
@@ -541,8 +493,11 @@ class _KasirScreenState extends State<KasirScreen>
           children: [
             Row(
               children: [
-                Expanded(child: Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold))),
-                Text(_formatRp(item.subtotal), style: TextStyle(fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
+                Expanded(
+                    child: Text(item.product.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                Text(_fmt(item.subtotal),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
                 const SizedBox(width: 4),
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
@@ -555,28 +510,132 @@ class _KasirScreenState extends State<KasirScreen>
             const SizedBox(height: 4),
             Row(
               children: [
-                Text('${_formatRp(item.product.price)} × ', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                // Qty controls
+                Text('${_fmt(item.product.price)} × ',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 IconButton(
                   icon: const Icon(Icons.remove_circle_outline, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _updateQty(index, -1),
                 ),
-                Text('${item.qty}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('${item.qty}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _updateQty(index, 1),
                 ),
-                const Spacer(),
-                // HPP info
-                Text('HPP: ${_formatRp(item.totalCost)}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                if (item.product.costPrice > 0) ...[
+                  const Spacer(),
+                  Text('HPP: ${_fmt(item.totalCost)}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                ],
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha:0.1), blurRadius: 8, offset: const Offset(0, -2))
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Diskon Order', style: TextStyle(color: Colors.grey)),
+              GestureDetector(
+                onTap: _showDiscountDialog,
+                child: Text(
+                  _orderDiscount > 0 ? '-${_fmt(_orderDiscount)}' : 'Tambah',
+                  style: TextStyle(color: KuwrirColors.primary, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(_fmt(_grandTotal),
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
+            ],
+          ),
+          if (_totalCost > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('HPP: ${_fmt(_totalCost)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('Laba: ${_fmt(_grossProfit)}',
+                    style: TextStyle(
+                        fontSize: 11, color: _grossProfit >= 0 ? Colors.green : Colors.red)),
+              ],
+            ),
+          const SizedBox(height: 12),
+
+          const Text('Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          _buildPaymentMethodSelector(),
+          const SizedBox(height: 12),
+
+          if (_paymentMethod == 'tab') ...[
+            TextField(
+              controller: _customerNameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nama Pelanggan *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          if (_paymentMethod == 'cash') ...[
+            TextField(
+              controller: _cashReceivedCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Uang Diterima',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.money),
+                isDense: true,
+                suffixText: _cashChange > 0 ? 'Kembalian: ${_fmt(_cashChange)}' : null,
+                suffixStyle: const TextStyle(color: Colors.blue),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          SizedBox(
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: _processPayment,
+              icon: const Icon(Icons.check_circle),
+              label: Text(
+                _paymentMethod == 'tab'
+                    ? 'Catat Tab (${_fmt(_grandTotal)})'
+                    : 'Bayar ${_fmt(_grandTotal)}',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -595,19 +654,22 @@ class _KasirScreenState extends State<KasirScreen>
           child: Padding(
             padding: const EdgeInsets.only(right: 6),
             child: GestureDetector(
-              onTap: () => setState(() { _paymentMethod = m.$1; }),
+              onTap: () => setState(() => _paymentMethod = m.$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: selected ? KuwrirColors.primary : Colors.grey.withOpacity(0.1),
+                  color: selected ? KuwrirColors.primary : Colors.grey.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: selected ? KuwrirColors.primary : Colors.transparent),
+                  border: Border.all(
+                      color: selected ? KuwrirColors.primary : Colors.transparent),
                 ),
                 child: Column(
                   children: [
                     Icon(m.$2, size: 20, color: selected ? Colors.white : Colors.grey),
-                    Text(m.$3, style: TextStyle(fontSize: 11, color: selected ? Colors.white : Colors.grey)),
+                    Text(m.$3,
+                        style: TextStyle(
+                            fontSize: 11, color: selected ? Colors.white : Colors.grey)),
                   ],
                 ),
               ),
@@ -619,7 +681,8 @@ class _KasirScreenState extends State<KasirScreen>
   }
 
   void _showDiscountDialog() {
-    final ctrl = TextEditingController(text: _orderDiscount > 0 ? _orderDiscount.toStringAsFixed(0) : '');
+    final ctrl = TextEditingController(
+        text: _orderDiscount > 0 ? _orderDiscount.toStringAsFixed(0) : '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -637,7 +700,10 @@ class _KasirScreenState extends State<KasirScreen>
         actions: [
           if (_orderDiscount > 0)
             TextButton(
-              onPressed: () { setState(() => _orderDiscount = 0); Navigator.pop(ctx); },
+              onPressed: () {
+                setState(() => _orderDiscount = 0);
+                Navigator.pop(ctx);
+              },
               child: const Text('Hapus Diskon', style: TextStyle(color: Colors.red)),
             ),
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
