@@ -207,7 +207,8 @@ func seedSettings(db *gorm.DB) {
 	}
 }
 
-// seedDeliveryZones creates the default Kuta, Lombok zone if no zones exist
+// seedDeliveryZones creates the default delivery zone if none exist.
+// Admin can update zone details via the admin panel.
 func seedDeliveryZones(db *gorm.DB) {
 	var count int64
 	db.Model(&model.DeliveryZone{}).Count(&count)
@@ -215,12 +216,12 @@ func seedDeliveryZones(db *gorm.DB) {
 		return
 	}
 	db.Create(&model.DeliveryZone{
-		CityName:  "Kuta, Lombok",
-		Latitude:  -8.7185,
-		Longitude: 116.3516,
-		RadiusKm:  5,
+		CityName:  "Default Zone",
+		Latitude:  0,
+		Longitude: 0,
+		RadiusKm:  50,
 		BaseFee:   15000,
-		PerKmFee:  10000,
+		PerKmFee:  5000,
 		IsDefault: true,
 		IsActive:  true,
 	})

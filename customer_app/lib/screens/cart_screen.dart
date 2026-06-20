@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
+import '../cubits/location_cubit.dart';
 import 'location_picker_screen.dart';
 
 class CartScreen extends StatefulWidget {
@@ -14,13 +15,25 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final _addressCtrl = TextEditingController(text: 'Kuta Beach Area, Lombok Tengah, NTB');
+  final _addressCtrl = TextEditingController();
   final _receiverCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   String _paymentType = 'cash';
-  double _dropoffLat = -8.7185;
-  double _dropoffLng = 116.3516;
+  double _dropoffLat = 0;
+  double _dropoffLng = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill delivery address from user's saved location
+    final loc = context.read<LocationCubit>().state;
+    if (loc.hasLocation) {
+      _addressCtrl.text = loc.address;
+      _dropoffLat = loc.lat!;
+      _dropoffLng = loc.lng!;
+    }
+  }
 
   @override
   void dispose() {
@@ -185,15 +198,16 @@ class _CartScreenState extends State<CartScreen> {
                               const SizedBox(height: 8),
                               OutlinedButton.icon(
                                 onPressed: () async {
+                                  final initial = _dropoffLat != 0
+                                      ? LatLng(_dropoffLat, _dropoffLng)
+                                      : null;
                                   final result = await Navigator.push<Map<String, dynamic>>(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => LocationPickerScreen(
-                                        initial: LatLng(_dropoffLat, _dropoffLng),
-                                      ),
+                                      builder: (_) => LocationPickerScreen(initial: initial),
                                     ),
                                   );
-                                  if (result != null) {
+                                  if (result != null && mounted) {
                                     final latlng = result['latlng'] as LatLng;
                                     final addr = result['address'] as String;
                                     setState(() {
@@ -201,6 +215,11 @@ class _CartScreenState extends State<CartScreen> {
                                       _dropoffLng = latlng.longitude;
                                       _addressCtrl.text = addr;
                                     });
+                                    // Update saved location too
+                                    if (mounted) {
+                                      context.read<LocationCubit>().setLocation(
+                                          latlng.latitude, latlng.longitude, addr);
+                                    }
                                   }
                                 },
                                 icon: const Icon(Icons.map_outlined, size: 18),

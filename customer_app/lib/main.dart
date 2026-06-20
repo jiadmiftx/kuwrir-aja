@@ -16,6 +16,7 @@ import 'cubits/merchant_detail_cubit.dart';
 import 'cubits/cart_cubit.dart';
 import 'cubits/order_cubit.dart';
 import 'cubits/order_tracking_cubit.dart';
+import 'cubits/location_cubit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -41,6 +42,7 @@ class KuwrirCustomerApp extends StatelessWidget {
       ],
       child: MultiBlocProvider(
         providers: [
+          BlocProvider(create: (_) => LocationCubit()..init()),
           BlocProvider(create: (_) => MerchantListCubit(apiClient)),
           BlocProvider(create: (_) => MerchantDetailCubit(apiClient)),
           BlocProvider(create: (_) => CartCubit()),

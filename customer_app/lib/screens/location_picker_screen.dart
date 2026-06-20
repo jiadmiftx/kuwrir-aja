@@ -17,7 +17,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final _mapCtrl = MapController();
   bool _mapReady = false;
 
-  LatLng _picked = const LatLng(-8.7185, 116.3516);
+  LatLng _picked = const LatLng(-6.2088, 106.8456); // fallback: Jakarta, diganti GPS otomatis
   String _address = 'Pilih lokasi di peta';
   bool _resolving = false;
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/merchant_list_cubit.dart';
-import '../cubits/order_tracking_cubit.dart';
+import '../cubits/location_cubit.dart';
+import 'location_picker_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,6 +69,22 @@ class _HomeTabState extends State<_HomeTab> {
     context.read<MerchantListCubit>().loadMerchants();
   }
 
+  Future<void> _openLocationPicker(BuildContext context, LocationState loc) async {
+    final initial = loc.hasLocation ? LatLng(loc.lat!, loc.lng!) : null;
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(initial: initial),
+      ),
+    );
+    if (result != null && context.mounted) {
+      final latlng = result['latlng'] as LatLng;
+      final address = result['address'] as String;
+      await context.read<LocationCubit>().setLocation(
+            latlng.latitude, latlng.longitude, address);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
@@ -77,18 +95,38 @@ class _HomeTabState extends State<_HomeTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_on, color: KuwrirColors.primary, size: 20),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Kuta, Lombok',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+                BlocBuilder<LocationCubit, LocationState>(
+                  builder: (context, loc) {
+                    return GestureDetector(
+                      onTap: () => _openLocationPicker(context, loc),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_on, color: KuwrirColors.primary, size: 20),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: loc.detecting
+                                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                    const SizedBox(width: 14, height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2)),
+                                    const SizedBox(width: 6),
+                                    Text('Mendeteksi...',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w600, color: Colors.grey)),
+                                  ])
+                                : Text(
+                                    loc.address,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                           ),
-                    ),
-                    const Icon(Icons.keyboard_arrow_down, size: 20),
-                  ],
+                          const Icon(Icons.keyboard_arrow_down, size: 20),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 GestureDetector(
