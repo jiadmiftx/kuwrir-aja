@@ -133,7 +133,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
                       ],
                       color: KuwrirColors.primary,
                       strokeWidth: 3,
-                      isDotted: true,
+                      pattern: StrokePattern.dashed(segments: const [12, 8]),
                     ),
                   ],
                 ),
