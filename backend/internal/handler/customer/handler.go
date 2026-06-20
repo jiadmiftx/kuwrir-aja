@@ -119,13 +119,14 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 
 		productID, _ := uuid.Parse(reqItem.ProductID)
 		orderItems = append(orderItems, model.OrderItem{
-			ProductID:  &productID,
-			ItemName:   product.Name,
-			Quantity:   reqItem.Quantity,
-			BasePrice:  product.Price,
-			UnitPrice:  priceWithMarkup,
-			TotalPrice: itemTotal,
-			Notes:      reqItem.Notes,
+			ProductID:    &productID,
+			ItemName:     product.Name,
+			Quantity:     reqItem.Quantity,
+			BasePrice:    product.Price,
+			UnitPrice:    priceWithMarkup,
+			TotalPrice:   itemTotal,
+			Notes:        reqItem.Notes,
+			VariantsJSON: func() *string { s := "[]"; return &s }(),
 		})
 
 		subtotalWithMarkup += itemTotal

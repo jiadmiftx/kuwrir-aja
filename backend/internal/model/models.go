@@ -280,7 +280,7 @@ type OrderItem struct {
 	BasePrice    float64    `gorm:"not null" json:"base_price"`   // Merchant's original price
 	UnitPrice    float64    `gorm:"not null" json:"unit_price"`   // Price with markup
 	TotalPrice   float64    `gorm:"not null" json:"total_price"`  // UnitPrice * Quantity + variants
-	VariantsJSON string     `gorm:"type:jsonb" json:"variants_json,omitempty"`
+	VariantsJSON *string    `gorm:"type:jsonb" json:"variants_json,omitempty"`
 	Notes        string     `json:"notes,omitempty"`
 }
 
