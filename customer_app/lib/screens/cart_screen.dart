@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
+import 'location_picker_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -179,6 +181,30 @@ class _CartScreenState extends State<CartScreen> {
                                   hintText: 'Masukkan alamat pengiriman',
                                 ),
                                 maxLines: 2,
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push<Map<String, dynamic>>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LocationPickerScreen(
+                                        initial: LatLng(_dropoffLat, _dropoffLng),
+                                      ),
+                                    ),
+                                  );
+                                  if (result != null) {
+                                    final latlng = result['latlng'] as LatLng;
+                                    final addr = result['address'] as String;
+                                    setState(() {
+                                      _dropoffLat = latlng.latitude;
+                                      _dropoffLng = latlng.longitude;
+                                      _addressCtrl.text = addr;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.map_outlined, size: 18),
+                                label: const Text('Pilih di Peta'),
                               ),
                               const SizedBox(height: 12),
                               Row(

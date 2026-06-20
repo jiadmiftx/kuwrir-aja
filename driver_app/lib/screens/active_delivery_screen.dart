@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/active_delivery_cubit.dart';
 
@@ -72,6 +74,14 @@ class ActiveDeliveryScreen extends StatelessWidget {
     final driverEarning = (order['driver_earning'] as num?)?.toDouble() ?? 0;
     final paymentType = order['payment_type'] as String? ?? 'cash';
 
+    final merchant = order['merchant'] as Map<String, dynamic>?;
+    final pickupLat = (merchant?['latitude'] as num?)?.toDouble() ?? -8.7185;
+    final pickupLng = (merchant?['longitude'] as num?)?.toDouble() ?? 116.3516;
+    final dropoffLat = (order['dropoff_lat'] as num?)?.toDouble() ?? -8.7185;
+    final dropoffLng = (order['dropoff_lng'] as num?)?.toDouble() ?? 116.3516;
+    final focusLat = isPickedUp ? dropoffLat : pickupLat;
+    final focusLng = isPickedUp ? dropoffLng : pickupLng;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
@@ -79,22 +89,55 @@ class ActiveDeliveryScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Map placeholder
+          // Live delivery map
           Expanded(
             flex: 2,
-            child: Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.map, size: 64, color: Colors.grey),
-                    SizedBox(height: 8),
-                    Text('Peta (coming soon)',
-                        style: TextStyle(color: Colors.grey)),
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: LatLng(focusLat, focusLng),
+                initialZoom: 15,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.kuwrir.driver',
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(pickupLat, pickupLng),
+                      width: 48,
+                      height: 48,
+                      child: const Tooltip(
+                        message: 'Merchant (Pickup)',
+                        child: Icon(Icons.store, color: Colors.orange, size: 40),
+                      ),
+                    ),
+                    Marker(
+                      point: LatLng(dropoffLat, dropoffLng),
+                      width: 48,
+                      height: 48,
+                      child: const Tooltip(
+                        message: 'Customer (Dropoff)',
+                        child: Icon(Icons.location_pin, color: Colors.red, size: 40),
+                      ),
+                    ),
                   ],
                 ),
-              ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: [
+                        LatLng(pickupLat, pickupLng),
+                        LatLng(dropoffLat, dropoffLng),
+                      ],
+                      color: KuwrirColors.primary,
+                      strokeWidth: 3,
+                      isDotted: true,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 

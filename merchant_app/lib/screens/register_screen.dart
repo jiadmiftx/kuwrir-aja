@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'location_picker_screen.dart';
 import 'pending_screen.dart';
 
 /// Merchant registration: data diri + data toko + upload 3 dokumen
@@ -30,8 +32,8 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
   final _storeDescCtrl = TextEditingController();
   final _storePhoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _latCtrl = TextEditingController(text: '-8.8953');
-  final _lngCtrl = TextEditingController(text: '116.2833');
+  double _storeLat = -8.8953;
+  double _storeLng = 116.2833;
 
   // Dokumen
   File? _ktpFile;
@@ -107,8 +109,8 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         ..fields['description'] = _storeDescCtrl.text.trim()
         ..fields['phone'] = _storePhoneCtrl.text.trim()
         ..fields['address'] = _addressCtrl.text.trim()
-        ..fields['latitude'] = _latCtrl.text.trim()
-        ..fields['longitude'] = _lngCtrl.text.trim();
+        ..fields['latitude'] = _storeLat.toString()
+        ..fields['longitude'] = _storeLng.toString();
 
       req.files.add(await http.MultipartFile.fromPath('owner_ktp', _ktpFile!.path));
       req.files.add(await http.MultipartFile.fromPath('store_photo', _storePhotoFile!.path));
@@ -214,13 +216,54 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         _field(_addressCtrl, 'Alamat Lengkap', Icons.location_on,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: _field(_latCtrl, 'Latitude', Icons.map)),
-          const SizedBox(width: 12),
-          Expanded(child: _field(_lngCtrl, 'Longitude', Icons.map)),
-        ]),
+        // Map location picker
+        Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () async {
+              final result = await Navigator.push<LatLng>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LocationPickerScreen(
+                    initial: LatLng(_storeLat, _storeLng),
+                  ),
+                ),
+              );
+              if (result != null) {
+                setState(() {
+                  _storeLat = result.latitude;
+                  _storeLng = result.longitude;
+                });
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.map, color: Colors.orange, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Lokasi Toko di Peta',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_storeLat.toStringAsFixed(5)}, ${_storeLng.toStringAsFixed(5)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 4),
-        const Text('Gunakan Google Maps untuk mendapatkan koordinat toko', style: TextStyle(color: Colors.grey, fontSize: 12)),
+        const Text('Ketuk untuk memilih lokasi toko di peta', style: TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 24),
         SizedBox(height: 50, child: FilledButton(
           onPressed: () {
