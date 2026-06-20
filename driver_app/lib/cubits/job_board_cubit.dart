@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
@@ -26,8 +27,15 @@ class JobBoardError extends JobBoardState {
 class JobBoardCubit extends Cubit<JobBoardState> {
   final ApiClient _api;
   bool _isOnline = false;
+  Timer? _pollTimer;
 
   JobBoardCubit(this._api) : super(JobBoardOffline());
+
+  @override
+  Future<void> close() {
+    _pollTimer?.cancel();
+    return super.close();
+  }
 
   Future<void> goOnline() async {
     emit(JobBoardLoading());
@@ -35,6 +43,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
       await _api.setDriverStatus(true);
       _isOnline = true;
       await loadJobs();
+      _startPolling();
     } on ApiException catch (e) {
       emit(JobBoardError(e.message));
     } catch (_) {
@@ -43,6 +52,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   }
 
   Future<void> goOffline() async {
+    _stopPolling();
     try {
       await _api.setDriverStatus(false);
       _isOnline = false;
@@ -50,6 +60,24 @@ class JobBoardCubit extends Cubit<JobBoardState> {
     } catch (_) {
       emit(JobBoardOffline());
     }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _silentRefresh());
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _silentRefresh() async {
+    if (!_isOnline || isClosed) return;
+    try {
+      final jobs = await _api.getAvailableJobs();
+      if (!isClosed) emit(JobBoardLoaded(jobs, isOnline: _isOnline));
+    } catch (_) {}
   }
 
   Future<void> loadJobs() async {
@@ -65,15 +93,19 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   }
 
   Future<Map<String, dynamic>?> acceptJob(String orderId) async {
+    _stopPolling();
     emit(JobBoardAccepting(orderId));
     try {
       final result = await _api.acceptDelivery(orderId);
-      await loadJobs();
+      _isOnline = false;
+      emit(JobBoardOffline());
       return result;
     } on ApiException catch (e) {
+      _startPolling();
       emit(JobBoardError(e.message));
       return null;
     } catch (_) {
+      _startPolling();
       emit(JobBoardError('Gagal mengambil pesanan'));
       return null;
     }
