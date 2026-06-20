@@ -36,7 +36,7 @@ interface Deposit {
 const api = (path: string, opts?: RequestInit) =>
   fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }, ...opts })
 
-const fmt = (v: number) => 'Rp ' + v.toLocaleString('id-ID')
+const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 
 export default function DriversPage() {
   const [search, setSearch] = useState('')

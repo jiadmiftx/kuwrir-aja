@@ -45,7 +45,7 @@ const api = (path: string, opts?: RequestInit) =>
     ...opts,
   })
 
-const fmt = (v: number) => 'Rp ' + v.toLocaleString('id-ID')
+const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function SettlementsPage() {
@@ -72,7 +72,7 @@ export default function SettlementsPage() {
         api('/api/v1/admin/settlements').then(r => r.json()),
         api('/api/v1/admin/settlements/merchants').then(r => r.json()),
       ])
-      setSummary({ total_driver_cash: s1.total_driver_cash, total_platform_revenue: s1.total_platform_revenue, pending_merchant_payout: s1.pending_merchant_payout ?? 0 })
+      setSummary({ total_driver_cash: s1.total_driver_cash ?? 0, total_platform_revenue: s1.total_platform_revenue ?? 0, pending_merchant_payout: s1.pending_merchant_payout ?? 0 })
       setPending(s2.pending_payouts ?? [])
       setSettlements(s2.settlements ?? [])
     } finally { setLoading(false) }

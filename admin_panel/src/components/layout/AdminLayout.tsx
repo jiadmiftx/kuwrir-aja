@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -29,6 +29,12 @@ const navItems = [
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) {
+      navigate('/login', { replace: true })
+    }
+  }, [navigate])
 
   return (
     <div className="flex h-screen bg-background">
@@ -73,7 +79,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground"
-            onClick={() => navigate('/login')}
+            onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login') }}
           >
             <LogOut className="h-4 w-4" />
             Logout

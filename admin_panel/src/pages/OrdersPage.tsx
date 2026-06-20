@@ -174,7 +174,7 @@ export default function OrdersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">
-                          IDR {order.total.toLocaleString('id-ID')}
+                          IDR {(order.total ?? 0).toLocaleString('id-ID')}
                         </TableCell>
                         <TableCell className="text-primary font-medium">
                           IDR {((order.platform_markup || 0) + (order.delivery_commission || 0)).toLocaleString('id-ID')}

@@ -19,8 +19,8 @@ interface Stats {
   pending_driver_cash: number
 }
 
-function fmt(v: number) {
-  return 'Rp ' + v.toLocaleString('id-ID')
+function fmt(v: number | undefined) {
+  return 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 }
 
 export default function DashboardPage() {
