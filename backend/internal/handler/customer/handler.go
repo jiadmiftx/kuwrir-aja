@@ -166,9 +166,10 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		appServiceFee = 0
 	} else {
 		// Platform delivery: KUWRIR driver delivers
+		// App service fee is charged to customer separately — driver is not penalised
 		appServiceFee = deliveryFee * (settings.AppServiceFeePct / 100.0)
 		deliveryCommission = deliveryFee * (settings.DeliveryCommissionPct / 100.0)
-		driverEarning = deliveryFee - deliveryCommission - appServiceFee
+		driverEarning = deliveryFee - deliveryCommission
 		if driverEarning < 0 {
 			driverEarning = 0
 		}
@@ -180,8 +181,8 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	// 6. Apply tax on subtotal (product portion only)
 	taxAmount := subtotalWithMarkup * (settings.TaxPct / 100.0)
 
-	// 7. Grand total customer pays
-	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee
+	// 7. Grand total customer pays (app service fee is an explicit charge to customer)
+	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee + appServiceFee
 
 	// Enforce min order amount
 	if settings.MinOrderAmount > 0 && subtotalWithMarkup < settings.MinOrderAmount {

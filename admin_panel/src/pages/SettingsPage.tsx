@@ -187,8 +187,8 @@ export default function SettingsPage() {
   const taxAmount = foodWithMarkup * (tax / 100)
   const appServiceFeeAmt = insideFee * (serviceFee / 100)
   const deliveryCommissionAmt = insideFee * (commission / 100)
-  const driverEarning = insideFee - deliveryCommissionAmt - appServiceFeeAmt
-  const total = foodWithMarkup + taxAmount + insideFee
+  const driverEarning = insideFee - deliveryCommissionAmt   // driver tidak kena potong app fee
+  const total = foodWithMarkup + taxAmount + insideFee + appServiceFeeAmt  // customer bayar app fee
   // Merchant gets BASE price only (transparent ujrah model)
   const merchantReceives = baseFood
   const kuwrirRevenue = platformUjrah + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
@@ -261,6 +261,10 @@ export default function SettingsPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">+ Ongkir (inside zone)</span>
                   <span>IDR {insideFee.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">+ Biaya Aplikasi ({serviceFee}%)</span>
+                  <span className="text-orange-500">IDR {appServiceFeeAmt.toLocaleString('id-ID')}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold text-base">
