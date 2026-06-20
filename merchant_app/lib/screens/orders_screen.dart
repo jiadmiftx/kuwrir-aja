@@ -1,26 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
-
-/// Mock order for display
-class _MockOrder {
-  final String id;
-  final String orderNumber;
-  final String customerName;
-  final double total;
-  final int itemCount;
-  final String deliveryType; // 'platform' or 'self'
-  String status; // pending, confirmed, preparing, ready
-
-  _MockOrder({
-    required this.id,
-    required this.orderNumber,
-    required this.customerName,
-    required this.total,
-    required this.itemCount,
-    required this.status,
-    this.deliveryType = 'platform',
-  });
-}
+import '../cubits/store_orders_cubit.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -30,133 +11,104 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  final List<_MockOrder> _orders = [
-    _MockOrder(
-      id: '1', orderNumber: 'KWR-260507091015',
-      customerName: 'John Tourist', total: 72500, itemCount: 3, status: 'pending',
-    ),
-    _MockOrder(
-      id: '2', orderNumber: 'KWR-260507094522',
-      customerName: 'Maria Guest', total: 61000, itemCount: 2, status: 'confirmed',
-      deliveryType: 'self', // Self-delivery order!
-    ),
-    _MockOrder(
-      id: '3', orderNumber: 'KWR-260507101200',
-      customerName: 'Budi Lombok', total: 89500, itemCount: 4, status: 'preparing',
-    ),
-  ];
-
-  bool _isOpen = true;
+  @override
+  void initState() {
+    super.initState();
+    context.read<StoreOrdersCubit>().startPolling();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Active Orders',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              GestureDetector(
-                onTap: () => setState(() => _isOpen = !_isOpen),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (_isOpen ? KuwrirColors.success : KuwrirColors.error).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(width: 8, height: 8, decoration: BoxDecoration(color: _isOpen ? KuwrirColors.success : KuwrirColors.error, shape: BoxShape.circle)),
-                      const SizedBox(width: 6),
-                      Text(_isOpen ? 'Store Open' : 'Store Closed', style: TextStyle(color: _isOpen ? KuwrirColors.success : KuwrirColors.error, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
+    return BlocBuilder<StoreOrdersCubit, StoreOrdersState>(
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Pesanan Masuk'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => context.read<StoreOrdersCubit>().load(),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Order list
-          Expanded(
-            child: _orders.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.receipt_long_outlined, size: 64, color: KuwrirColors.textHint),
-                        const SizedBox(height: 16),
-                        Text('No active orders', style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 16)),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _orders.length,
-                    itemBuilder: (context, index) {
-                      final order = _orders[index];
-                      return _OrderCard(
-                        order: order,
-                        onAction: () {
-                          setState(() {
-                            switch (order.status) {
-                              case 'pending':
-                                order.status = 'confirmed';
-                                break;
-                              case 'confirmed':
-                                order.status = 'preparing';
-                                break;
-                              case 'preparing':
-                                order.status = 'ready';
-                                break;
-                              case 'ready':
-                                if (order.deliveryType == 'self') {
-                                  // Self-delivery: merchant picks up
-                                  order.status = 'picked_up';
-                                } else {
-                                  _orders.removeAt(index); // Picked up by driver
-                                }
-                                break;
-                              case 'picked_up':
-                                _orders.removeAt(index); // Delivered by merchant
-                                break;
-                            }
-                          });
-                        },
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+          body: _buildBody(context, state),
+        );
+      },
     );
+  }
+
+  Widget _buildBody(BuildContext context, StoreOrdersState state) {
+    if (state is StoreOrdersLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state is StoreOrdersError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => context.read<StoreOrdersCubit>().load(),
+              child: const Text('Coba lagi'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (state is StoreOrdersLoaded) {
+      final active = state.orders
+          .where((o) => !['delivered', 'cancelled'].contains(o['status']))
+          .toList();
+
+      if (active.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
+              const SizedBox(height: 16),
+              const Text('Tidak ada pesanan aktif', style: TextStyle(color: Colors.grey, fontSize: 16)),
+              const SizedBox(height: 8),
+              const Text('Pesanan baru akan muncul di sini otomatis',
+                  style: TextStyle(color: Colors.grey, fontSize: 13)),
+            ],
+          ),
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: () => context.read<StoreOrdersCubit>().load(),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: active.length,
+          itemBuilder: (context, i) {
+            final order = active[i];
+            return _OrderCard(order: order);
+          },
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
 
 class _OrderCard extends StatelessWidget {
-  final _MockOrder order;
-  final VoidCallback onAction;
+  final Map<String, dynamic> order;
 
-  const _OrderCard({required this.order, required this.onAction});
+  const _OrderCard({required this.order});
 
   @override
   Widget build(BuildContext context) {
-    // For self-delivery orders with 'ready' status, use special config
-    _StatusConfig config;
-    if (order.deliveryType == 'self' && order.status == 'ready') {
-      config = _StatusConfig(label: 'Ready', color: KuwrirColors.primary, actionIcon: Icons.delivery_dining, actionLabel: 'Antar Sendiri');
-    } else if (order.status == 'picked_up') {
-      config = _StatusConfig(label: 'Sedang Diantar', color: const Color(0xFF0EA5E9), actionIcon: Icons.check_circle, actionLabel: 'Pesanan Sampai');
-    } else {
-      config = _statusConfig[order.status]!;
-    }
+    final status = order['status'] as String? ?? 'pending';
+    final items = order['items'] as List<dynamic>? ?? [];
+    final customer = order['customer'] as Map<String, dynamic>?;
+    final customerName = customer?['name'] as String? ?? 'Customer';
+    final orderNumber = order['order_number'] as String? ?? '-';
+    final total = (order['total'] as num?)?.toDouble() ?? 0;
+    final deliveryType = order['delivery_type'] as String? ?? 'platform';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -165,84 +117,176 @@ class _OrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row
+            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace')),
-                ),
-                if (order.deliveryType == 'self')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      color: KuwrirColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('Self-Delivery', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: KuwrirColors.primary)),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: config.color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(config.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: config.color)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Customer + items
-            Row(
-              children: [
-                Icon(Icons.person_outline, size: 16, color: KuwrirColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(order.customerName, style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
-                const Spacer(),
-                Text('${order.itemCount} items', style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
+                Text(orderNumber,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                _StatusBadge(status),
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              'IDR ${order.total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: KuwrirColors.primary),
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 14, color: KuwrirColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(customerName,
+                    style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
+                const SizedBox(width: 12),
+                Icon(
+                  deliveryType == 'self' ? Icons.store_outlined : Icons.delivery_dining,
+                  size: 14,
+                  color: KuwrirColors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  deliveryType == 'self' ? 'Antar sendiri' : 'Platform',
+                  style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // Action button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onAction,
-                icon: Icon(config.actionIcon, size: 18),
-                label: Text(config.actionLabel),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: config.color,
-                  foregroundColor: Colors.white,
+            // Items
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '${item['quantity']}x ${item['item_name']}',
+                  style: const TextStyle(fontSize: 13),
                 ),
               ),
+
+            const SizedBox(height: 10),
+
+            // Total + action
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total', style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+                    Text(
+                      'IDR ${_fmt(total)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ],
+                ),
+                _ActionButton(orderId: order['id'] as String, status: status),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 }
 
-class _StatusConfig {
-  final String label;
-  final Color color;
-  final IconData actionIcon;
-  final String actionLabel;
+class _ActionButton extends StatefulWidget {
+  final String orderId;
+  final String status;
 
-  _StatusConfig({required this.label, required this.color, required this.actionIcon, required this.actionLabel});
+  const _ActionButton({required this.orderId, required this.status});
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
 }
 
-final Map<String, _StatusConfig> _statusConfig = {
-  'pending': _StatusConfig(label: 'New Order', color: KuwrirColors.warning, actionIcon: Icons.check_circle, actionLabel: 'Accept Order'),
-  'confirmed': _StatusConfig(label: 'Confirmed', color: KuwrirColors.info, actionIcon: Icons.store, actionLabel: 'Start Preparing'),
-  'preparing': _StatusConfig(label: 'Preparing', color: const Color(0xFF8B5CF6), actionIcon: Icons.check, actionLabel: 'Mark Ready'),
-  'ready': _StatusConfig(label: 'Ready', color: KuwrirColors.success, actionIcon: Icons.delivery_dining, actionLabel: 'Waiting for Driver'),
-};
+class _ActionButtonState extends State<_ActionButton> {
+  bool _loading = false;
+
+  Future<void> _act(BuildContext context) async {
+    setState(() => _loading = true);
+    final cubit = context.read<StoreOrdersCubit>();
+    try {
+      switch (widget.status) {
+        case 'pending':
+          await cubit.accept(widget.orderId);
+          break;
+        case 'confirmed':
+          await cubit.markPreparing(widget.orderId);
+          break;
+        case 'preparing':
+          await cubit.markReady(widget.orderId);
+          break;
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    String label;
+    Color color;
+    switch (widget.status) {
+      case 'pending':
+        label = 'Terima Pesanan';
+        color = KuwrirColors.success;
+        break;
+      case 'confirmed':
+        label = 'Mulai Masak';
+        color = KuwrirColors.warning;
+        break;
+      case 'preparing':
+        label = 'Siap Dikirim';
+        color = KuwrirColors.primary;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
+      onPressed: _loading ? null : () => _act(context),
+      child: _loading
+          ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : Text(label),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge(this.status);
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (status) {
+      case 'pending':
+        color = Colors.orange;
+        break;
+      case 'confirmed':
+        color = Colors.blue;
+        break;
+      case 'preparing':
+        color = Colors.purple;
+        break;
+      case 'ready':
+        color = Colors.green;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(status.toUpperCase(),
+          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+    );
+  }
+}

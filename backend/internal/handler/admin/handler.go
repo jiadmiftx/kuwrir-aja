@@ -52,12 +52,23 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/driver-applications", driverreg.ListDriverApplications(h.db))
 	r.PUT("/driver-applications/:id/review", driverreg.ReviewDriverApplication(h.db))
 
+	// Wallet & withdrawals
+	r.GET("/withdrawals", h.GetWithdrawals)
+	r.GET("/drivers/:id/cod-holding", h.GetDriverCODHolding)
+	r.POST("/drivers/:id/cod-deposit", h.AdminConfirmCODDeposit)
+
 	// Promotions
 	r.GET("/promotions", h.GetPromotions)
 	r.POST("/promotions", h.CreatePromotion)
 	r.PUT("/promotions/:id", h.UpdatePromotion)
 	r.DELETE("/promotions/:id", h.DeletePromotion)
 	r.PUT("/promotions/:id/toggle", h.TogglePromotion)
+
+	// Delivery zones (city reference points for pricing)
+	r.GET("/delivery-zones", h.GetDeliveryZones)
+	r.POST("/delivery-zones", h.CreateDeliveryZone)
+	r.PUT("/delivery-zones/:id", h.UpdateDeliveryZone)
+	r.DELETE("/delivery-zones/:id", h.DeleteDeliveryZone)
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -266,7 +277,7 @@ func (h *Handler) GetDriverDeposits(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"driver":      driver,
 		"deposits":    deposits,
-		"cash_balance": driver.CashBalance,
+		"cod_holding": driver.CodHolding,
 	})
 }
 
@@ -566,4 +577,198 @@ func (h *Handler) TogglePromotion(c *gin.Context) {
 	}
 	h.db.Model(&promo).Update("is_active", !promo.IsActive)
 	c.JSON(http.StatusOK, gin.H{"is_active": !promo.IsActive})
+}
+
+// ─── WALLET & WITHDRAWALS ────────────────────────────────────────────────────
+
+// GetWithdrawals returns all withdrawal requests across all users.
+func (h *Handler) GetWithdrawals(c *gin.Context) {
+	status := c.DefaultQuery("status", "")
+	var requests []model.WithdrawalRequest
+	q := h.db.Preload("Wallet")
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	q.Order("created_at DESC").Find(&requests)
+	c.JSON(http.StatusOK, gin.H{"withdrawals": requests})
+}
+
+// GetDriverCODHolding returns a driver's COD cash balance and deposit history.
+func (h *Handler) GetDriverCODHolding(c *gin.Context) {
+	driverID := c.Param("id")
+	var driver model.Driver
+	if h.db.Preload("User").First(&driver, "id = ?", driverID).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
+		return
+	}
+	var deposits []model.DriverDeposit
+	h.db.Where("driver_id = ?", driverID).Order("created_at DESC").Find(&deposits)
+	c.JSON(http.StatusOK, gin.H{
+		"driver":      driver,
+		"cod_holding": driver.CodHolding,
+		"deposits":    deposits,
+	})
+}
+
+// AdminConfirmCODDeposit allows admin to record a COD deposit on behalf of a driver.
+func (h *Handler) AdminConfirmCODDeposit(c *gin.Context) {
+	driverID := c.Param("id")
+	adminID := c.GetString("user_id")
+
+	var req struct {
+		Amount    float64 `json:"amount" binding:"required,gt=0"`
+		Method    string  `json:"method"`
+		Reference string  `json:"reference"`
+		Notes     string  `json:"notes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Method == "" {
+		req.Method = "cash"
+	}
+
+	var driver model.Driver
+	if h.db.First(&driver, "id = ?", driverID).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
+		return
+	}
+	if driver.CodHolding < req.Amount {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       "Amount exceeds driver COD holding",
+			"cod_holding": driver.CodHolding,
+		})
+		return
+	}
+
+	adminUID, _ := uuid.Parse(adminID)
+	now := time.Now()
+	deposit := model.DriverDeposit{
+		DriverID:     driver.ID,
+		Amount:       req.Amount,
+		Method:       req.Method,
+		Reference:    req.Reference,
+		Notes:        req.Notes,
+		VerifiedByID: &adminUID,
+		VerifiedAt:   &now,
+	}
+
+	tx := h.db.Begin()
+	tx.Create(&deposit)
+	tx.Model(&driver).UpdateColumn("cod_holding", gorm.Expr("cod_holding - ?", req.Amount))
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record deposit"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"deposit":           deposit,
+		"remaining_holding": driver.CodHolding - req.Amount,
+	})
+}
+
+// ─── DELIVERY ZONES ──────────────────────────────────────────────────────────
+
+// GetDeliveryZones returns all city delivery zones.
+func (h *Handler) GetDeliveryZones(c *gin.Context) {
+	var zones []model.DeliveryZone
+	h.db.Order("city_name ASC").Find(&zones)
+	c.JSON(http.StatusOK, gin.H{"zones": zones})
+}
+
+// CreateDeliveryZone adds a new city reference point for delivery pricing.
+func (h *Handler) CreateDeliveryZone(c *gin.Context) {
+	var req struct {
+		CityName  string  `json:"city_name" binding:"required"`
+		Latitude  float64 `json:"latitude" binding:"required"`
+		Longitude float64 `json:"longitude" binding:"required"`
+		RadiusKm  float64 `json:"radius_km"`
+		BaseFee   float64 `json:"base_fee"`
+		PerKmFee  float64 `json:"per_km_fee"`
+		IsDefault bool    `json:"is_default"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.RadiusKm == 0 {
+		req.RadiusKm = 5
+	}
+	if req.BaseFee == 0 {
+		req.BaseFee = 15000
+	}
+	if req.PerKmFee == 0 {
+		req.PerKmFee = 10000
+	}
+
+	// If this is set as default, unset other defaults
+	if req.IsDefault {
+		h.db.Model(&model.DeliveryZone{}).Where("is_default = ?", true).Update("is_default", false)
+	}
+
+	zone := model.DeliveryZone{
+		CityName:  req.CityName,
+		Latitude:  req.Latitude,
+		Longitude: req.Longitude,
+		RadiusKm:  req.RadiusKm,
+		BaseFee:   req.BaseFee,
+		PerKmFee:  req.PerKmFee,
+		IsDefault: req.IsDefault,
+		IsActive:  true,
+	}
+	if err := h.db.Create(&zone).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zone"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"zone": zone})
+}
+
+// UpdateDeliveryZone edits an existing city zone.
+func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
+	id := c.Param("id")
+	var zone model.DeliveryZone
+	if h.db.First(&zone, "id = ?", id).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found"})
+		return
+	}
+
+	var req struct {
+		CityName  string  `json:"city_name"`
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		RadiusKm  float64 `json:"radius_km"`
+		BaseFee   float64 `json:"base_fee"`
+		PerKmFee  float64 `json:"per_km_fee"`
+		IsDefault bool    `json:"is_default"`
+		IsActive  bool    `json:"is_active"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.IsDefault {
+		h.db.Model(&model.DeliveryZone{}).Where("id != ? AND is_default = ?", id, true).Update("is_default", false)
+	}
+
+	updates := map[string]interface{}{
+		"city_name":  req.CityName,
+		"latitude":   req.Latitude,
+		"longitude":  req.Longitude,
+		"radius_km":  req.RadiusKm,
+		"base_fee":   req.BaseFee,
+		"per_km_fee": req.PerKmFee,
+		"is_default": req.IsDefault,
+		"is_active":  req.IsActive,
+	}
+	h.db.Model(&zone).Updates(updates)
+	c.JSON(http.StatusOK, gin.H{"zone": zone})
+}
+
+// DeleteDeliveryZone removes a city zone.
+func (h *Handler) DeleteDeliveryZone(c *gin.Context) {
+	id := c.Param("id")
+	h.db.Where("id = ?", id).Delete(&model.DeliveryZone{})
+	c.JSON(http.StatusOK, gin.H{"message": "Zone deleted"})
 }

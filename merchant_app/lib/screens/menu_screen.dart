@@ -1,19 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
-
-/// Mock data for menu display
-class _MockCategory {
-  final String name;
-  final List<_MockItem> items;
-  _MockCategory({required this.name, required this.items});
-}
-
-class _MockItem {
-  final String name;
-  final double price;
-  final bool isAvailable;
-  _MockItem({required this.name, required this.price, this.isAvailable = true});
-}
+import '../cubits/menu_cubit.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -23,201 +11,230 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  final List<_MockCategory> _categories = [
-    _MockCategory(
-      name: 'Makanan Utama',
-      items: [
-        _MockItem(name: 'Nasi Campur Spesial', price: 50000),
-        _MockItem(name: 'Ayam Bakar Taliwang', price: 40000),
-        _MockItem(name: 'Plecing Kangkung', price: 15000),
-        _MockItem(name: 'Nasi Goreng Lombok', price: 35000, isAvailable: false),
-      ],
-    ),
-    _MockCategory(
-      name: 'Minuman',
-      items: [
-        _MockItem(name: 'Es Kelapa Muda', price: 15000),
-        _MockItem(name: 'Jus Mangga', price: 13000),
-      ],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    context.read<MenuCubit>().load();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Product & Inventory Management',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Manage your product categories and items',
-              style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _categories.length,
-                itemBuilder: (context, catIndex) {
-                  final cat = _categories[catIndex];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Category header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            cat.name,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: KuwrirColors.primary,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                onPressed: () => _showEditCategoryDialog(cat.name),
-                                color: KuwrirColors.textSecondary,
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline, size: 18),
-                                onPressed: () => _showAddItemDialog(cat.name),
-                                color: KuwrirColors.primary,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      // Items
-                      ...cat.items.map((item) => _ProductTile(
-                            name: item.name,
-                            price: item.price,
-                            isAvailable: item.isAvailable,
-                            onToggle: () {
-                              setState(() {
-                                // Toggle availability (mock)
-                              });
-                            },
-                          )),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                },
+    return BlocBuilder<MenuCubit, MenuState>(
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Menu Saya'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => context.read<MenuCubit>().load(),
               ),
+            ],
+          ),
+          body: _buildBody(context, state),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: state is MenuLoading ? null : () => _showAddCategoryDialog(context),
+            backgroundColor: KuwrirColors.primary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add),
+            label: const Text('Tambah Kategori'),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(BuildContext context, MenuState state) {
+    if (state is MenuLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state is MenuError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => context.read<MenuCubit>().load(),
+              child: const Text('Coba lagi'),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddCategoryDialog,
-        backgroundColor: KuwrirColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Category'),
-      ),
+      );
+    }
+
+    final categories = state is MenuLoaded
+        ? state.categories
+        : (state is MenuSaving ? state.categories : <ProductCategory>[]);
+
+    if (categories.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text('Belum ada menu', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            const SizedBox(height: 8),
+            const Text('Tambah kategori dan produk pertama Anda',
+                style: TextStyle(color: Colors.grey, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+          itemCount: categories.length,
+          itemBuilder: (context, i) {
+            final cat = categories[i];
+            return _CategorySection(category: cat);
+          },
+        ),
+        if (state is MenuSaving)
+          const Positioned.fill(
+            child: ColoredBox(
+              color: Color(0x33000000),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+      ],
     );
   }
 
-  void _showAddCategoryDialog() {
-    final controller = TextEditingController();
+  void _showAddCategoryDialog(BuildContext context) {
+    final ctrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Category'),
+        title: const Text('Tambah Kategori'),
         content: TextField(
-          controller: controller,
+          controller: ctrl,
+          autofocus: true,
           decoration: const InputDecoration(
-            labelText: 'Category Name',
-            hintText: 'e.g., Snacks, Dessert',
+            labelText: 'Nama Kategori',
+            hintText: 'cth. Makanan Utama, Minuman',
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () {
-              if (controller.text.isNotEmpty) {
-                setState(() {
-                  _categories.add(_MockCategory(name: controller.text, items: []));
-                });
+              if (ctrl.text.trim().isNotEmpty) {
+                context.read<MenuCubit>().createCategory(ctrl.text.trim());
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Add'),
+            child: const Text('Tambah'),
           ),
         ],
       ),
     );
   }
+}
 
-  void _showEditCategoryDialog(String currentName) {
-    final controller = TextEditingController(text: currentName);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Category'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Category Name'),
+class _CategorySection extends StatelessWidget {
+  final ProductCategory category;
+  const _CategorySection({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                category.name,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: KuwrirColors.primary,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                color: KuwrirColors.primary,
+                onPressed: () => _showAddProductDialog(context, category.id, category.name),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Save')),
-        ],
-      ),
+        if (category.products.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text('Belum ada produk',
+                style: TextStyle(color: KuwrirColors.textHint, fontSize: 13)),
+          )
+        else
+          for (final product in category.products)
+            _ProductTile(product: product),
+        const SizedBox(height: 8),
+      ],
     );
   }
 
-  void _showAddItemDialog(String categoryName) {
+  void _showAddProductDialog(BuildContext context, String catId, String catName) {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Add Item to $categoryName'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Item Name'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: priceCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Base Price (IDR)',
-                hintText: 'e.g., 50000',
+        title: Text('Tambah ke $catName'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Nama Produk'),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Harga Dasar (IDR)',
+                  hintText: '50000',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: descCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Deskripsi (opsional)',
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () {
-              if (nameCtrl.text.isNotEmpty && priceCtrl.text.isNotEmpty) {
-                setState(() {
-                  final cat = _categories.firstWhere((c) => c.name == categoryName);
-                  cat.items.add(_MockItem(
-                    name: nameCtrl.text,
-                    price: double.tryParse(priceCtrl.text) ?? 0,
-                  ));
+              final name = nameCtrl.text.trim();
+              final price = double.tryParse(priceCtrl.text) ?? 0;
+              if (name.isNotEmpty && price > 0) {
+                context.read<MenuCubit>().createProduct(catId, {
+                  'name': name,
+                  'price': price,
+                  'description': descCtrl.text.trim(),
+                  'is_available': true,
                 });
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Add'),
+            child: const Text('Tambah'),
           ),
         ],
       ),
@@ -226,17 +243,8 @@ class _MenuScreenState extends State<MenuScreen> {
 }
 
 class _ProductTile extends StatelessWidget {
-  final String name;
-  final double price;
-  final bool isAvailable;
-  final VoidCallback onToggle;
-
-  const _ProductTile({
-    required this.name,
-    required this.price,
-    required this.isAvailable,
-    required this.onToggle,
-  });
+  final Product product;
+  const _ProductTile({required this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -250,31 +258,126 @@ class _ProductTile extends StatelessWidget {
             color: KuwrirColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(Icons.shopping_bag, color: KuwrirColors.primary, size: 22),
+          child: product.imageUrl != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(product.imageUrl!, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(Icons.fastfood, color: KuwrirColors.primary)),
+                )
+              : Icon(Icons.fastfood, color: KuwrirColors.primary, size: 22),
         ),
         title: Text(
-          name,
+          product.name,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            decoration: isAvailable ? null : TextDecoration.lineThrough,
-            color: isAvailable ? null : KuwrirColors.textHint,
+            decoration: product.isAvailable ? null : TextDecoration.lineThrough,
+            color: product.isAvailable ? null : KuwrirColors.textHint,
           ),
         ),
         subtitle: Text(
-          'IDR ${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
+          'IDR ${_fmt(product.price)}',
           style: TextStyle(
             fontSize: 13,
-            color: isAvailable ? KuwrirColors.primary : KuwrirColors.textHint,
+            color: product.isAvailable ? KuwrirColors.primary : KuwrirColors.textHint,
             fontWeight: FontWeight.w600,
           ),
         ),
-        trailing: Switch.adaptive(
-          value: isAvailable,
-          onChanged: (_) => onToggle(),
-          activeColor: KuwrirColors.success,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Switch.adaptive(
+              value: product.isAvailable,
+              onChanged: (v) =>
+                  context.read<MenuCubit>().toggleAvailability(product.id, v),
+              activeColor: KuwrirColors.success,
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 18),
+              onSelected: (action) => _handleAction(context, action),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(value: 'delete', child: Text('Hapus')),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+
+  void _handleAction(BuildContext context, String action) {
+    if (action == 'edit') {
+      _showEditDialog(context);
+    } else if (action == 'delete') {
+      _showDeleteConfirm(context);
+    }
+  }
+
+  void _showEditDialog(BuildContext context) {
+    final nameCtrl = TextEditingController(text: product.name);
+    final priceCtrl = TextEditingController(text: product.price.toStringAsFixed(0));
+    final descCtrl = TextEditingController(text: product.description ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Produk'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nama')),
+              const SizedBox(height: 8),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Harga (IDR)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Deskripsi')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<MenuCubit>().updateProduct(product.id, {
+                'name': nameCtrl.text.trim(),
+                'price': double.tryParse(priceCtrl.text) ?? product.price,
+                'description': descCtrl.text.trim(),
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirm(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Produk?'),
+        content: Text('${product.name} akan dihapus permanen.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              context.read<MenuCubit>().deleteProduct(product.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 }

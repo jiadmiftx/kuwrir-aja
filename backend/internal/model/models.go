@@ -191,7 +191,7 @@ type Driver struct {
 	IsAvailable    bool      `gorm:"default:true" json:"is_available"`
 	Rating         float64   `gorm:"default:5.0" json:"rating"`
 	TotalDelivered int       `gorm:"default:0" json:"total_delivered"`
-	CashBalance    float64   `gorm:"default:0" json:"cash_balance"` // Cash owed to platform
+	CodHolding     float64   `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -239,6 +239,16 @@ type Order struct {
 	ReturnLat         float64    `json:"return_lat,omitempty"`
 	ReturnLng         float64    `json:"return_lng,omitempty"`
 	WeightKg          float64    `gorm:"default:0" json:"weight_kg,omitempty"` // untuk layanan per-kg (laundry)
+
+	// Tax & fees (added to total beyond markup + delivery)
+	TaxAmount     float64 `gorm:"default:0" json:"tax_amount"`      // PPN applied on subtotal_with_markup
+	AppServiceFee float64 `gorm:"default:0" json:"app_service_fee"` // platform service fee on delivery
+
+	// Payment (online gateway)
+	PaymentStatus    string     `gorm:"type:varchar(20);default:'pending'" json:"payment_status"` // pending | paid | failed | expired
+	PaymentRef       string     `json:"payment_ref,omitempty"`       // Duitku merchant_order_id
+	PaymentURL       string     `json:"payment_url,omitempty"`       // URL bayar untuk customer
+	PaymentExpiredAt *time.Time `json:"payment_expired_at,omitempty"` // kapan link expired
 
 	// Timestamps
 	PlacedAt        *time.Time `json:"placed_at,omitempty"`
@@ -489,4 +499,64 @@ type MerchantPayablePayment struct {
 	Amount    float64   `gorm:"not null" json:"amount"`
 	Method    string    `gorm:"type:varchar(20);default:'cash'" json:"method"`
 	Notes     string    `json:"notes,omitempty"`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WALLET & PAYMENT MODELS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Wallet holds the earnings balance for a driver or merchant.
+// One wallet per user. Credits happen automatically on order completion;
+// debits happen on withdrawal.
+type Wallet struct {
+	Base
+	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	Balance        float64   `gorm:"default:0" json:"balance"`         // available to withdraw
+	TotalEarned    float64   `gorm:"default:0" json:"total_earned"`    // lifetime credits
+	TotalWithdrawn float64   `gorm:"default:0" json:"total_withdrawn"` // lifetime debits
+
+	User         User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Transactions []WalletTransaction `gorm:"foreignKey:WalletID" json:"transactions,omitempty"`
+}
+
+// WalletTransaction is an immutable ledger entry for every wallet movement.
+type WalletTransaction struct {
+	Base
+	WalletID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"wallet_id"`
+	OrderID     *uuid.UUID `gorm:"type:uuid;index" json:"order_id,omitempty"` // source order (nullable for manual adjustments)
+	Type        string     `gorm:"type:varchar(20);not null" json:"type"`      // credit | debit
+	Category    string     `gorm:"type:varchar(30);not null" json:"category"`  // order_earning | withdrawal | refund | adjustment | cod_deposit
+	Amount      float64    `gorm:"not null" json:"amount"`
+	BalanceAfter float64   `gorm:"not null" json:"balance_after"` // snapshot of balance after this entry
+	Notes       string     `json:"notes,omitempty"`
+}
+
+// DeliveryZone defines city-based delivery pricing zones for admin configuration.
+// The nearest active zone to the merchant is used when calculating delivery fees.
+type DeliveryZone struct {
+	Base
+	CityName  string  `gorm:"type:varchar(100);not null" json:"city_name"`
+	Latitude  float64 `gorm:"not null" json:"latitude"`
+	Longitude float64 `gorm:"not null" json:"longitude"`
+	RadiusKm  float64 `gorm:"default:5" json:"radius_km"`     // inside-zone radius
+	BaseFee   float64 `gorm:"default:15000" json:"base_fee"`  // fee within radius
+	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km beyond radius
+	IsDefault bool    `gorm:"default:false" json:"is_default"` // fallback when no zone matches
+	IsActive  bool    `gorm:"default:true" json:"is_active"`
+}
+
+// WithdrawalRequest tracks a payout request and its Duitku disbursement status.
+type WithdrawalRequest struct {
+	Base
+	WalletID          uuid.UUID  `gorm:"type:uuid;not null;index" json:"wallet_id"`
+	Amount            float64    `gorm:"not null" json:"amount"`
+	BankCode          string     `gorm:"type:varchar(20);not null" json:"bank_code"`           // BCA, BNI, MANDIRI, etc.
+	BankAccountNumber string     `gorm:"type:varchar(50);not null" json:"bank_account_number"`
+	BankAccountName   string     `gorm:"type:varchar(100);not null" json:"bank_account_name"`
+	Status            string     `gorm:"type:varchar(20);default:'processing'" json:"status"` // processing | success | failed
+	DisbursementRef   string     `json:"disbursement_ref,omitempty"`  // reference from Duitku
+	FailedReason      string     `json:"failed_reason,omitempty"`
+	ProcessedAt       *time.Time `json:"processed_at,omitempty"`
+
+	Wallet Wallet `gorm:"foreignKey:WalletID" json:"wallet,omitempty"`
 }

@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/service"
 )
 
 type Handler struct {
@@ -504,7 +505,7 @@ func (h *Handler) AcceptReturnLeg(c *gin.Context) {
 }
 
 // MarkReturned: driver delivered items back to customer, customer pays COD.
-// returning → returned. Updates driver cash balance.
+// returning → returned. Credits driver and merchant wallets; tracks COD holding.
 func (h *Handler) MarkReturned(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
@@ -522,23 +523,57 @@ func (h *Handler) MarkReturned(c *gin.Context) {
 	}
 
 	now := time.Now()
+	orderUUID := order.ID
+
 	tx := h.db.Begin()
 	tx.Model(&order).Updates(map[string]interface{}{
 		"status":      model.OrderStatusReturned,
 		"returned_at": now,
 	})
-	// Driver collects full COD, owes platform the difference
 	tx.Model(&model.Driver{}).Where("id = ?", driver.ID).
-		UpdateColumn("cash_balance", gorm.Expr("cash_balance + ?", order.Total))
+		Update("is_available", true)
+
+	merchantNotes := fmt.Sprintf("Service order %s returned", order.OrderNumber)
+	driverNotes := fmt.Sprintf("Earning service order %s", order.OrderNumber)
+
+	if order.PaymentType == "cash" {
+		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
+			return
+		}
+		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
+			return
+		}
+		tx.Model(&model.Driver{}).Where("id = ?", driver.ID).
+			UpdateColumn("cod_holding", gorm.Expr("cod_holding + ?", order.Total))
+	} else if order.PaymentStatus == "paid" {
+		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
+			return
+		}
+		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
+			return
+		}
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "Order completed. Customer has paid COD.",
-		"total_collected": order.Total,
-		"driver_earning":  order.DriverEarning,
-		"to_deposit":      order.Total - order.DriverEarning,
-	})
+	resp := gin.H{
+		"message":        "Order completed.",
+		"driver_earning": order.DriverEarning,
+	}
+	if order.PaymentType == "cash" {
+		resp["cash_collected"] = order.Total
+		resp["to_deposit"] = order.Total - order.DriverEarning
+	}
+	c.JSON(http.StatusOK, resp)
 }

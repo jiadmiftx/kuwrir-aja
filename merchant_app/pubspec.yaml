@@ -17,6 +17,10 @@ dependencies:
   firebase_analytics: ^11.4.5
   http: ^1.6.0
   image_picker: ^1.2.2
+  flutter_bloc: ^9.1.1
+  bloc: ^9.1.1
+  equatable: ^2.0.7
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import '../cubits/merchant_list_cubit.dart';
+import '../cubits/order_tracking_cubit.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,21 +53,30 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // --- Home Tab ---
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab();
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<MerchantListCubit>().loadMerchants();
+  }
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        // Header with location + search
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Location
                 Row(
                   children: [
                     Icon(Icons.location_on, color: KuwrirColors.primary, size: 20),
@@ -79,8 +91,6 @@ class _HomeTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Search bar
                 GestureDetector(
                   onTap: () => Navigator.pushNamed(context, '/search'),
                   child: Container(
@@ -95,7 +105,7 @@ class _HomeTab extends StatelessWidget {
                         Icon(Icons.search, color: KuwrirColors.textHint, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Search merchants or product...',
+                          'Cari restoran atau menu...',
                           style: TextStyle(color: KuwrirColors.textHint, fontSize: 14),
                         ),
                       ],
@@ -103,164 +113,86 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Categories
                 Text(
-                  'Categories',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 90,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: const [
-                      _CategoryChip(icon: Icons.store, label: 'All', isSelected: true),
-                      _CategoryChip(icon: Icons.local_fire_department, label: 'Popular'),
-                      _CategoryChip(icon: Icons.rice_bowl, label: 'Nasi'),
-                      _CategoryChip(icon: Icons.kebab_dining, label: 'Sate'),
-                      _CategoryChip(icon: Icons.local_drink, label: 'Drinks'),
-                      _CategoryChip(icon: Icons.icecream, label: 'Dessert'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Nearby Merchants',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  'Restoran Terdekat',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
         ),
 
-        // Merchant list
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              _MerchantCard(
-                name: 'Warung Nasi Campur Bu Eka',
-                category: 'Indonesian · Rice',
-                rating: 4.8,
-                reviews: 124,
-                distance: '0.8 km',
-                deliveryTime: '15-20 min',
-                imageColor: KuwrirColors.primary,
-                onTap: () => Navigator.pushNamed(context, '/merchant', arguments: {
-                  'id': '1',
-                  'name': 'Warung Nasi Campur Bu Eka',
-                }),
-              ),
-              _MerchantCard(
-                name: 'Ayam Taliwang Irama',
-                category: 'Lombok · Spicy',
-                rating: 4.5,
-                reviews: 89,
-                distance: '1.2 km',
-                deliveryTime: '20-25 min',
-                imageColor: KuwrirColors.accent,
-                onTap: () => Navigator.pushNamed(context, '/merchant', arguments: {
-                  'id': '2',
-                  'name': 'Ayam Taliwang Irama',
-                }),
-              ),
-              _MerchantCard(
-                name: 'Sate Rembiga Pak Haji',
-                category: 'Satay · Grilled',
-                rating: 4.9,
-                reviews: 210,
-                distance: '1.5 km',
-                deliveryTime: '25-30 min',
-                imageColor: KuwrirColors.warning,
-                onTap: () => Navigator.pushNamed(context, '/merchant', arguments: {
-                  'id': '3',
-                  'name': 'Sate Rembiga Pak Haji',
-                }),
-              ),
-              const SizedBox(height: 24),
-            ]),
-          ),
+        // Merchant list from API
+        BlocBuilder<MerchantListCubit, MerchantListState>(
+          builder: (context, state) {
+            if (state is MerchantListLoading) {
+              return const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+            if (state is MerchantListError) {
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(Icons.wifi_off, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(state.message, style: const TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => context.read<MerchantListCubit>().loadMerchants(),
+                        child: const Text('Coba lagi'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            if (state is MerchantListLoaded) {
+              if (state.merchants.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('Belum ada restoran di area ini')),
+                  ),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == state.merchants.length) return const SizedBox(height: 24);
+                      final m = state.merchants[index];
+                      return _MerchantCard(
+                        merchant: m,
+                        onTap: () => Navigator.pushNamed(context, '/merchant',
+                            arguments: {'id': m.id, 'name': m.name}),
+                      );
+                    },
+                    childCount: state.merchants.length + 1,
+                  ),
+                ),
+              );
+            }
+            return const SliverToBoxAdapter(child: SizedBox.shrink());
+          },
         ),
       ],
     );
   }
 }
 
-// --- Category Chip ---
-class _CategoryChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-
-  const _CategoryChip({
-    required this.icon,
-    required this.label,
-    this.isSelected = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: isSelected ? KuwrirColors.primary : KuwrirColors.background,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected ? KuwrirColors.primary : KuwrirColors.border,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: isSelected ? Colors.white : KuwrirColors.textSecondary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? KuwrirColors.primary : KuwrirColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // --- Merchant Card ---
 class _MerchantCard extends StatelessWidget {
-  final String name;
-  final String category;
-  final double rating;
-  final int reviews;
-  final String distance;
-  final String deliveryTime;
-  final Color imageColor;
+  final Merchant merchant;
   final VoidCallback onTap;
 
-  const _MerchantCard({
-    required this.name,
-    required this.category,
-    required this.rating,
-    required this.reviews,
-    required this.distance,
-    required this.deliveryTime,
-    required this.imageColor,
-    required this.onTap,
-  });
+  const _MerchantCard({required this.merchant, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -271,45 +203,64 @@ class _MerchantCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image placeholder
             Container(
               height: 140,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: imageColor.withValues(alpha: 0.15),
+                color: KuwrirColors.primary.withValues(alpha: 0.1),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
-              child: Center(
-                child: Icon(Icons.store, size: 48, color: imageColor),
-              ),
+              child: merchant.logoUrl != null
+                  ? ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(merchant.logoUrl!, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
+                    )
+                  : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(merchant.name,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      ),
+                      if (!merchant.isOpen)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('Tutup', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    category,
-                    style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary),
-                  ),
+                  Text(merchant.address,
+                      style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 16, color: KuwrirColors.warning),
+                      Icon(Icons.star, size: 14, color: KuwrirColors.warning),
                       const SizedBox(width: 2),
-                      Text('$rating', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(' ($reviews)', style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
-                      const SizedBox(width: 12),
-                      Icon(Icons.location_on_outlined, size: 14, color: KuwrirColors.textSecondary),
-                      Text(distance, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
-                      const SizedBox(width: 12),
-                      Icon(Icons.access_time, size: 14, color: KuwrirColors.textSecondary),
-                      Text(deliveryTime, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+                      Text('${merchant.rating.toStringAsFixed(1)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(' (${merchant.totalReviews})',
+                          style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                      if (merchant.distanceKm != null) ...[
+                        const SizedBox(width: 12),
+                        Icon(Icons.location_on_outlined, size: 13, color: KuwrirColors.textSecondary),
+                        Text('${merchant.distanceKm!.toStringAsFixed(1)} km',
+                            style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                      ],
                     ],
                   ),
                 ],
@@ -322,37 +273,164 @@ class _MerchantCard extends StatelessWidget {
   }
 }
 
-// --- Placeholder Tabs ---
-class _OrdersTab extends StatelessWidget {
+// --- Orders Tab ---
+class _OrdersTab extends StatefulWidget {
   const _OrdersTab();
 
   @override
+  State<_OrdersTab> createState() => _OrdersTabState();
+}
+
+class _OrdersTabState extends State<_OrdersTab> {
+  List<Order> _orders = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = context.read<ApiClient>();
+      final orders = await api.getMyOrders();
+      setState(() {
+        _orders = orders;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Gagal memuat riwayat pesanan';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('No orders yet', style: TextStyle(color: Colors.grey, fontSize: 16)),
-        ],
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.grey)),
+            TextButton(onPressed: _loadOrders, child: const Text('Coba lagi')),
+          ],
+        ),
+      );
+    }
+    if (_orders.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Belum ada pesanan', style: TextStyle(color: Colors.grey, fontSize: 16)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadOrders,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _orders.length,
+        itemBuilder: (context, i) {
+          final order = _orders[i];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              leading: const Icon(Icons.receipt_outlined),
+              title: Text(order.orderNumber),
+              subtitle: Text(order.merchantName ?? order.pickupAddress ?? ''),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _StatusChip(order.status),
+                  Text('Rp ${order.total.toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                ],
+              ),
+              onTap: () => Navigator.pushNamed(context, '/tracking',
+                  arguments: {'order_id': order.id}),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip(this.status);
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (status) {
+      case 'delivered':
+      case 'returned':
+        color = Colors.green;
+        break;
+      case 'cancelled':
+        color = Colors.red;
+        break;
+      case 'preparing':
+      case 'ready':
+      case 'picked_up':
+        color = Colors.orange;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(status.replaceAll('_', ' '),
+          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// --- Profile Tab ---
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.person_outline, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Profile', style: TextStyle(color: Colors.grey, fontSize: 16)),
+          const Icon(Icons.person_outline, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text('Profile', style: TextStyle(color: Colors.grey, fontSize: 16)),
+          const SizedBox(height: 24),
+          TextButton(
+            onPressed: () async {
+              final api = context.read<ApiClient>();
+              await api.clearTokens();
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+              }
+            },
+            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );

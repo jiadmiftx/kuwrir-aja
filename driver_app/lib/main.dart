@@ -1,10 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'providers/auth_provider.dart';
+import 'cubits/job_board_cubit.dart';
+import 'cubits/active_delivery_cubit.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/pending_screen.dart';
@@ -21,12 +24,23 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  final apiClient = ApiClient();
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
-      child: const KuwrirDriverApp(),
+      child: MultiRepositoryProvider(
+        providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
+        child: MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => JobBoardCubit(apiClient)),
+            BlocProvider(create: (_) => ActiveDeliveryCubit(apiClient)),
+          ],
+          child: const KuwrirDriverApp(),
+        ),
+      ),
     ),
   );
 }

@@ -1,110 +1,286 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import '../cubits/order_tracking_cubit.dart';
+import '../cubits/order_cubit.dart';
 
-class OrderTrackingScreen extends StatelessWidget {
-  final String orderNumber;
-  final String merchantName;
-  final double total;
+class OrderTrackingScreen extends StatefulWidget {
+  final String orderId;
 
-  const OrderTrackingScreen({
-    super.key,
-    required this.orderNumber,
-    required this.merchantName,
-    required this.total,
-  });
+  const OrderTrackingScreen({super.key, required this.orderId});
+
+  @override
+  State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
+}
+
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<OrderTrackingCubit>().startTracking(widget.orderId);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Order $orderNumber')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Order status card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const Icon(Icons.delivery_dining, size: 48, color: KuwrirColors.primary),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Your order is being prepared',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(merchantName, style: TextStyle(color: KuwrirColors.textSecondary)),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.warning.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Estimated: 20-25 min',
-                        style: TextStyle(color: KuwrirColors.warning, fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
+    return BlocBuilder<OrderTrackingCubit, OrderTrackingState>(
+      builder: (context, state) {
+        if (state is OrderTrackingLoading) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Tracking Pesanan')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-            // Timeline
-            const Text('Order Timeline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 16),
-            _TimelineStep(title: 'Order Placed', subtitle: '10:12 AM', isCompleted: true, isFirst: true),
-            _TimelineStep(title: 'Merchant Confirmed', subtitle: '10:13 AM', isCompleted: true),
-            _TimelineStep(title: 'Preparing Product', subtitle: 'In progress...', isCompleted: false, isActive: true),
-            _TimelineStep(title: 'Ready for Pickup', subtitle: '', isCompleted: false),
-            _TimelineStep(title: 'Driver Picked Up', subtitle: '', isCompleted: false),
-            _TimelineStep(title: 'Delivered', subtitle: '', isCompleted: false, isLast: true),
+        if (state is OrderTrackingError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Tracking Pesanan')),
+            body: Center(child: Text(state.message, style: const TextStyle(color: Colors.grey))),
+          );
+        }
 
-            const SizedBox(height: 24),
+        final order = state is OrderTracking
+            ? state.order
+            : (state as OrderTrackingDelivered).order;
+        final isDelivered =
+            state is OrderTrackingDelivered || order.status == 'delivered';
 
-            // Payment info
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Payment', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Scaffold(
+          appBar: AppBar(title: Text('Pesanan ${order.orderNumber}')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
                       children: [
+                        Icon(
+                          isDelivered ? Icons.check_circle : Icons.delivery_dining,
+                          size: 48,
+                          color: isDelivered ? KuwrirColors.success : KuwrirColors.primary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _statusLabel(order.status),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (order.merchantName != null) ...[
+                          const SizedBox(height: 4),
+                          Text(order.merchantName!,
+                              style: TextStyle(color: KuwrirColors.textSecondary)),
+                        ],
+                        if (!isDelivered) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.warning.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: KuwrirColors.warning)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Memperbarui setiap 5 detik...',
+                                  style: const TextStyle(
+                                      color: KuwrirColors.warning,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Timeline
+                const Text('Status Pesanan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                _TimelineStep(
+                  title: 'Pesanan Dibuat',
+                  isCompleted: true,
+                  isFirst: true,
+                ),
+                _TimelineStep(
+                  title: 'Dikonfirmasi Merchant',
+                  isCompleted: _isCompleted(order.status, 'confirmed'),
+                  isActive: order.status == 'confirmed',
+                ),
+                _TimelineStep(
+                  title: 'Sedang Diproses',
+                  isCompleted: _isCompleted(order.status, 'preparing'),
+                  isActive: order.status == 'preparing',
+                ),
+                _TimelineStep(
+                  title: 'Siap Dikirim',
+                  isCompleted: _isCompleted(order.status, 'ready'),
+                  isActive: order.status == 'ready',
+                ),
+                _TimelineStep(
+                  title: 'Driver Menjemput',
+                  isCompleted: _isCompleted(order.status, 'picked_up'),
+                  isActive: order.status == 'picked_up',
+                ),
+                _TimelineStep(
+                  title: 'Terkirim',
+                  isCompleted: isDelivered,
+                  isActive: isDelivered,
+                  isLast: true,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Delivery info
+                if (order.dropoffAddress != null)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Informasi Pengiriman',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 12),
+                          _InfoRow(
+                              icon: Icons.location_on_outlined,
+                              label: 'Alamat',
+                              value: order.dropoffAddress!),
+                          if (order.receiverName != null)
+                            _InfoRow(
+                                icon: Icons.person_outline,
+                                label: 'Penerima',
+                                value: order.receiverName!),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
+                // Payment summary
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Rincian Pembayaran',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        _PriceRow(label: 'Subtotal menu', amount: order.subtotal),
+                        if (order.taxAmount > 0)
+                          _PriceRow(label: 'Pajak (PPN)', amount: order.taxAmount),
+                        _PriceRow(label: 'Ongkir', amount: order.deliveryFee),
+                        if (order.appServiceFee > 0)
+                          _PriceRow(label: 'Biaya layanan', amount: order.appServiceFee),
+                        const Divider(height: 16),
+                        _PriceRow(label: 'Total', amount: order.total, isBold: true),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.payments, size: 18, color: KuwrirColors.warning),
-                            const SizedBox(width: 8),
-                            const Text('Cash on Delivery'),
+                            Icon(
+                                order.paymentType == 'cash'
+                                    ? Icons.payments_outlined
+                                    : Icons.qr_code,
+                                size: 16,
+                                color: KuwrirColors.warning),
+                            const SizedBox(width: 6),
+                            Text(
+                              order.paymentType == 'cash'
+                                  ? 'Bayar tunai ke driver'
+                                  : 'Bayar online (${order.paymentStatus})',
+                              style: const TextStyle(
+                                  fontSize: 12, color: KuwrirColors.warning),
+                            ),
                           ],
-                        ),
-                        Text(
-                          'IDR ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: KuwrirColors.primary),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+
+                const SizedBox(height: 16),
+
+                // Cancel button (only if still cancellable)
+                if (order.isCancellable)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      style:
+                          OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: () async {
+                        final api = context.read<ApiClient>();
+                        try {
+                          await api.cancelOrder(order.id);
+                          if (context.mounted) Navigator.pop(context);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Gagal membatalkan pesanan')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Batalkan Pesanan'),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Menunggu konfirmasi merchant';
+      case 'confirmed':
+        return 'Pesanan dikonfirmasi';
+      case 'preparing':
+        return 'Sedang disiapkan';
+      case 'ready':
+        return 'Menunggu driver';
+      case 'picked_up':
+        return 'Driver dalam perjalanan';
+      case 'delivered':
+        return 'Pesanan diterima!';
+      case 'cancelled':
+        return 'Pesanan dibatalkan';
+      default:
+        return status.replaceAll('_', ' ');
+    }
+  }
+
+  bool _isCompleted(String current, String target) {
+    const order = [
+      'pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivered'
+    ];
+    final ci = order.indexOf(current);
+    final ti = order.indexOf(target);
+    return ci > ti;
   }
 }
 
 class _TimelineStep extends StatelessWidget {
   final String title;
-  final String subtitle;
   final bool isCompleted;
   final bool isActive;
   final bool isFirst;
@@ -112,8 +288,7 @@ class _TimelineStep extends StatelessWidget {
 
   const _TimelineStep({
     required this.title,
-    required this.subtitle,
-    required this.isCompleted,
+    this.isCompleted = false,
     this.isActive = false,
     this.isFirst = false,
     this.isLast = false,
@@ -121,57 +296,115 @@ class _TimelineStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isCompleted ? KuwrirColors.success : (isActive ? KuwrirColors.primary : KuwrirColors.border);
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Timeline dot and line
-        SizedBox(
-          width: 32,
-          child: Column(
-            children: [
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: isCompleted ? color : (isActive ? color : Colors.transparent),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color, width: 2),
-                ),
-                child: isCompleted ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
+        Column(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isCompleted || isActive
+                    ? KuwrirColors.primary
+                    : Colors.grey[300],
+                shape: BoxShape.circle,
               ),
-              if (!isLast)
-                Container(
-                  width: 2,
-                  height: 40,
-                  color: isCompleted ? KuwrirColors.success : KuwrirColors.border,
-                ),
-            ],
-          ),
+              child: Icon(
+                isCompleted ? Icons.check : Icons.circle,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+            if (!isLast)
+              Container(
+                width: 2,
+                height: 32,
+                color: isCompleted ? KuwrirColors.primary : Colors.grey[300],
+              ),
+          ],
         ),
         const SizedBox(width: 12),
-        // Content
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: (isCompleted || isActive) ? FontWeight.w600 : FontWeight.normal,
-                    color: (isCompleted || isActive) ? null : KuwrirColors.textHint,
-                  ),
-                ),
-                if (subtitle.isNotEmpty)
-                  Text(subtitle, style: TextStyle(fontSize: 12, color: isActive ? KuwrirColors.primary : KuwrirColors.textSecondary)),
-              ],
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                color: isActive
+                    ? KuwrirColors.primary
+                    : isCompleted
+                        ? Colors.black87
+                        : Colors.grey,
+              ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: KuwrirColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                Text(value, style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceRow extends StatelessWidget {
+  final String label;
+  final double amount;
+  final bool isBold;
+
+  const _PriceRow({required this.label, required this.amount, this.isBold = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontSize: isBold ? 15 : 13,
+      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+      color: isBold ? null : KuwrirColors.textSecondary,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: style),
+          Text(
+            'IDR ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
+            style: style.copyWith(color: isBold ? KuwrirColors.primary : null),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -7,5 +7,8 @@ export 'src/api/api_config.dart';
 export 'src/models/user.dart';
 export 'src/models/auth.dart';
 export 'src/models/order.dart';
+export 'src/models/merchant.dart';
+export 'src/models/product.dart';
+export 'src/models/cart_item.dart';
 export 'src/theme/kuwrir_theme.dart';
 export 'src/theme/kuwrir_colors.dart';

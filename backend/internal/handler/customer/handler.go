@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/service"
 )
 
 type Handler struct {
@@ -42,14 +43,15 @@ type OrderItemRequest struct {
 }
 
 type PlaceOrderRequest struct {
-	MerchantID      string             `json:"merchant_id" binding:"required"`
-	Items           []OrderItemRequest `json:"items" binding:"required,min=1"`
-	DropoffAddress  string             `json:"dropoff_address" binding:"required"`
-	DropoffLat      float64            `json:"dropoff_lat" binding:"required"`
-	DropoffLng      float64            `json:"dropoff_lng" binding:"required"`
-	ReceiverName    string             `json:"receiver_name"`
-	ReceiverPhone   string             `json:"receiver_phone"`
-	Notes           string             `json:"notes"`
+	MerchantID     string             `json:"merchant_id" binding:"required"`
+	Items          []OrderItemRequest `json:"items" binding:"required,min=1"`
+	DropoffAddress string             `json:"dropoff_address" binding:"required"`
+	DropoffLat     float64            `json:"dropoff_lat" binding:"required"`
+	DropoffLng     float64            `json:"dropoff_lng" binding:"required"`
+	ReceiverName   string             `json:"receiver_name"`
+	ReceiverPhone  string             `json:"receiver_phone"`
+	PaymentType    string             `json:"payment_type"` // cash | qris | virtual_account
+	Notes          string             `json:"notes"`
 }
 
 // --- Handlers ---
@@ -75,16 +77,17 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		return
 	}
 
-	// 3. Calculate delivery fee
+	// 3. Calculate delivery fee using city zone reference points
 	distanceKm := haversineDistance(
 		merchant.Latitude, merchant.Longitude,
 		req.DropoffLat, req.DropoffLng,
 	)
 
-	deliveryFee := settings.InsideZoneFee
-	if distanceKm > 5.0 { // Outside zone threshold
+	zoneBasisFee, zonePerKmFee := h.loadDeliveryZone(merchant.Latitude, merchant.Longitude, settings)
+	deliveryFee := zoneBasisFee
+	if distanceKm > 5.0 {
 		extraKm := distanceKm - 5.0
-		deliveryFee = settings.InsideZoneFee + (extraKm * settings.FeePerKmOutside)
+		deliveryFee = zoneBasisFee + (extraKm * zonePerKmFee)
 	}
 
 	// 4. Build order items with markup calculation
@@ -138,6 +141,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	deliveryType := "platform"
 	var deliveryCommission float64
 	var driverEarning float64
+	var appServiceFee float64
 
 	if merchant.CanSelfDeliver {
 		// Self-delivery: merchant delivers, uses their own fee, no platform delivery commission
@@ -145,14 +149,22 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		deliveryFee = merchant.SelfDeliveryFee // Could be 0 (free delivery)
 		deliveryCommission = 0
 		driverEarning = 0
+		appServiceFee = 0
 	} else {
 		// Platform delivery: KUWRIR driver delivers
+		appServiceFee = deliveryFee * (settings.AppServiceFeePct / 100.0)
 		deliveryCommission = deliveryFee * (settings.DeliveryCommissionPct / 100.0)
-		driverEarning = deliveryFee - deliveryCommission
+		driverEarning = deliveryFee - deliveryCommission - appServiceFee
+		if driverEarning < 0 {
+			driverEarning = 0
+		}
 	}
 
-	// 6. Grand total customer pays (cash)
-	grandTotal := subtotalWithMarkup + deliveryFee
+	// 6. Apply tax on subtotal (product portion only)
+	taxAmount := subtotalWithMarkup * (settings.TaxPct / 100.0)
+
+	// 7. Grand total customer pays
+	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee
 
 	// 7. Generate order number
 	orderNumber := fmt.Sprintf("KWR-%s", time.Now().Format("060102150405"))
@@ -161,37 +173,44 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	merchantUUID, _ := uuid.Parse(req.MerchantID)
 	now := time.Now()
 
+	paymentType := req.PaymentType
+	if paymentType == "" {
+		paymentType = "cash"
+	}
+
 	order := model.Order{
 		OrderNumber:        orderNumber,
 		ServiceType:        "ecommerce",
 		CustomerID:         &customerUUID,
 		MerchantID:         &merchantUUID,
 		Status:             model.OrderStatusPending,
-		DeliveryType:        deliveryType,
-		PaymentType:        "cash",
+		DeliveryType:       deliveryType,
+		PaymentType:        paymentType,
 		Subtotal:           subtotalWithMarkup,
 		PlatformMarkup:     totalPlatformMarkup,
+		TaxAmount:          taxAmount,
+		AppServiceFee:      appServiceFee,
 		DeliveryFee:        deliveryFee,
 		DeliveryCommission: deliveryCommission,
 		DriverEarning:      driverEarning,
 		Total:              grandTotal,
-		
-		PickupAddress:      merchant.Address,
-		PickupLat:          merchant.Latitude,
-		PickupLng:          merchant.Longitude,
-		SenderName:         merchant.Name,
-		SenderPhone:        merchant.Phone,
 
-		DropoffAddress:     req.DropoffAddress,
-		DropoffLat:         req.DropoffLat,
-		DropoffLng:         req.DropoffLng,
-		ReceiverName:       req.ReceiverName,
-		ReceiverPhone:      req.ReceiverPhone,
+		PickupAddress: merchant.Address,
+		PickupLat:     merchant.Latitude,
+		PickupLng:     merchant.Longitude,
+		SenderName:    merchant.Name,
+		SenderPhone:   merchant.Phone,
 
-		DistanceKm:         distanceKm,
-		Notes:              req.Notes,
-		PlacedAt:           &now,
-		Items:              orderItems,
+		DropoffAddress: req.DropoffAddress,
+		DropoffLat:     req.DropoffLat,
+		DropoffLng:     req.DropoffLng,
+		ReceiverName:   req.ReceiverName,
+		ReceiverPhone:  req.ReceiverPhone,
+
+		DistanceKm: distanceKm,
+		Notes:      req.Notes,
+		PlacedAt:   &now,
+		Items:      orderItems,
 	}
 
 	if err := h.db.Create(&order).Error; err != nil {
@@ -204,7 +223,9 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		"pricing_breakdown": gin.H{
 			"product_subtotal_with_markup": subtotalWithMarkup,
 			"platform_markup_total":        totalPlatformMarkup,
+			"tax_amount":                   taxAmount,
 			"delivery_fee":                 deliveryFee,
+			"app_service_fee":              appServiceFee,
 			"delivery_commission_kuwrir":   deliveryCommission,
 			"driver_earning":               driverEarning,
 			"total_customer_pays":          grandTotal,
@@ -376,6 +397,9 @@ func NewDriverOrderHandler(db *gorm.DB) *DriverOrderHandler {
 }
 
 func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
+	// Driver status toggle
+	r.PATCH("/driver/status", h.SetDriverStatus)
+
 	orders := r.Group("/driver-orders")
 	{
 		orders.GET("/available", h.AvailableOrders)
@@ -385,8 +409,51 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 }
 
+// SetDriverStatus sets the driver online/offline and updates availability.
+func (h *DriverOrderHandler) SetDriverStatus(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req struct {
+		Online bool `json:"online"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	h.db.Model(&driver).Updates(map[string]interface{}{
+		"is_online":    req.Online,
+		"is_available": req.Online,
+	})
+
+	status := "offline"
+	if req.Online {
+		status = "online"
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status, "is_online": req.Online})
+}
+
 // AvailableOrders returns ready orders that need a driver
 func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	if !driver.IsOnline || !driver.IsAvailable {
+		c.JSON(http.StatusOK, gin.H{"orders": []model.Order{}, "message": "Go online to see available orders"})
+		return
+	}
+
 	var orders []model.Order
 	h.db.Where("status = ? AND driver_id IS NULL", model.OrderStatusReady).
 		Preload("Merchant").
@@ -419,7 +486,13 @@ func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 		"driver_id": driver.ID,
 	})
 
-	c.JSON(http.StatusOK, gin.H{"message": "Delivery accepted"})
+	// Reload with merchant info for the Flutter app
+	h.db.Preload("Merchant").First(&order, "id = ?", order.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Delivery accepted",
+		"order":   order,
+	})
 }
 
 // MarkPickedUp transitions: (driver assigned) → picked_up
@@ -446,7 +519,9 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Order picked up", "status": model.OrderStatusPickedUp})
 }
 
-// MarkDelivered transitions: picked_up → delivered (customer pays cash)
+// MarkDelivered transitions: picked_up → delivered.
+// For COD: credits driver and merchant wallets immediately, tracks cash holding.
+// For online payment: wallets already credited at payment confirmation, no extra action.
 func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	orderID := c.Param("id")
 	userID := c.GetString("user_id")
@@ -455,30 +530,71 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	h.db.Where("user_id = ?", userID).First(&driver)
 
 	var order model.Order
-	if err := h.db.Where("id = ? AND driver_id = ? AND status = ?",
+	if err := h.db.Preload("Merchant").Where("id = ? AND driver_id = ? AND status = ?",
 		orderID, driver.ID, model.OrderStatusPickedUp).First(&order).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot mark as delivered"})
 		return
 	}
 
 	now := time.Now()
-	h.db.Model(&order).Updates(map[string]interface{}{
+	orderUUID := order.ID
+
+	tx := h.db.Begin()
+
+	tx.Model(&order).Updates(map[string]interface{}{
 		"status":       model.OrderStatusDelivered,
 		"delivered_at": &now,
 	})
-
-	// Add cash to driver's balance (they owe this to the platform)
-	h.db.Model(&driver).Update("cash_balance", gorm.Expr("cash_balance + ?", order.Total))
-
-	// Update driver stats
-	h.db.Model(&driver).Update("total_delivered", gorm.Expr("total_delivered + 1"))
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":              "Order delivered! Cash collected.",
-		"cash_collected":       order.Total,
-		"driver_earning":       order.DriverEarning,
-		"amount_owed_to_admin": order.Total - order.DriverEarning,
+	tx.Model(&driver).Updates(map[string]interface{}{
+		"is_available":    true,
+		"total_delivered": gorm.Expr("total_delivered + 1"),
 	})
+
+	merchantNotes := fmt.Sprintf("Order %s delivered", order.OrderNumber)
+	driverNotes := fmt.Sprintf("Earning order %s", order.OrderNumber)
+
+	if order.PaymentType == "cash" {
+		// COD: credit wallets immediately; track cash driver is physically holding
+		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
+			return
+		}
+		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
+			return
+		}
+		// Track full COD cash driver is physically holding
+		tx.Model(&driver).Update("cod_holding", gorm.Expr("cod_holding + ?", order.Total))
+	} else if order.PaymentStatus == "paid" {
+		// Online payment already collected by platform — credit wallets at delivery
+		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
+			return
+		}
+		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete delivery"})
+		return
+	}
+
+	resp := gin.H{
+		"message":        "Order delivered!",
+		"driver_earning": order.DriverEarning,
+	}
+	if order.PaymentType == "cash" {
+		resp["cash_collected"] = order.Total
+		resp["to_deposit"] = order.Total - order.DriverEarning
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // --- Settings Helper ---
@@ -488,6 +604,8 @@ type settingsData struct {
 	DeliveryCommissionPct float64
 	InsideZoneFee         float64
 	FeePerKmOutside       float64
+	TaxPct                float64
+	AppServiceFeePct      float64
 }
 
 func (h *Handler) loadSettings() settingsData {
@@ -496,6 +614,8 @@ func (h *Handler) loadSettings() settingsData {
 		DeliveryCommissionPct: 25,
 		InsideZoneFee:         15000,
 		FeePerKmOutside:       10000,
+		TaxPct:                11,
+		AppServiceFeePct:      5,
 	}
 
 	var settings []model.SystemSetting
@@ -512,9 +632,48 @@ func (h *Handler) loadSettings() settingsData {
 			s.InsideZoneFee = val
 		case "delivery_fee_per_km_outside":
 			s.FeePerKmOutside = val
+		case "tax_percentage":
+			s.TaxPct = val
+		case "app_service_fee_percentage":
+			s.AppServiceFeePct = val
 		}
 	}
 	return s
+}
+
+// loadDeliveryZone finds the nearest active DeliveryZone to the given lat/lng.
+// Falls back to the default zone, then to system-setting values.
+func (h *Handler) loadDeliveryZone(lat, lng float64, fallback settingsData) (baseFee, perKmFee float64) {
+	var zones []model.DeliveryZone
+	h.db.Where("is_active = ?", true).Find(&zones)
+
+	if len(zones) == 0 {
+		return fallback.InsideZoneFee, fallback.FeePerKmOutside
+	}
+
+	var nearest *model.DeliveryZone
+	minDist := math.MaxFloat64
+	var defaultZone *model.DeliveryZone
+
+	for i := range zones {
+		if zones[i].IsDefault {
+			defaultZone = &zones[i]
+		}
+		d := haversineDistance(lat, lng, zones[i].Latitude, zones[i].Longitude)
+		if d < minDist {
+			minDist = d
+			nearest = &zones[i]
+		}
+	}
+
+	// Use nearest zone if within 50km, else default zone, else first zone
+	if nearest != nil && minDist <= 50 {
+		return nearest.BaseFee, nearest.PerKmFee
+	}
+	if defaultZone != nil {
+		return defaultZone.BaseFee, defaultZone.PerKmFee
+	}
+	return nearest.BaseFee, nearest.PerKmFee
 }
 
 // haversineDistance calculates distance between two GPS coordinates in km

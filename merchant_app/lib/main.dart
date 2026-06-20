@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -12,6 +13,9 @@ import 'screens/kasir_screen.dart';
 import 'screens/kasir_reports_screen.dart';
 import 'screens/kasir_receivables_screen.dart';
 import 'screens/kasir_payables_screen.dart';
+import 'cubits/store_orders_cubit.dart';
+import 'cubits/menu_cubit.dart';
+import 'cubits/store_cubit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -30,19 +34,30 @@ class KuwrirMerchantApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'KUWRIR Merchant',
-      debugShowCheckedModeBanner: false,
-      theme: KuwrirTheme.light,
-      darkTheme: KuwrirTheme.dark,
-      themeMode: ThemeMode.light,
-      initialRoute: '/login',
-      routes: {
-        '/login':    (_) => const MerchantLoginScreen(),
-        '/register': (_) => const MerchantRegisterScreen(),
-        '/pending':  (_) => const MerchantPendingScreen(),
-        '/home':     (_) => const MerchantHome(),
-      },
+    final apiClient = ApiClient();
+    return MultiRepositoryProvider(
+      providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => StoreOrdersCubit(apiClient)),
+          BlocProvider(create: (_) => MenuCubit(apiClient)),
+          BlocProvider(create: (_) => StoreCubit(apiClient)),
+        ],
+        child: MaterialApp(
+          title: 'KUWRIR Merchant',
+          debugShowCheckedModeBanner: false,
+          theme: KuwrirTheme.light,
+          darkTheme: KuwrirTheme.dark,
+          themeMode: ThemeMode.light,
+          initialRoute: '/login',
+          routes: {
+            '/login':    (_) => const MerchantLoginScreen(),
+            '/register': (_) => const MerchantRegisterScreen(),
+            '/pending':  (_) => const MerchantPendingScreen(),
+            '/home':     (_) => const MerchantHome(),
+          },
+        ),
+      ),
     );
   }
 }

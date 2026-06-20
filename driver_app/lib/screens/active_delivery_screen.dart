@@ -1,219 +1,305 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import '../cubits/active_delivery_cubit.dart';
 
-class ActiveDeliveryScreen extends StatefulWidget {
+class ActiveDeliveryScreen extends StatelessWidget {
   const ActiveDeliveryScreen({super.key});
 
   @override
-  State<ActiveDeliveryScreen> createState() => _ActiveDeliveryScreenState();
-}
-
-class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
-  Order? _order;
-  bool _isLoading = true;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final orderId = ModalRoute.of(context)?.settings.arguments as String?;
-    if (orderId != null && _order == null) {
-      _fetchOrder(orderId);
-    }
-  }
-
-  Future<void> _fetchOrder(String orderId) async {
-    try {
-      final response = await ApiClient().get('/orders/$orderId');
-      if (mounted) {
-        setState(() {
-          _order = Order.fromJson(response['order']);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load order: $e')),
-        );
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _markPickedUp() async {
-    if (_order == null) return;
-    setState(() => _isLoading = true);
-    try {
-      await ApiClient().post('/driver-orders/${_order!.id}/pickup', {});
-      await _fetchOrder(_order!.id);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update status: $e')),
-      );
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _markDelivered() async {
-    if (_order == null) return;
-    setState(() => _isLoading = true);
-    try {
-      final res = await ApiClient().post('/driver-orders/${_order!.id}/deliver', {});
-      if (!mounted) return;
-      
-      final cashCollected = res['cash_collected'];
-      
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Delivery Complete! 🎉'),
-          content: Text('You collected Rp $cashCollected in cash.\nGreat job!'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // close dialog
-                Navigator.of(context).pushReplacementNamed('/job_board');
-              },
-              child: const Text('Back to Job Board'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to complete delivery: $e')),
-      );
-      setState(() => _isLoading = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    return BlocConsumer<ActiveDeliveryCubit, ActiveDeliveryState>(
+      listener: (context, state) {
+        if (state is ActiveDeliveryDone) {
+          _showDoneDialog(context, state.result);
+        }
+        if (state is ActiveDeliveryError) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(state.message)));
+        }
+      },
+      builder: (context, state) {
+        if (state is ActiveDeliveryIdle) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Pengiriman Aktif')),
+            body: const Center(child: Text('Tidak ada pengiriman aktif')),
+          );
+        }
 
-    if (_order == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Active Delivery')),
-        body: const Center(child: Text('Order not found')),
-      );
-    }
+        Map<String, dynamic>? order;
+        bool isLoading = false;
 
-    final isPickedUp = _order!.status == 'picked_up';
+        if (state is ActiveDeliveryActive) order = state.order;
+        if (state is ActiveDeliveryMarkingPickup) {
+          order = state.order;
+          isLoading = true;
+        }
+        if (state is ActiveDeliveryMarkingDelivered) {
+          order = state.order;
+          isLoading = true;
+        }
+        if (state is ActiveDeliveryDone) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Selesai')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (order == null) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _buildScreen(context, order, isLoading);
+      },
+    );
+  }
+
+  Widget _buildScreen(
+      BuildContext context, Map<String, dynamic> order, bool isLoading) {
+    final status = order['status'] as String? ?? 'confirmed';
+    final isPickedUp = status == 'picked_up';
+    final orderId = order['id'] as String? ?? '';
+    final orderNumber = order['order_number'] as String? ?? '';
+    final merchantName = order['merchant_name'] as String? ??
+        (order['merchant'] as Map?)?['name'] as String? ?? 'Merchant';
+    final pickupAddress = order['pickup_address'] as String? ?? '';
+    final dropoffAddress = order['dropoff_address'] as String? ?? '';
+    final receiverName = order['receiver_name'] as String? ?? 'Customer';
+    final receiverPhone = order['receiver_phone'] as String? ?? '';
+    final total = (order['total'] as num?)?.toDouble() ?? 0;
+    final driverEarning = (order['driver_earning'] as num?)?.toDouble() ?? 0;
+    final paymentType = order['payment_type'] as String? ?? 'cash';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isPickedUp ? 'Deliver to Customer' : 'Pickup at Store'),
+        title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
+        automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
-          // Map Placeholder
+          // Map placeholder
           Expanded(
-            flex: 3,
+            flex: 2,
             child: Container(
-              color: Colors.grey[300],
+              color: Colors.grey[200],
               child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.map, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('Map Integration (Phase 5)'),
+                    SizedBox(height: 8),
+                    Text('Peta (coming soon)',
+                        style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
             ),
           ),
-          
-          // Order Details Card
-          Expanded(
-            flex: 2,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, -5),
-                  )
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+
+          // Order details bottom sheet
+          Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))
+              ],
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Order number + earning
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Text(
+                      isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: KuwrirColors.primary),
+                    ),
+                    Text('#$orderNumber',
+                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Penghasilan: Rp ${_fmt(driverEarning)}',
+                  style: const TextStyle(
+                      color: KuwrirColors.success, fontWeight: FontWeight.w600),
+                ),
+                const Divider(height: 20),
+
+                // Location info
+                if (!isPickedUp) ...[
+                  _InfoRow(
+                    icon: Icons.store,
+                    color: Colors.orange,
+                    label: merchantName,
+                    sub: pickupAddress,
+                  ),
+                ] else ...[
+                  _InfoRow(
+                    icon: Icons.person,
+                    color: Colors.blue,
+                    label: receiverName,
+                    sub: receiverPhone,
+                  ),
+                  const SizedBox(height: 4),
+                  _InfoRow(
+                    icon: Icons.location_on,
+                    color: Colors.red,
+                    label: dropoffAddress,
+                    sub: '',
+                  ),
+                ],
+
+                if (paymentType == 'cash' && isPickedUp) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
                       children: [
+                        const Icon(Icons.payments, color: Colors.orange, size: 18),
+                        const SizedBox(width: 8),
                         Text(
-                          isPickedUp ? 'Drop-off' : 'Pick-up',
+                          'Tagih COD: Rp ${_fmt(total)}',
                           style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: KuwrirColors.primary,
-                          ),
-                        ),
-                        Text(
-                          'Order #${_order!.orderNumber.substring(4)}',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                              fontSize: 14),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      isPickedUp ? (_order!.receiverName ?? 'Customer') : (_order!.senderName ?? 'Store'),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                if (isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (!isPickedUp)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isPickedUp ? _order!.dropoffAddress : (_order!.pickupAddress ?? ''),
-                      style: const TextStyle(color: Colors.grey),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    onPressed: () =>
+                        context.read<ActiveDeliveryCubit>().markPickedUp(orderId),
+                    child: const Text('Sudah Diambil',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                  )
+                else
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: KuwrirColors.success,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    const Spacer(),
-                    
-                    if (!isPickedUp)
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.orange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: _markPickedUp,
-                        child: const Text('Mark as Picked Up', style: TextStyle(fontSize: 18)),
-                      )
-                    else
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.green,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: _markDelivered,
-                        child: Text(
-                          'Complete Delivery (Collect Rp ${_order!.total.toStringAsFixed(0)})', 
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+                    onPressed: () =>
+                        context.read<ActiveDeliveryCubit>().markDelivered(orderId),
+                    child: const Text('Selesai Diantarkan',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showDoneDialog(BuildContext context, Map<String, dynamic> result) {
+    final cashCollected = (result['cash_collected'] as num?)?.toDouble() ?? 0;
+    final driverEarning = (result['driver_earning'] as num?)?.toDouble() ?? 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pengiriman Selesai!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (cashCollected > 0)
+              Text('Uang COD diterima: Rp ${_fmt(cashCollected)}',
+                  style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 4),
+            Text('Penghasilan: Rp ${_fmt(driverEarning)}',
+                style: const TextStyle(
+                    fontSize: 15,
+                    color: KuwrirColors.success,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<ActiveDeliveryCubit>().reset();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Kembali ke Job Board'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String sub;
+
+  const _InfoRow(
+      {required this.icon,
+      required this.color,
+      required this.label,
+      required this.sub});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14)),
+              if (sub.isNotEmpty)
+                Text(sub,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

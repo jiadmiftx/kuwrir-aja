@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -16,12 +17,19 @@ import (
 	driverregHandler "github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	kasirHandler "github.com/kuwrir-platform/backend/internal/handler/kasir"
 	merchantHandler "github.com/kuwrir-platform/backend/internal/handler/merchant"
+	paymentHandler "github.com/kuwrir-platform/backend/internal/handler/payment"
 	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
+	walletHandler "github.com/kuwrir-platform/backend/internal/handler/wallet"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
 )
 
 func main() {
+	// Load .env file if present (dev convenience; prod uses real env vars)
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
 	// Load config
 	cfg := config.Load()
 
@@ -62,12 +70,19 @@ func main() {
 		&model.MerchantReceivablePayment{},
 		&model.MerchantPayable{},
 		&model.MerchantPayablePayment{},
+		// Payment & Wallet
+		&model.Wallet{},
+		&model.WalletTransaction{},
+		&model.WithdrawalRequest{},
+		// Delivery zones (city reference points for pricing)
+		&model.DeliveryZone{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	// Seed default system settings
+	// Seed default system settings and delivery zones
 	seedSettings(db)
+	seedDeliveryZones(db)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -155,6 +170,15 @@ func main() {
 			driverRoutes := protected.Group("")
 			driverRoutes.Use(middleware.RoleMiddleware("driver"))
 			driverOrderH.RegisterRoutes(driverRoutes)
+
+			// Payment (webhook public, create needs customer auth)
+			payH := paymentHandler.NewHandler(db, cfg)
+			payH.RegisterRoutes(v1, custRoutes, cfg.Server.Mode == "debug")
+
+			// Wallet — driver & merchant
+			wH := walletHandler.NewHandler(db, cfg)
+			wH.RegisterDriverRoutes(driverRoutes)
+			wH.RegisterMerchantRoutes(merchOwnerRoutes)
 		}
 	}
 
@@ -174,9 +198,30 @@ func seedSettings(db *gorm.DB) {
 		{Key: "delivery_base_fee_inside_zone", Value: "15000", Label: "Inside Zone Delivery Fee (IDR)"},
 		{Key: "delivery_fee_per_km_outside", Value: "10000", Label: "Outside Zone Fee Per KM (IDR)"},
 		{Key: "service_delivery_fee_round_trip", Value: "20000", Label: "Service Round-Trip Delivery Fee (IDR)"},
+		{Key: "tax_percentage", Value: "11", Label: "Tax/PPN Percentage (%)"},
+		{Key: "app_service_fee_percentage", Value: "5", Label: "App Service Fee on Delivery (%)"},
 	}
 
 	for _, setting := range defaults {
 		db.Where("key = ?", setting.Key).FirstOrCreate(&setting)
 	}
+}
+
+// seedDeliveryZones creates the default Kuta, Lombok zone if no zones exist
+func seedDeliveryZones(db *gorm.DB) {
+	var count int64
+	db.Model(&model.DeliveryZone{}).Count(&count)
+	if count > 0 {
+		return
+	}
+	db.Create(&model.DeliveryZone{
+		CityName:  "Kuta, Lombok",
+		Latitude:  -8.7185,
+		Longitude: 116.3516,
+		RadiusKm:  5,
+		BaseFee:   15000,
+		PerKmFee:  10000,
+		IsDefault: true,
+		IsActive:  true,
+	})
 }

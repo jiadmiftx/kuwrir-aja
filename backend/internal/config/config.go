@@ -13,6 +13,7 @@ type Config struct {
 	JWT      JWTConfig
 	R2       R2Config
 	Valhalla ValhallaConfig
+	Duitku   DuitkuConfig
 }
 
 type ServerConfig struct {
@@ -54,6 +55,14 @@ type ValhallaConfig struct {
 	BaseURL string // e.g., http://localhost:8002
 }
 
+type DuitkuConfig struct {
+	MerchantCode string
+	APIKey       string
+	BaseURL      string
+	CallbackURL  string
+	ReturnURL    string
+}
+
 // Load reads configuration from environment variables with sensible defaults
 func Load() *Config {
 	return &Config{
@@ -89,6 +98,13 @@ func Load() *Config {
 		},
 		Valhalla: ValhallaConfig{
 			BaseURL: getEnv("VALHALLA_URL", "http://localhost:8002"),
+		},
+		Duitku: DuitkuConfig{
+			MerchantCode: getEnv("DUITKU_MERCHANT_CODE", ""),
+			APIKey:       getEnv("DUITKU_API_KEY", ""),
+			BaseURL:      getEnv("DUITKU_BASE_URL", "https://api-sandbox.duitku.com"),
+			CallbackURL:  getEnv("DUITKU_CALLBACK_URL", ""),
+			ReturnURL:    getEnv("DUITKU_RETURN_URL", ""),
 		},
 	}
 }

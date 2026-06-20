@@ -52,6 +52,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		owner.POST("/my-deliveries/:id/deliver", h.SelfDeliveryDeliver)
 
 		// Product Category management
+		owner.GET("/categories", h.GetMyCategories)
 		owner.POST("/categories", h.CreateCategory)
 		owner.PUT("/categories/:catId", h.UpdateCategory)
 		owner.DELETE("/categories/:catId", h.DeleteCategory)
@@ -65,6 +66,9 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		// Product Variant management
 		owner.POST("/products/:productId/variants", h.CreateVariant)
 		owner.DELETE("/variants/:variantId", h.DeleteVariant)
+
+		// Dashboard summary
+		owner.GET("/today-summary", h.TodaySummary)
 	}
 }
 
@@ -189,6 +193,28 @@ func (h *Handler) GetProducts(c *gin.Context) {
 		Order("sort_order ASC").
 		Find(&categories).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"categories": categories})
+}
+
+// GetMyCategories returns all product categories with products for the logged-in merchant
+func (h *Handler) GetMyCategories(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var categories []model.ProductCategory
+	if err := h.db.Where("merchant_id = ?", merchant.ID).
+		Preload("Products").
+		Preload("Products.Variants").
+		Order("sort_order ASC").
+		Find(&categories).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
@@ -691,4 +717,37 @@ func (h *Handler) SelfDeliveryDeliver(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order delivered by merchant", "status": "delivered"})
+}
+
+// TodaySummary returns today's order count and revenue for the merchant's dashboard.
+func (h *Handler) TodaySummary(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var orderCount int64
+	var totalRevenue float64
+
+	today := time.Now().Truncate(24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	h.db.Model(&model.Order{}).
+		Where("merchant_id = ? AND created_at >= ? AND created_at < ? AND status NOT IN (?)",
+			merchant.ID, today, tomorrow, []string{"cancelled"}).
+		Count(&orderCount)
+
+	h.db.Model(&model.Order{}).
+		Select("COALESCE(SUM(subtotal), 0)").
+		Where("merchant_id = ? AND created_at >= ? AND created_at < ? AND status = ?",
+			merchant.ID, today, tomorrow, "delivered").
+		Scan(&totalRevenue)
+
+	c.JSON(http.StatusOK, gin.H{
+		"order_count":   orderCount,
+		"total_revenue": totalRevenue,
+		"date":          today.Format("2006-01-02"),
+	})
 }
