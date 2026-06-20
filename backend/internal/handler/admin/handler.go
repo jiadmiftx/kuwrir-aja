@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/service"
 )
 
 type Handler struct {
@@ -41,6 +44,16 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 
 	// Orders
 	r.GET("/orders", h.GetOrders)
+	r.GET("/orders/:id/nearby-drivers", h.NearbyDriversForOrder)
+	r.POST("/orders/:id/assign-driver", h.AssignDriverToOrder)
+	r.POST("/orders/:id/admin-cancel", h.AdminCancelOrder)
+
+	// Revenue analytics
+	r.GET("/revenue", h.GetRevenue)
+
+	// Refunds
+	r.GET("/refunds", h.GetRefunds)
+	r.POST("/refunds/:id/process", h.ProcessRefund)
 
 	// Settlements
 	r.GET("/settlements", h.GetSettlements)
@@ -99,7 +112,7 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 	var monthRevenue float64
 	h.db.Model(&model.Order{}).
 		Where("status = ? AND delivered_at >= ?", "delivered", monthStart).
-		Select("COALESCE(SUM(platform_markup + delivery_commission), 0)").
+		Select("COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0)").
 		Scan(&monthRevenue)
 
 	var pendingDriverCash float64
@@ -357,7 +370,7 @@ func (h *Handler) GetSettlements(c *gin.Context) {
 
 	var totalPlatformRevenue float64
 	h.db.Model(&model.Order{}).Where("status = ?", "delivered").
-		Select("COALESCE(SUM(platform_markup + delivery_commission), 0)").
+		Select("COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0)").
 		Scan(&totalPlatformRevenue)
 
 	var pendingMerchantPayout float64
@@ -772,3 +785,317 @@ func (h *Handler) DeleteDeliveryZone(c *gin.Context) {
 	h.db.Where("id = ?", id).Delete(&model.DeliveryZone{})
 	c.JSON(http.StatusOK, gin.H{"message": "Zone deleted"})
 }
+
+// ─── DRIVER ASSIGNMENT ────────────────────────────────────────────────────────
+
+// NearbyDriversForOrder returns online available drivers sorted by distance from the order's pickup point.
+func (h *Handler) NearbyDriversForOrder(c *gin.Context) {
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.First(&order, "id = ?", orderID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var drivers []model.Driver
+	h.db.Preload("User").Where("is_online = ? AND is_available = ?", true, true).Find(&drivers)
+
+	type DriverWithDistance struct {
+		model.Driver
+		DistanceKm float64 `json:"distance_km"`
+	}
+
+	var result []DriverWithDistance
+	for _, d := range drivers {
+		dist := haversineKm(order.PickupLat, order.PickupLng, d.Latitude, d.Longitude)
+		result = append(result, DriverWithDistance{Driver: d, DistanceKm: dist})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].DistanceKm < result[j].DistanceKm
+	})
+
+	c.JSON(http.StatusOK, gin.H{"drivers": result, "order_id": orderID})
+}
+
+// AssignDriverToOrder pre-assigns a specific driver to a ready order.
+// The assigned driver sees it exclusively; other drivers cannot accept it.
+func (h *Handler) AssignDriverToOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	adminID := c.GetString("user_id")
+
+	var req struct {
+		DriverID string `json:"driver_id" binding:"required"`
+		Note     string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.First(&order, "id = ? AND status = ?", orderID, model.OrderStatusReady).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or not in ready state"})
+		return
+	}
+
+	// Find the driver record to verify they exist and are active
+	var driver model.Driver
+	if err := h.db.Preload("User").First(&driver, "id = ?", req.DriverID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
+		return
+	}
+
+	driverUID, _ := uuid.Parse(req.DriverID)
+	h.db.Model(&order).Update("driver_id", driverUID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Driver assigned",
+		"order_id":    orderID,
+		"driver_id":   req.DriverID,
+		"driver_name": driver.User.Name,
+		"assigned_by": adminID,
+		"note":        req.Note,
+	})
+}
+
+// AdminCancelOrder allows admin to cancel any non-delivered order and triggers refund if needed.
+func (h *Handler) AdminCancelOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	adminID := c.GetString("user_id")
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.First(&order, "id = ?", orderID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+	if order.Status == model.OrderStatusDelivered || order.Status == model.OrderStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot cancel a delivered or already-cancelled order"})
+		return
+	}
+
+	now := time.Now()
+	tx := h.db.Begin()
+	tx.Model(&order).Updates(map[string]interface{}{
+		"status":       model.OrderStatusCancelled,
+		"cancelled_at": &now,
+	})
+
+	// If online payment was collected, issue wallet refund to customer
+	if order.PaymentStatus == "paid" && order.CustomerID != nil {
+		refundNotes := "Admin cancelled order " + order.OrderNumber + ": " + req.Reason
+		orderUUID := order.ID
+		_ = service.CreditWallet(tx, *order.CustomerID, order.Total, "refund", &orderUUID, refundNotes)
+	}
+
+	// Create audit refund record
+	adminUID, _ := uuid.Parse(adminID)
+	refund := model.RefundRequest{
+		OrderID:     order.ID,
+		RequestedBy: adminUID,
+		Reason:      req.Reason,
+		Amount:      order.Total,
+		Status:      "approved",
+		AdminNote:   "Admin-initiated cancellation",
+		ProcessedBy: &adminUID,
+		ProcessedAt: &now,
+	}
+	tx.Create(&refund)
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Order cancelled", "refund_issued": order.PaymentStatus == "paid"})
+}
+
+// ─── REVENUE ANALYTICS ────────────────────────────────────────────────────────
+
+// GetRevenue returns platform revenue breakdown for a given period.
+func (h *Handler) GetRevenue(c *gin.Context) {
+	period := c.DefaultQuery("period", "month") // today | week | month | all
+
+	now := time.Now()
+	var from time.Time
+	switch period {
+	case "today":
+		from = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	case "week":
+		from = now.AddDate(0, 0, -7)
+	case "month":
+		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	default:
+		from = time.Time{} // all time
+	}
+
+	q := h.db.Model(&model.Order{}).Where("status = ?", "delivered")
+	if !from.IsZero() {
+		q = q.Where("delivered_at >= ?", from)
+	}
+
+	type RevenueRow struct {
+		TotalOrders          int64   `json:"total_orders"`
+		TotalGMV             float64 `json:"total_gmv"`              // grand total customer paid
+		PlatformMarkupTotal  float64 `json:"platform_markup_total"`  // ujrah on products
+		DeliveryCommission   float64 `json:"delivery_commission"`    // platform cut on delivery
+		AppServiceFee        float64 `json:"app_service_fee"`        // tech fee on delivery
+		TaxCollected         float64 `json:"tax_collected"`          // PPN collected
+		TotalPlatformRevenue float64 `json:"total_platform_revenue"` // sum of all above
+		MerchantPayoutTotal  float64 `json:"merchant_payout_total"`  // what merchants received
+		DriverEarningTotal   float64 `json:"driver_earning_total"`   // what drivers received
+	}
+
+	var row RevenueRow
+	q.Select(`
+		COUNT(id) as total_orders,
+		COALESCE(SUM(total), 0) as total_gmv,
+		COALESCE(SUM(platform_markup), 0) as platform_markup_total,
+		COALESCE(SUM(delivery_commission), 0) as delivery_commission,
+		COALESCE(SUM(app_service_fee), 0) as app_service_fee,
+		COALESCE(SUM(tax_amount), 0) as tax_collected,
+		COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0) as total_platform_revenue,
+		COALESCE(SUM(merchant_payout + merchant_delivery_earning), 0) as merchant_payout_total,
+		COALESCE(SUM(driver_earning), 0) as driver_earning_total
+	`).Scan(&row)
+
+	// Daily breakdown for chart (last 30 days or period)
+	type DayRow struct {
+		Day     string  `json:"day"`
+		Orders  int64   `json:"orders"`
+		Revenue float64 `json:"revenue"`
+		GMV     float64 `json:"gmv"`
+	}
+	var daily []DayRow
+	dailyQ := h.db.Model(&model.Order{}).Where("status = ?", "delivered")
+	if !from.IsZero() {
+		dailyQ = dailyQ.Where("delivered_at >= ?", from)
+	}
+	dailyQ.Select(`
+		DATE(delivered_at) as day,
+		COUNT(id) as orders,
+		COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0) as revenue,
+		COALESCE(SUM(total), 0) as gmv
+	`).Group("DATE(delivered_at)").Order("day ASC").Scan(&daily)
+
+	c.JSON(http.StatusOK, gin.H{
+		"period":  period,
+		"summary": row,
+		"daily":   daily,
+	})
+}
+
+// ─── REFUND MANAGEMENT ────────────────────────────────────────────────────────
+
+// GetRefunds returns all refund requests with optional status filter.
+func (h *Handler) GetRefunds(c *gin.Context) {
+	status := c.DefaultQuery("status", "")
+	var refunds []model.RefundRequest
+	q := h.db.Preload("Order").Order("created_at DESC")
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	q.Find(&refunds)
+	c.JSON(http.StatusOK, gin.H{"refunds": refunds})
+}
+
+// ProcessRefund approves or rejects a customer refund request.
+// On approval: reverses merchant wallet credit and (for online payment) credits customer wallet.
+func (h *Handler) ProcessRefund(c *gin.Context) {
+	refundID := c.Param("id")
+	adminID := c.GetString("user_id")
+
+	var req struct {
+		Approve   bool   `json:"approve"`
+		AdminNote string `json:"admin_note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var refund model.RefundRequest
+	if err := h.db.Preload("Order").First(&refund, "id = ?", refundID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Refund request not found"})
+		return
+	}
+	if refund.Status != "pending" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Refund already processed"})
+		return
+	}
+
+	now := time.Now()
+	adminUID, _ := uuid.Parse(adminID)
+	status := "rejected"
+	if req.Approve {
+		status = "approved"
+	}
+
+	tx := h.db.Begin()
+
+	if req.Approve {
+		order := refund.Order
+		orderUUID := order.ID
+		refundNotes := "Refund approved for order " + order.OrderNumber
+
+		// Reverse merchant wallet credit
+		if order.MerchantID != nil {
+			merchantCredit := order.MerchantPayout
+			if merchantCredit == 0 {
+				merchantCredit = order.Subtotal - order.PlatformMarkup
+			}
+			if merchantCredit > 0 {
+				_ = service.DebitWallet(tx, *order.MerchantID, merchantCredit, "refund", &orderUUID, "Refund reversal: "+order.OrderNumber)
+			}
+		}
+
+		// For online paid orders: credit customer wallet
+		if order.PaymentStatus == "paid" && order.CustomerID != nil {
+			_ = service.CreditWallet(tx, *order.CustomerID, order.Total, "refund", &orderUUID, refundNotes)
+		}
+		// For COD: refund is manual cash — just record the approval; admin handles cash separately
+	}
+
+	tx.Model(&refund).Updates(map[string]interface{}{
+		"status":       status,
+		"admin_note":   req.AdminNote,
+		"processed_by": adminUID,
+		"processed_at": now,
+	})
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process refund"})
+		return
+	}
+
+	msg := "Refund rejected"
+	if req.Approve {
+		msg = "Refund approved. Merchant wallet reversed."
+		if refund.Order.PaymentStatus == "paid" {
+			msg += " Customer wallet credited."
+		} else {
+			msg += " COD order — handle cash refund manually."
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"message": msg, "refund": refund})
+}
+
+// haversineKm calculates the distance between two GPS coordinates in km.
+func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
+	const R = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLng := (lng2 - lng1) * math.Pi / 180.0
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180.0)*math.Cos(lat2*math.Pi/180.0)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+

@@ -244,6 +244,10 @@ type Order struct {
 	TaxAmount     float64 `gorm:"default:0" json:"tax_amount"`      // PPN applied on subtotal_with_markup
 	AppServiceFee float64 `gorm:"default:0" json:"app_service_fee"` // platform service fee on delivery
 
+	// Payout tracking (what each party actually receives)
+	MerchantPayout          float64 `gorm:"default:0" json:"merchant_payout"`           // = Subtotal - PlatformMarkup (merchant's base price)
+	MerchantDeliveryEarning float64 `gorm:"default:0" json:"merchant_delivery_earning"` // self-deliver: merchant's cut of delivery fee
+
 	// Payment (online gateway)
 	PaymentStatus    string     `gorm:"type:varchar(20);default:'pending'" json:"payment_status"` // pending | paid | failed | expired
 	PaymentRef       string     `json:"payment_ref,omitempty"`       // Duitku merchant_order_id
@@ -543,6 +547,22 @@ type DeliveryZone struct {
 	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km beyond radius
 	IsDefault bool    `gorm:"default:false" json:"is_default"` // fallback when no zone matches
 	IsActive  bool    `gorm:"default:true" json:"is_active"`
+}
+
+// RefundRequest tracks a customer's refund request and admin resolution.
+type RefundRequest struct {
+	Base
+	OrderID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"order_id"`
+	RequestedBy uuid.UUID  `gorm:"type:uuid;not null;index" json:"requested_by"` // customer user_id
+	Reason      string     `gorm:"not null" json:"reason"`
+	Amount      float64    `gorm:"not null" json:"amount"`
+	// pending → approved (wallets reversed) | rejected
+	Status      string     `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	AdminNote   string     `json:"admin_note,omitempty"`
+	ProcessedBy *uuid.UUID `gorm:"type:uuid" json:"processed_by,omitempty"`
+	ProcessedAt *time.Time `json:"processed_at,omitempty"`
+
+	Order Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 }
 
 // WithdrawalRequest tracks a payout request and its Duitku disbursement status.

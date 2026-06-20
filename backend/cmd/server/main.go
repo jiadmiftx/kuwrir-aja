@@ -76,6 +76,8 @@ func main() {
 		&model.WithdrawalRequest{},
 		// Delivery zones (city reference points for pricing)
 		&model.DeliveryZone{},
+		// Refund requests
+		&model.RefundRequest{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -193,13 +195,22 @@ func main() {
 // seedSettings inserts default configurable settings if they don't exist
 func seedSettings(db *gorm.DB) {
 	defaults := []model.SystemSetting{
-		{Key: "platform_markup_percentage", Value: "15", Label: "Platform Markup Percentage (%)"},
-		{Key: "delivery_commission_percentage", Value: "25", Label: "Delivery Commission Percentage (%)"},
-		{Key: "delivery_base_fee_inside_zone", Value: "15000", Label: "Inside Zone Delivery Fee (IDR)"},
-		{Key: "delivery_fee_per_km_outside", Value: "10000", Label: "Outside Zone Fee Per KM (IDR)"},
+		// Platform service fee on products (Wakalah/Ujrah — disclosed to merchant, visible in breakdown)
+		{Key: "platform_markup_percentage", Value: "15", Label: "Platform Service Fee / Ujrah on Products (%)"},
+		// Delivery split
+		{Key: "delivery_commission_percentage", Value: "25", Label: "Platform Commission on Delivery Fee (%)"},
+		{Key: "app_service_fee_percentage", Value: "5", Label: "App Tech Fee on Delivery (%)"},
+		// Self-deliver: merchant keeps delivery fee minus this commission
+		{Key: "self_deliver_commission_percentage", Value: "10", Label: "Self-Deliver Commission for Platform (%)"},
+		// Zone fallback fees (used when no DeliveryZone matches)
+		{Key: "delivery_base_fee_inside_zone", Value: "15000", Label: "Default Inside Zone Delivery Fee (IDR)"},
+		{Key: "delivery_fee_per_km_outside", Value: "10000", Label: "Default Outside Zone Fee Per KM (IDR)"},
 		{Key: "service_delivery_fee_round_trip", Value: "20000", Label: "Service Round-Trip Delivery Fee (IDR)"},
+		// Tax
 		{Key: "tax_percentage", Value: "11", Label: "Tax/PPN Percentage (%)"},
-		{Key: "app_service_fee_percentage", Value: "5", Label: "App Service Fee on Delivery (%)"},
+		// Order guardrails
+		{Key: "min_order_amount", Value: "0", Label: "Minimum Order Amount (IDR, 0 = no minimum)"},
+		{Key: "max_cod_amount", Value: "500000", Label: "Maximum COD Order Amount (IDR)"},
 	}
 
 	for _, setting := range defaults {

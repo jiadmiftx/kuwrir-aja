@@ -37,12 +37,21 @@ interface DeliveryZone {
 }
 
 const defaultSettings: Setting[] = [
-  { key: 'platform_markup_percentage', value: '15', label: 'Platform Markup (%)' },
-  { key: 'delivery_commission_percentage', value: '25', label: 'Delivery Commission (%)' },
-  { key: 'app_service_fee_percentage', value: '5', label: 'App Service Fee on Delivery (%)' },
+  // Product margin — Wakalah/Ujrah (disclosed platform service fee on products)
+  { key: 'platform_markup_percentage', value: '15', label: 'Platform Ujrah / Service Fee on Products (%)' },
+  // Delivery split
+  { key: 'delivery_commission_percentage', value: '25', label: 'Platform Commission from Delivery Fee (%)' },
+  { key: 'app_service_fee_percentage', value: '5', label: 'Platform Tech Fee from Delivery Fee (%)' },
+  // Self-deliver merchant: platform takes small ujrah on their delivery fee too
+  { key: 'self_deliver_commission_percentage', value: '10', label: 'Self-Deliver Merchant Commission (%)' },
+  // Tax
   { key: 'tax_percentage', value: '11', label: 'Tax / PPN (%)' },
+  // Zone fallback
   { key: 'delivery_base_fee_inside_zone', value: '15000', label: 'Default Inside Zone Delivery Fee (IDR)' },
   { key: 'delivery_fee_per_km_outside', value: '10000', label: 'Default Outside Zone Fee Per KM (IDR)' },
+  // Order guardrails
+  { key: 'min_order_amount', value: '0', label: 'Minimum Order Amount (IDR, 0 = no minimum)' },
+  { key: 'max_cod_amount', value: '500000', label: 'Maximum COD Order Amount (IDR)' },
 ]
 
 const emptyZone = (): Partial<DeliveryZone> => ({
@@ -163,21 +172,31 @@ export default function SettingsPage() {
     }
   }
 
-  // Live calculation preview
+  // Live calculation preview (Wakalah/Ujrah model)
   const markup = parseFloat(settings.find((s) => s.key === 'platform_markup_percentage')?.value || '15')
   const commission = parseFloat(settings.find((s) => s.key === 'delivery_commission_percentage')?.value || '25')
   const serviceFee = parseFloat(settings.find((s) => s.key === 'app_service_fee_percentage')?.value || '5')
+  const selfDeliverComm = parseFloat(settings.find((s) => s.key === 'self_deliver_commission_percentage')?.value || '10')
   const tax = parseFloat(settings.find((s) => s.key === 'tax_percentage')?.value || '11')
   const insideFee = parseFloat(settings.find((s) => s.key === 'delivery_base_fee_inside_zone')?.value || '15000')
 
+  // Platform delivery scenario
   const baseFood = 50000
-  const foodWithMarkup = baseFood + baseFood * (markup / 100)
+  const platformUjrah = baseFood * (markup / 100)
+  const foodWithMarkup = baseFood + platformUjrah
   const taxAmount = foodWithMarkup * (tax / 100)
   const appServiceFeeAmt = insideFee * (serviceFee / 100)
   const deliveryCommissionAmt = insideFee * (commission / 100)
   const driverEarning = insideFee - deliveryCommissionAmt - appServiceFeeAmt
   const total = foodWithMarkup + taxAmount + insideFee
-  const kuwrirRevenue = baseFood * (markup / 100) + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
+  // Merchant gets BASE price only (transparent ujrah model)
+  const merchantReceives = baseFood
+  const kuwrirRevenue = platformUjrah + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
+
+  // Self-deliver scenario
+  const selfDeliverFee = 10000
+  const selfDeliverCommAmt = selfDeliverFee * (selfDeliverComm / 100)
+  const merchantDeliveryEarning = selfDeliverFee - selfDeliverCommAmt
 
   return (
     <div className="space-y-6">
@@ -226,43 +245,54 @@ export default function SettingsPage() {
                 <CardDescription>Example: food base IDR 50,000 inside zone</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Platform Delivery (food Rp 50.000)</p>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Food Base (merchant price)</span>
+                  <span className="text-muted-foreground">Merchant harga asli</span>
                   <span>IDR {baseFood.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Markup ({markup}%)</span>
-                  <span className="text-primary">IDR {(baseFood * markup / 100).toLocaleString('id-ID')}</span>
+                  <span className="text-muted-foreground">+ Platform Ujrah ({markup}%)</span>
+                  <span className="text-primary">IDR {platformUjrah.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">+ Tax/PPN ({tax}%)</span>
                   <span className="text-orange-500">IDR {taxAmount.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivery Fee (inside zone)</span>
+                  <span className="text-muted-foreground">+ Ongkir (inside zone)</span>
                   <span>IDR {insideFee.toLocaleString('id-ID')}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold text-base">
-                  <span>Total Customer Pays</span>
+                  <span>Customer Bayar</span>
                   <span>IDR {total.toLocaleString('id-ID')}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between text-green-600">
-                  <span>→ Merchant Receives</span>
-                  <span>IDR {baseFood.toLocaleString('id-ID')}</span>
+                <div className="flex justify-between text-green-700 font-medium">
+                  <span>→ Merchant Terima (harga asli)</span>
+                  <span>IDR {merchantReceives.toLocaleString('id-ID')}</span>
                 </div>
-                <div className="flex justify-between text-blue-600">
-                  <span>→ Driver Receives</span>
+                <div className="flex justify-between text-blue-600 font-medium">
+                  <span>→ Driver Terima</span>
                   <span>IDR {driverEarning.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between text-primary font-bold">
                   <span>→ KUWRIR Revenue</span>
                   <span>IDR {kuwrirRevenue.toLocaleString('id-ID')}</span>
                 </div>
-                <div className="text-xs text-muted-foreground pt-2 space-y-1">
-                  <div>App service fee: IDR {appServiceFeeAmt.toLocaleString('id-ID')} ({serviceFee}% of delivery)</div>
-                  <div>Delivery commission: IDR {deliveryCommissionAmt.toLocaleString('id-ID')} ({commission}% of delivery)</div>
+                <div className="text-xs text-muted-foreground pt-1 space-y-0.5">
+                  <div>Ujrah produk: IDR {platformUjrah.toLocaleString('id-ID')} | PPN: IDR {taxAmount.toLocaleString('id-ID')}</div>
+                  <div>Komisi delivery: IDR {deliveryCommissionAmt.toLocaleString('id-ID')} | Tech fee: IDR {appServiceFeeAmt.toLocaleString('id-ID')}</div>
+                </div>
+                <Separator />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Self-Deliver Merchant (ongkir Rp 10.000)</p>
+                <div className="flex justify-between text-green-700">
+                  <span>→ Merchant Terima (product + delivery)</span>
+                  <span>IDR {(merchantReceives + merchantDeliveryEarning).toLocaleString('id-ID')}+</span>
+                </div>
+                <div className="flex justify-between text-primary">
+                  <span>→ Platform Ujrah Delivery ({selfDeliverComm}%)</span>
+                  <span>IDR {selfDeliverCommAmt.toLocaleString('id-ID')}</span>
                 </div>
               </CardContent>
             </Card>

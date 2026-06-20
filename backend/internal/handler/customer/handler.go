@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("", h.MyOrders)
 		orders.GET("/:id", h.GetOrder)
 		orders.POST("/:id/cancel", h.CancelOrder)
+		orders.POST("/:id/refund-request", h.RequestRefund)
 	}
 }
 
@@ -77,6 +78,11 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	// COD cap guard (checked again after total is computed, but early rough check on payment type)
+	if req.PaymentType == "cash" && settings.MaxCODAmount > 0 {
+		// We'll re-check after calculating total; skip here as total unknown yet
+	}
+
 	// 3. Calculate delivery fee using city zone reference points
 	distanceKm := haversineDistance(
 		merchant.Latitude, merchant.Longitude,
@@ -93,6 +99,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	// 4. Build order items with markup calculation
 	var orderItems []model.OrderItem
 	var subtotalWithMarkup float64
+	var totalBasePrice float64
 	var totalPlatformMarkup float64
 
 	for _, reqItem := range req.Items {
@@ -129,7 +136,9 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 			VariantsJSON: func() *string { s := "[]"; return &s }(),
 		})
 
+		baseItemTotal := product.Price * float64(reqItem.Quantity)
 		subtotalWithMarkup += itemTotal
+		totalBasePrice += baseItemTotal
 		totalPlatformMarkup += markupAmount * float64(reqItem.Quantity)
 
 		// Deduct stock if tracking
@@ -143,12 +152,16 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	var deliveryCommission float64
 	var driverEarning float64
 	var appServiceFee float64
+	var merchantDeliveryEarning float64
 
 	if merchant.CanSelfDeliver {
-		// Self-delivery: merchant delivers, uses their own fee, no platform delivery commission
+		// Self-delivery: merchant delivers themselves
+		// Platform still takes a small commission (Ujrah on delivery service)
 		deliveryType = "self"
-		deliveryFee = merchant.SelfDeliveryFee // Could be 0 (free delivery)
-		deliveryCommission = 0
+		deliveryFee = merchant.SelfDeliveryFee
+		selfDeliverCommission := deliveryFee * (settings.SelfDeliverCommissionPct / 100.0)
+		merchantDeliveryEarning = deliveryFee - selfDeliverCommission
+		deliveryCommission = selfDeliverCommission
 		driverEarning = 0
 		appServiceFee = 0
 	} else {
@@ -161,13 +174,29 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		}
 	}
 
+	// Merchant receives their base product price only (platform service fee stays with platform)
+	merchantPayout := totalBasePrice
+
 	// 6. Apply tax on subtotal (product portion only)
 	taxAmount := subtotalWithMarkup * (settings.TaxPct / 100.0)
 
 	// 7. Grand total customer pays
 	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee
 
-	// 7. Generate order number
+	// Enforce min order amount
+	if settings.MinOrderAmount > 0 && subtotalWithMarkup < settings.MinOrderAmount {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Minimum order amount is IDR %.0f", settings.MinOrderAmount)})
+		return
+	}
+
+	// Enforce COD cap
+	if req.PaymentType == "cash" && settings.MaxCODAmount > 0 && grandTotal > settings.MaxCODAmount {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("COD maximum is IDR %.0f. Please use online payment for larger orders.", settings.MaxCODAmount),
+		})
+		return
+	}
+
 	orderNumber := fmt.Sprintf("KWR-%s", time.Now().Format("060102150405"))
 
 	customerUUID, _ := uuid.Parse(userID)
@@ -191,10 +220,12 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		PlatformMarkup:     totalPlatformMarkup,
 		TaxAmount:          taxAmount,
 		AppServiceFee:      appServiceFee,
-		DeliveryFee:        deliveryFee,
-		DeliveryCommission: deliveryCommission,
-		DriverEarning:      driverEarning,
-		Total:              grandTotal,
+		DeliveryFee:             deliveryFee,
+		DeliveryCommission:      deliveryCommission,
+		DriverEarning:           driverEarning,
+		MerchantPayout:          merchantPayout,
+		MerchantDeliveryEarning: merchantDeliveryEarning,
+		Total:                   grandTotal,
 
 		PickupAddress: merchant.Address,
 		PickupLat:     merchant.Latitude,
@@ -456,7 +487,8 @@ func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 	}
 
 	var orders []model.Order
-	h.db.Where("status = ? AND driver_id IS NULL", model.OrderStatusReady).
+	// Show: (a) unassigned orders, OR (b) orders admin pre-assigned to this specific driver
+	h.db.Where("status = ? AND (driver_id IS NULL OR driver_id = ?)", model.OrderStatusReady, driver.ID).
 		Preload("Merchant").
 		Preload("Customer").
 		Order("created_at ASC").
@@ -477,8 +509,9 @@ func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 	}
 
 	var order model.Order
-	if err := h.db.Where("id = ? AND status = ? AND driver_id IS NULL",
-		orderID, model.OrderStatusReady).First(&order).Error; err != nil {
+	// Allow accept if: not yet assigned to anyone, OR admin pre-assigned to this driver
+	if err := h.db.Where("id = ? AND status = ? AND (driver_id IS NULL OR driver_id = ?)",
+		orderID, model.OrderStatusReady, driver.ID).First(&order).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not available for pickup"})
 		return
 	}
@@ -554,30 +587,46 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	merchantNotes := fmt.Sprintf("Order %s delivered", order.OrderNumber)
 	driverNotes := fmt.Sprintf("Earning order %s", order.OrderNumber)
 
+	// Merchant receives their base product price (MerchantPayout).
+	// For self-deliver: also receives their cut of the delivery fee (MerchantDeliveryEarning).
+	// Platform keeps the markup + its commission share — this is the transparent Ujrah/Wakalah model.
+	merchantCredit := order.MerchantPayout
+	if order.DeliveryType == "self" {
+		merchantCredit += order.MerchantDeliveryEarning
+	}
+	// Fallback for orders placed before this migration (MerchantPayout = 0)
+	if merchantCredit == 0 {
+		merchantCredit = order.Subtotal - order.PlatformMarkup
+		if merchantCredit <= 0 {
+			merchantCredit = order.Subtotal
+		}
+	}
+
+	creditWallets := func() error {
+		if err := service.CreditWallet(tx, *order.MerchantID, merchantCredit, "order_earning", &orderUUID, merchantNotes); err != nil {
+			return err
+		}
+		if order.DriverEarning > 0 {
+			if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	if order.PaymentType == "cash" {
-		// COD: credit wallets immediately; track cash driver is physically holding
-		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+		// COD: credit wallets immediately; track COD cash driver is physically holding
+		if err := creditWallets(); err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit wallets"})
 			return
 		}
-		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
-			return
-		}
-		// Track full COD cash driver is physically holding
 		tx.Model(&driver).Update("cod_holding", gorm.Expr("cod_holding + ?", order.Total))
 	} else if order.PaymentStatus == "paid" {
 		// Online payment already collected by platform — credit wallets at delivery
-		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+		if err := creditWallets(); err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
-			return
-		}
-		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit wallets"})
 			return
 		}
 	}
@@ -598,25 +647,77 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// RequestRefund allows a customer to submit a refund request for a delivered order.
+func (h *Handler) RequestRefund(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	if order.Status != model.OrderStatusDelivered && order.Status != model.OrderStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Refund only allowed for delivered or cancelled orders"})
+		return
+	}
+
+	// Prevent duplicate requests
+	var existing model.RefundRequest
+	if h.db.Where("order_id = ?", order.ID).First(&existing).Error == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Refund request already submitted", "refund": existing})
+		return
+	}
+
+	userUID, _ := uuid.Parse(userID)
+	refund := model.RefundRequest{
+		OrderID:     order.ID,
+		RequestedBy: userUID,
+		Reason:      req.Reason,
+		Amount:      order.Total,
+		Status:      "pending",
+	}
+	if err := h.db.Create(&refund).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit refund request"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"refund": refund, "message": "Refund request submitted. Admin will review within 1-2 business days."})
+}
+
 // --- Settings Helper ---
 
 type settingsData struct {
-	PlatformMarkupPct     float64
-	DeliveryCommissionPct float64
-	InsideZoneFee         float64
-	FeePerKmOutside       float64
-	TaxPct                float64
-	AppServiceFeePct      float64
+	PlatformMarkupPct        float64
+	DeliveryCommissionPct    float64
+	SelfDeliverCommissionPct float64
+	InsideZoneFee            float64
+	FeePerKmOutside          float64
+	TaxPct                   float64
+	AppServiceFeePct         float64
+	MinOrderAmount           float64
+	MaxCODAmount             float64
 }
 
 func (h *Handler) loadSettings() settingsData {
 	s := settingsData{
-		PlatformMarkupPct:     15,
-		DeliveryCommissionPct: 25,
-		InsideZoneFee:         15000,
-		FeePerKmOutside:       10000,
-		TaxPct:                11,
-		AppServiceFeePct:      5,
+		PlatformMarkupPct:        15,
+		DeliveryCommissionPct:    25,
+		SelfDeliverCommissionPct: 10,
+		InsideZoneFee:            15000,
+		FeePerKmOutside:          10000,
+		TaxPct:                   11,
+		AppServiceFeePct:         5,
+		MinOrderAmount:           0,
+		MaxCODAmount:             500000,
 	}
 
 	var settings []model.SystemSetting
@@ -629,6 +730,8 @@ func (h *Handler) loadSettings() settingsData {
 			s.PlatformMarkupPct = val
 		case "delivery_commission_percentage":
 			s.DeliveryCommissionPct = val
+		case "self_deliver_commission_percentage":
+			s.SelfDeliverCommissionPct = val
 		case "delivery_base_fee_inside_zone":
 			s.InsideZoneFee = val
 		case "delivery_fee_per_km_outside":
@@ -637,6 +740,10 @@ func (h *Handler) loadSettings() settingsData {
 			s.TaxPct = val
 		case "app_service_fee_percentage":
 			s.AppServiceFeePct = val
+		case "min_order_amount":
+			s.MinOrderAmount = val
+		case "max_cod_amount":
+			s.MaxCODAmount = val
 		}
 	}
 	return s

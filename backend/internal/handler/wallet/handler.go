@@ -218,7 +218,7 @@ func (h *Handler) withdraw(c *gin.Context, userID string) {
 	if status == "success" {
 		tx := h.db.Begin()
 		notes := fmt.Sprintf("Withdrawal to %s %s", req.BankCode, req.BankAccountNumber)
-		if err := service.DebitWallet(tx, uid, req.Amount, "withdrawal", notes); err != nil {
+		if err := service.DebitWallet(tx, uid, req.Amount, "withdrawal", nil, notes); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to debit wallet"})
 			return
