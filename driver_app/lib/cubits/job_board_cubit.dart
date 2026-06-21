@@ -98,16 +98,24 @@ class JobBoardCubit extends Cubit<JobBoardState> {
     try {
       final result = await _api.acceptDelivery(orderId);
       _isOnline = false;
-      emit(JobBoardOffline());
+      // Don't emit JobBoardOffline here — screen handles navigation first,
+      // then calls resetAfterDelivery() when driver returns to job board.
       return result;
     } on ApiException catch (e) {
+      _isOnline = true;
       _startPolling();
       emit(JobBoardError(e.message));
       return null;
     } catch (_) {
+      _isOnline = true;
       _startPolling();
       emit(JobBoardError('Gagal mengambil pesanan'));
       return null;
     }
+  }
+
+  void resetAfterDelivery() {
+    _isOnline = false;
+    emit(JobBoardOffline());
   }
 }

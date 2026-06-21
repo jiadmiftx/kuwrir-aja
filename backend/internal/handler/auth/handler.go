@@ -40,6 +40,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	authed := r.Group("/auth")
 	authed.Use(middleware.AuthMiddleware(h.cfg.JWT.Secret))
 	{
+		authed.GET("/me", h.GetMe)
 		authed.PUT("/device-token", h.SaveDeviceToken)
 	}
 }
@@ -240,6 +241,16 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 
 // SaveDeviceToken stores the FCM device token for push notifications.
 // PUT /auth/device-token   Body: {"token": "..."}
+func (h *Handler) GetMe(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var user model.User
+	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
 func (h *Handler) SaveDeviceToken(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req struct {

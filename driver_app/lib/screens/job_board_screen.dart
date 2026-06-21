@@ -329,10 +329,13 @@ class _JobCardState extends State<_JobCard> {
     if (result != null) {
       context.read<ActiveDeliveryCubit>().setOrder(
           result['order'] as Map<String, dynamic>? ?? job);
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ActiveDeliveryScreen()),
       );
+      // Driver returned from active delivery — reset to offline so they
+      // can manually go online to receive more orders.
+      if (mounted) context.read<JobBoardCubit>().resetAfterDelivery();
     }
   }
 
