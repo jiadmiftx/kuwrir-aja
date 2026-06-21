@@ -14,68 +14,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: IndexedStack(
-          index: _currentIndex,
-          children: const [
-            _HomeTab(),
-            _OrdersTab(),
-            _ProfileTab(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Orders',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// --- Home Tab ---
-class _HomeTab extends StatefulWidget {
-  const _HomeTab();
-
-  @override
-  State<_HomeTab> createState() => _HomeTabState();
-}
-
-class _HomeTabState extends State<_HomeTab> {
   @override
   void initState() {
     super.initState();
     context.read<MerchantListCubit>().loadMerchants();
   }
 
-  Future<void> _openLocationPicker(BuildContext context, LocationState loc) async {
+  Future<void> _openLocationPicker(LocationState loc) async {
     final initial = loc.hasLocation ? LatLng(loc.lat!, loc.lng!) : null;
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(
-        builder: (_) => LocationPickerScreen(initial: initial),
-      ),
+      MaterialPageRoute(builder: (_) => LocationPickerScreen(initial: initial)),
     );
     if (result != null && context.mounted) {
       final latlng = result['latlng'] as LatLng;
@@ -87,149 +36,297 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                BlocBuilder<LocationCubit, LocationState>(
-                  builder: (context, loc) {
-                    return GestureDetector(
-                      onTap: () => _openLocationPicker(context, loc),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+    return Scaffold(
+      backgroundColor: KuwrirColors.background,
+      body: RefreshIndicator(
+        onRefresh: () => context.read<MerchantListCubit>().loadMerchants(),
+        child: CustomScrollView(
+          slivers: [
+            // ── Header ──────────────────────────────────────────────
+            SliverToBoxAdapter(child: _buildHeader()),
+
+            // ── Service Menu ────────────────────────────────────────
+            SliverToBoxAdapter(child: _buildServiceMenu()),
+
+            // ── Promo Banner ────────────────────────────────────────
+            SliverToBoxAdapter(child: _buildPromoBanner()),
+
+            // ── CoFood Section Title ────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Restoran Terdekat',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(context, '/search'),
+                      child: const Text('Lihat semua'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Merchant List ───────────────────────────────────────
+            BlocBuilder<MerchantListCubit, MerchantListState>(
+              builder: (context, state) {
+                if (state is MerchantListLoading) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+                if (state is MerchantListError) {
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
                         children: [
-                          Icon(Icons.location_on, color: KuwrirColors.primary, size: 20),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: loc.detecting
-                                ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                    const SizedBox(width: 14, height: 14,
-                                        child: CircularProgressIndicator(strokeWidth: 2)),
-                                    const SizedBox(width: 6),
-                                    Text('Mendeteksi...',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w600, color: Colors.grey)),
-                                  ])
-                                : Text(
-                                    loc.address,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                          Icon(Icons.wifi_off, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(state.message,
+                              style: const TextStyle(color: Colors.grey)),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () =>
+                                context.read<MerchantListCubit>().loadMerchants(),
+                            child: const Text('Coba lagi'),
                           ),
-                          const Icon(Icons.keyboard_arrow_down, size: 20),
                         ],
                       ),
+                    ),
+                  );
+                }
+                if (state is MerchantListLoaded) {
+                  if (state.merchants.isEmpty) {
+                    return const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(
+                            child: Text('Belum ada restoran di area ini',
+                                style: TextStyle(color: Colors.grey))),
+                      ),
                     );
-                  },
+                  }
+                  return SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final m = state.merchants[index];
+                          return _MerchantCard(
+                            merchant: m,
+                            onTap: () => Navigator.pushNamed(context, '/merchant',
+                                arguments: {'id': m.id, 'name': m.name}),
+                          );
+                        },
+                        childCount: state.merchants.length,
+                      ),
+                    ),
+                  );
+                }
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      color: KuwrirColors.primary,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 16,
+        right: 16,
+        bottom: 20,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location row
+          BlocBuilder<LocationCubit, LocationState>(
+            builder: (context, loc) {
+              return GestureDetector(
+                onTap: () => _openLocationPicker(loc),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Colors.white70, size: 16),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: loc.detecting
+                          ? const Text('Mendeteksi lokasi...',
+                              style: TextStyle(color: Colors.white70, fontSize: 13))
+                          : Text(
+                              loc.address,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/search'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: KuwrirColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: KuwrirColors.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, color: KuwrirColors.textHint, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Cari restoran atau menu...',
-                          style: TextStyle(color: KuwrirColors.textHint, fontSize: 14),
-                        ),
-                      ],
-                    ),
+              );
+            },
+          ),
+          const SizedBox(height: 4),
+          const Text('Mau pesan apa hari ini?',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 14),
+          // Search bar
+          GestureDetector(
+            onTap: () => Navigator.pushNamed(context, '/search'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, color: Colors.grey, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Cari restoran atau menu...',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceMenu() {
+    final services = [
+      _Service('CoFood', Icons.restaurant_menu, KuwrirColors.primary, '/search'),
+      _Service('Courier', Icons.delivery_dining, const Color(0xFF1976D2), null),
+      _Service('Cocar', Icons.directions_car, const Color(0xFF6A1B9A), null),
+      _Service('CoSend', Icons.send_rounded, const Color(0xFFE65100), null),
+    ];
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: services.map((s) => _ServiceIcon(service: s)).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPromoBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      height: 130,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [KuwrirColors.primary, KuwrirColors.primaryLight],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -10,
+            bottom: -10,
+            child: Icon(Icons.local_offer,
+                size: 110, color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: const Text('PROMO',
+                      style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Restoran Terdekat',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
+                const SizedBox(height: 8),
+                const Text('Gratis Ongkir\nPesanan Pertama!',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.2)),
               ],
             ),
           ),
-        ),
-
-        // Merchant list from API
-        BlocBuilder<MerchantListCubit, MerchantListState>(
-          builder: (context, state) {
-            if (state is MerchantListLoading) {
-              return const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              );
-            }
-            if (state is MerchantListError) {
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(Icons.wifi_off, size: 48, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(state.message, style: const TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () => context.read<MerchantListCubit>().loadMerchants(),
-                        child: const Text('Coba lagi'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            if (state is MerchantListLoaded) {
-              if (state.merchants.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: Text('Belum ada restoran di area ini')),
-                  ),
-                );
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index == state.merchants.length) return const SizedBox(height: 24);
-                      final m = state.merchants[index];
-                      return _MerchantCard(
-                        merchant: m,
-                        onTap: () => Navigator.pushNamed(context, '/merchant',
-                            arguments: {'id': m.id, 'name': m.name}),
-                      );
-                    },
-                    childCount: state.merchants.length + 1,
-                  ),
-                ),
-              );
-            }
-            return const SliverToBoxAdapter(child: SizedBox.shrink());
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// --- Merchant Card ---
+class _Service {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final String? route;
+  const _Service(this.label, this.icon, this.color, this.route);
+}
+
+class _ServiceIcon extends StatelessWidget {
+  final _Service service;
+  const _ServiceIcon({super.key, required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (service.route != null) {
+          Navigator.pushNamed(context, service.route!);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${service.label} segera hadir!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: service.color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(service.icon, color: service.color, size: 30),
+          ),
+          const SizedBox(height: 8),
+          Text(service.label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Merchant Card ────────────────────────────────────────────────────────────
+
 class _MerchantCard extends StatelessWidget {
   final Merchant merchant;
   final VoidCallback onTap;
-
   const _MerchantCard({required this.merchant, required this.onTap});
 
   @override
@@ -238,23 +335,20 @@ class _MerchantCard extends StatelessWidget {
       onTap: onTap,
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner image
             Container(
-              height: 140,
+              height: 130,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: KuwrirColors.primary.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
+              color: KuwrirColors.primary.withValues(alpha: 0.08),
               child: merchant.logoUrl != null
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: Image.network(merchant.logoUrl!, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
-                    )
+                  ? Image.network(merchant.logoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(
+                          child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)))
                   : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
             ),
             Padding(
@@ -266,16 +360,17 @@ class _MerchantCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(merchant.name,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700)),
                       ),
                       if (!merchant.isOpen)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text('Tutup', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6)),
+                          child: const Text('Tutup',
+                              style: TextStyle(fontSize: 11, color: Colors.grey)),
                         ),
                     ],
                   ),
@@ -287,17 +382,20 @@ class _MerchantCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 14, color: KuwrirColors.warning),
+                      Icon(Icons.star_rounded, size: 14, color: Colors.amber[600]),
                       const SizedBox(width: 2),
-                      Text('${merchant.rating.toStringAsFixed(1)}',
+                      Text(merchant.rating.toStringAsFixed(1),
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       Text(' (${merchant.totalReviews})',
                           style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
                       if (merchant.distanceKm != null) ...[
-                        const SizedBox(width: 12),
-                        Icon(Icons.location_on_outlined, size: 13, color: KuwrirColors.textSecondary),
+                        const SizedBox(width: 10),
+                        Icon(Icons.location_on_outlined,
+                            size: 13, color: KuwrirColors.textSecondary),
+                        const SizedBox(width: 2),
                         Text('${merchant.distanceKm!.toStringAsFixed(1)} km',
-                            style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                            style: TextStyle(
+                                fontSize: 11, color: KuwrirColors.textSecondary)),
                       ],
                     ],
                   ),
@@ -306,170 +404,6 @@ class _MerchantCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// --- Orders Tab ---
-class _OrdersTab extends StatefulWidget {
-  const _OrdersTab();
-
-  @override
-  State<_OrdersTab> createState() => _OrdersTabState();
-}
-
-class _OrdersTabState extends State<_OrdersTab> {
-  List<Order> _orders = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadOrders();
-  }
-
-  Future<void> _loadOrders() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final api = context.read<ApiClient>();
-      final orders = await api.getMyOrders();
-      setState(() {
-        _orders = orders;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Gagal memuat riwayat pesanan';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(_error!, style: const TextStyle(color: Colors.grey)),
-            TextButton(onPressed: _loadOrders, child: const Text('Coba lagi')),
-          ],
-        ),
-      );
-    }
-    if (_orders.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('Belum ada pesanan', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: _loadOrders,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _orders.length,
-        itemBuilder: (context, i) {
-          final order = _orders[i];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: const Icon(Icons.receipt_outlined),
-              title: Text(order.orderNumber),
-              subtitle: Text(order.merchantName ?? order.pickupAddress ?? ''),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _StatusChip(order.status),
-                  Text('Rp ${order.total.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                ],
-              ),
-              onTap: () => Navigator.pushNamed(context, '/tracking',
-                  arguments: {'order_id': order.id}),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip(this.status);
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    switch (status) {
-      case 'delivered':
-      case 'returned':
-        color = Colors.green;
-        break;
-      case 'cancelled':
-        color = Colors.red;
-        break;
-      case 'preparing':
-      case 'ready':
-      case 'picked_up':
-        color = Colors.orange;
-        break;
-      default:
-        color = Colors.grey;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(status.replaceAll('_', ' '),
-          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
-    );
-  }
-}
-
-// --- Profile Tab ---
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.person_outline, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          const Text('Profile', style: TextStyle(color: Colors.grey, fontSize: 16)),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: () async {
-              final api = context.read<ApiClient>();
-              await api.clearTokens();
-              if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-              }
-            },
-            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
-          ),
-        ],
       ),
     );
   }

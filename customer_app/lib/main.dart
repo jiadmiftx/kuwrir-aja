@@ -160,8 +160,9 @@ class _CustomerHomeState extends State<CustomerHome> {
         index: _idx,
         children: const [
           HomeScreen(),
+          _PromoScreen(),
           _OrdersScreen(),
-          _ProfileScreen(),
+          _ChatListScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -169,17 +170,21 @@ class _CustomerHomeState extends State<CustomerHome> {
         onDestinationSelected: (i) => setState(() => _idx = i),
         destinations: const [
           NavigationDestination(
-              icon: Icon(Icons.restaurant_menu_outlined),
-              selectedIcon: Icon(Icons.restaurant_menu),
-              label: 'Makanan'),
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Beranda'),
+          NavigationDestination(
+              icon: Icon(Icons.local_offer_outlined),
+              selectedIcon: Icon(Icons.local_offer),
+              label: 'Promo'),
           NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
               selectedIcon: Icon(Icons.receipt_long),
-              label: 'Pesanan'),
+              label: 'Orders'),
           NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Profil'),
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Chat'),
         ],
       ),
     );
@@ -298,32 +303,53 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _ProfileScreen extends StatelessWidget {
-  const _ProfileScreen();
+class _PromoScreen extends StatelessWidget {
+  const _PromoScreen();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
+      appBar: AppBar(title: const Text('Promo')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.person_outline, size: 64, color: Colors.grey),
-            const SizedBox(height: 24),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Keluar', style: TextStyle(color: Colors.red)),
-              onTap: () async {
-                await context.read<ApiClient>().clearTokens();
-                if (context.mounted) {
-                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-                }
-              },
-            ),
+            Icon(Icons.local_offer_outlined, size: 72, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            const Text('Promo segera hadir!',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 8),
+            const Text('Pantau terus untuk penawaran terbaik',
+                style: TextStyle(color: Colors.grey)),
           ],
         ),
       ),
     );
   }
 }
+
+class _ChatListScreen extends StatelessWidget {
+  const _ChatListScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Chat')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 72, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            const Text('Belum ada chat aktif',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 8),
+            const Text('Chat tersedia saat pesanan sedang diantar',
+                style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
