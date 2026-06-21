@@ -194,7 +194,7 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 
 	// Find existing user by google_id or email
 	var user model.User
-	err = h.db.Where("google_id = ? OR (email = ? AND email != '')", info.Sub, info.Email).First(&user).Error
+	err = h.db.Where("google_id = ? OR (email != '' AND email = ?)", info.Sub, info.Email).First(&user).Error
 	if err != nil {
 		// New user — auto-register
 		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
@@ -204,7 +204,7 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 			Phone:     "", // Google users may not have phone; they can add later
 			Password:  string(fakePassword),
 			AvatarURL: info.Picture,
-			GoogleID:  info.Sub,
+			GoogleID:  &info.Sub,
 			Role:      req.Role,
 			IsActive:  true,
 		}
@@ -216,7 +216,7 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 		}
 	} else {
 		// Update google_id if linked via email
-		if user.GoogleID == "" {
+		if user.GoogleID == nil {
 			h.db.Model(&user).Update("google_id", info.Sub)
 		}
 		if !user.IsActive {

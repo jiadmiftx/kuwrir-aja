@@ -70,7 +70,7 @@ const (
 type User struct {
 	Base
 	Name            string     `gorm:"not null" json:"name"`
-	Email           string     `gorm:"uniqueIndex" json:"email"`
+	Email           string     `gorm:"uniqueIndex:idx_users_email,where:email != ''" json:"email"`
 	Phone           string     `gorm:"uniqueIndex;not null" json:"phone"`
 	Password        string     `gorm:"not null" json:"-"`
 	AvatarURL       string     `json:"avatar_url,omitempty"`
@@ -81,7 +81,7 @@ type User struct {
 	IsActive        bool       `json:"is_active"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
 	FCMToken        string     `gorm:"type:text" json:"-"`
-	GoogleID        string     `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	GoogleID        *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
 
 	// Relations
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
