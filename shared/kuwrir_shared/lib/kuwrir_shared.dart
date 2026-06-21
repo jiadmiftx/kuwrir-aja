@@ -10,5 +10,6 @@ export 'src/models/order.dart';
 export 'src/models/merchant.dart';
 export 'src/models/product.dart';
 export 'src/models/cart_item.dart';
+export 'src/models/chat_message.dart';
 export 'src/theme/kuwrir_theme.dart';
 export 'src/theme/kuwrir_colors.dart';

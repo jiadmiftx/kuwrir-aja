@@ -288,6 +288,40 @@ class ApiClient {
   Future<Map<String, dynamic>> getDriverWallet() async {
     return await get('/driver/wallet');
   }
+
+  // --- Chat ---
+
+  Future<List<Map<String, dynamic>>> getOrderChat(String orderId) async {
+    final data = await get('/orders/$orderId/chat');
+    final list = data['messages'] as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> sendChatMessage(String orderId, String text) async {
+    await post('/orders/$orderId/chat', {'text': text});
+  }
+
+  Future<List<Map<String, dynamic>>> getDriverOrderChat(String orderId) async {
+    final data = await get('/driver-orders/$orderId/chat');
+    final list = data['messages'] as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> sendDriverChatMessage(String orderId, String text) async {
+    await post('/driver-orders/$orderId/chat', {'text': text});
+  }
+
+  // --- Notifications ---
+
+  Future<void> saveDeviceToken(String token) async {
+    await put('/auth/device-token', {'token': token});
+  }
+
+  // --- Google Auth ---
+
+  Future<Map<String, dynamic>> googleLogin(String idToken, String role) async {
+    return await post('/auth/google', {'id_token': idToken, 'role': role});
+  }
 }
 
 /// Custom API exception

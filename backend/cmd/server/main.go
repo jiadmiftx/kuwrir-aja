@@ -13,6 +13,7 @@ import (
 	"github.com/kuwrir-platform/backend/internal/config"
 	adminHandler "github.com/kuwrir-platform/backend/internal/handler/admin"
 	authHandler "github.com/kuwrir-platform/backend/internal/handler/auth"
+	"github.com/kuwrir-platform/backend/internal/service"
 	customerHandler "github.com/kuwrir-platform/backend/internal/handler/customer"
 	driverregHandler "github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	kasirHandler "github.com/kuwrir-platform/backend/internal/handler/kasir"
@@ -78,9 +79,14 @@ func main() {
 		&model.DeliveryZone{},
 		// Refund requests
 		&model.RefundRequest{},
+		// In-order chat messages
+		&model.ChatMessage{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
+
+	// Initialize Firebase Admin SDK for push notifications
+	service.InitFCM()
 
 	// Seed default system settings and delivery zones
 	seedSettings(db)

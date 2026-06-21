@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'providers/auth_provider.dart';
+import 'services/notification_service.dart';
 import 'cubits/job_board_cubit.dart';
 import 'cubits/active_delivery_cubit.dart';
 import 'screens/login_screen.dart';
@@ -24,6 +25,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await NotificationService.init();
+  NotificationService.setupForegroundHandler();
 
   final apiClient = ApiClient();
   runApp(

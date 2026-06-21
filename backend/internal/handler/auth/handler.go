@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -31,6 +33,14 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
+		auth.POST("/google", h.GoogleLogin)
+	}
+
+	// Authenticated routes
+	authed := r.Group("/auth")
+	authed.Use(middleware.AuthMiddleware(h.cfg.JWT.Secret))
+	{
+		authed.PUT("/device-token", h.SaveDeviceToken)
 	}
 }
 
@@ -158,6 +168,123 @@ func (h *Handler) Login(c *gin.Context) {
 		RefreshToken: refreshToken,
 		User:         user,
 	})
+}
+
+// GoogleLogin authenticates or registers a user via Google ID token.
+// Body: {"id_token": "...", "role": "customer"}
+func (h *Handler) GoogleLogin(c *gin.Context) {
+	var req struct {
+		IDToken string     `json:"id_token" binding:"required"`
+		Role    model.Role `json:"role"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Role == "" {
+		req.Role = model.RoleCustomer
+	}
+
+	// Verify ID token with Google
+	info, err := verifyGoogleToken(req.IDToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
+		return
+	}
+
+	// Find existing user by google_id or email
+	var user model.User
+	err = h.db.Where("google_id = ? OR (email = ? AND email != '')", info.Sub, info.Email).First(&user).Error
+	if err != nil {
+		// New user — auto-register
+		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
+		user = model.User{
+			Name:      info.Name,
+			Email:     info.Email,
+			Phone:     "", // Google users may not have phone; they can add later
+			Password:  string(fakePassword),
+			AvatarURL: info.Picture,
+			GoogleID:  info.Sub,
+			Role:      req.Role,
+			IsActive:  true,
+		}
+		// Phone must be unique and not-null — use a placeholder
+		user.Phone = "G-" + info.Sub[:10]
+		if err := h.db.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create account"})
+			return
+		}
+	} else {
+		// Update google_id if linked via email
+		if user.GoogleID == "" {
+			h.db.Model(&user).Update("google_id", info.Sub)
+		}
+		if !user.IsActive {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Account is deactivated"})
+			return
+		}
+	}
+
+	token, refreshToken, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         user,
+	})
+}
+
+// SaveDeviceToken stores the FCM device token for push notifications.
+// PUT /auth/device-token   Body: {"token": "..."}
+func (h *Handler) SaveDeviceToken(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.db.Model(&model.User{}).Where("id = ?", userID).Update("fcm_token", req.Token).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Device token saved"})
+}
+
+// --- Google token verification ---
+
+type googleTokenInfo struct {
+	Sub     string `json:"sub"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Picture string `json:"picture"`
+}
+
+func verifyGoogleToken(idToken string) (*googleTokenInfo, error) {
+	resp, err := http.Get("https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("google rejected token: %s", string(body))
+	}
+	var info googleTokenInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		return nil, err
+	}
+	if info.Sub == "" {
+		return nil, fmt.Errorf("invalid token: missing sub")
+	}
+	return &info, nil
 }
 
 func (h *Handler) generateTokens(user model.User) (string, string, error) {

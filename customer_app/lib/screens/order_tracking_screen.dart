@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'chat_screen.dart';
 import '../cubits/order_tracking_cubit.dart';
 import '../cubits/order_cubit.dart';
 
@@ -44,8 +45,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         final isDelivered =
             state is OrderTrackingDelivered || order.status == 'delivered';
 
+        // Show chat button only when driver is assigned (order in transit)
+        final canChat = ['picked_up', 'confirmed', 'preparing', 'ready'].contains(order.status);
+
         return Scaffold(
-          appBar: AppBar(title: Text('Pesanan ${order.orderNumber}')),
+          appBar: AppBar(
+            title: Text('Pesanan ${order.orderNumber}'),
+            actions: [
+              if (canChat)
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  tooltip: 'Chat dengan Driver',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(

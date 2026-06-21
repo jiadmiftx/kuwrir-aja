@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/active_delivery_cubit.dart';
+import 'chat_screen.dart';
 
 class ActiveDeliveryScreen extends StatelessWidget {
   const ActiveDeliveryScreen({super.key});
@@ -86,6 +87,18 @@ class ActiveDeliveryScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Chat dengan Customer',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(orderId: orderId, orderNumber: orderNumber),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [

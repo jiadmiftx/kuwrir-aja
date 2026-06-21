@@ -32,6 +32,8 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id", h.GetOrder)
 		orders.POST("/:id/cancel", h.CancelOrder)
 		orders.POST("/:id/refund-request", h.RequestRefund)
+		orders.GET("/:id/chat", h.GetChat)
+		orders.POST("/:id/chat", h.SendChat)
 	}
 }
 
@@ -252,6 +254,16 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		return
 	}
 
+	// Notify merchant owner about new order
+	var merchantOwner model.User
+	if h.db.Where("id = ?", merchant.UserID).First(&merchantOwner).Error == nil {
+		service.SendToUser(h.db, merchantOwner.ID,
+			"Pesanan Baru! 🛍️",
+			fmt.Sprintf("Order #%s masuk — segera konfirmasi", order.OrderNumber),
+			map[string]string{"order_id": order.ID.String(), "type": "new_order"},
+		)
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"order": order,
 		"pricing_breakdown": gin.H{
@@ -417,6 +429,24 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 	}
 
 	h.db.Model(&order).Updates(updates)
+
+	// Push notifications to customer on key status changes
+	if order.CustomerID != nil {
+		var title, body string
+		switch to {
+		case model.OrderStatusConfirmed:
+			title = "Pesanan Dikonfirmasi ✅"
+			body = fmt.Sprintf("Order #%s sedang dipersiapkan", order.OrderNumber)
+		case model.OrderStatusReady:
+			title = "Pesanan Siap! 📦"
+			body = fmt.Sprintf("Order #%s siap, menunggu driver", order.OrderNumber)
+		}
+		if title != "" {
+			service.SendToUser(h.db, *order.CustomerID, title, body,
+				map[string]string{"order_id": order.ID.String(), "type": "order_status"})
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Order marked as %s", to), "status": to})
 }
 
@@ -440,6 +470,8 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/:id/accept", h.AcceptDelivery)
 		orders.POST("/:id/pickup", h.MarkPickedUp)
 		orders.POST("/:id/deliver", h.MarkDelivered)
+		orders.GET("/:id/chat", h.GetChat)
+		orders.POST("/:id/chat", h.SendChat)
 	}
 }
 
@@ -525,6 +557,15 @@ func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 	// Reload with merchant info for the Flutter app
 	h.db.Preload("Merchant").First(&order, "id = ?", order.ID)
 
+	// Notify customer that driver is on the way
+	if order.CustomerID != nil {
+		service.SendToUser(h.db, *order.CustomerID,
+			"Driver Ditemukan! 🏍️",
+			"Driver sedang menuju merchant untuk mengambil pesananmu",
+			map[string]string{"order_id": order.ID.String(), "type": "driver_assigned"},
+		)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Delivery accepted",
 		"order":   order,
@@ -550,6 +591,16 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot mark as picked up"})
 		return
+	}
+
+	// Notify customer that order is on the way
+	var pickedOrder model.Order
+	if h.db.Where("id = ?", orderID).First(&pickedOrder).Error == nil && pickedOrder.CustomerID != nil {
+		service.SendToUser(h.db, *pickedOrder.CustomerID,
+			"Pesanan Sedang Diantar 🛵",
+			"Driver sedang dalam perjalanan menuju lokasimu",
+			map[string]string{"order_id": orderID, "type": "picked_up"},
+		)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order picked up", "status": model.OrderStatusPickedUp})
@@ -638,6 +689,15 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 		return
 	}
 
+	// Notify customer that order has arrived
+	if order.CustomerID != nil {
+		service.SendToUser(h.db, *order.CustomerID,
+			"Pesanan Tiba! 🎉",
+			fmt.Sprintf("Order #%s sudah sampai. Selamat menikmati!", order.OrderNumber),
+			map[string]string{"order_id": order.ID.String(), "type": "delivered"},
+		)
+	}
+
 	resp := gin.H{
 		"message":        "Order delivered!",
 		"driver_earning": order.DriverEarning,
@@ -647,6 +707,76 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 		resp["to_deposit"] = order.Total - order.DriverEarning
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// GetChat returns chat messages for a driver-order.
+func (h *DriverOrderHandler) GetChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	// Verify driver is assigned to this order
+	var order model.Order
+	if err := h.db.Where("id = ? AND driver_id = ?", orderID, driver.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var msgs []model.ChatMessage
+	h.db.Where("order_id = ?", orderID).Order("created_at ASC").Find(&msgs)
+	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// SendChat sends a chat message from driver to customer.
+func (h *DriverOrderHandler) SendChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		Text string `json:"text" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND driver_id = ?", orderID, driver.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	senderUID, _ := uuid.Parse(userID)
+	orderUID, _ := uuid.Parse(orderID)
+	msg := model.ChatMessage{
+		OrderID:    orderUID,
+		SenderID:   senderUID,
+		SenderRole: "driver",
+		Text:       req.Text,
+	}
+	h.db.Create(&msg)
+
+	// Notify customer
+	if order.CustomerID != nil {
+		service.SendToUser(h.db, *order.CustomerID,
+			"Pesan dari Driver 💬",
+			req.Text,
+			map[string]string{"order_id": orderID, "type": "chat"},
+		)
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
 // RequestRefund allows a customer to submit a refund request for a delivered order.
@@ -693,6 +823,67 @@ func (h *Handler) RequestRefund(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"refund": refund, "message": "Refund request submitted. Admin will review within 1-2 business days."})
+}
+
+// GetChat returns chat messages for an order (customer side).
+func (h *Handler) GetChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	// Verify customer owns order
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var msgs []model.ChatMessage
+	h.db.Where("order_id = ?", orderID).Order("created_at ASC").Find(&msgs)
+	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// SendChat sends a chat message from customer to driver.
+func (h *Handler) SendChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		Text string `json:"text" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	senderUID, _ := uuid.Parse(userID)
+	orderUID, _ := uuid.Parse(orderID)
+	msg := model.ChatMessage{
+		OrderID:    orderUID,
+		SenderID:   senderUID,
+		SenderRole: "customer",
+		Text:       req.Text,
+	}
+	h.db.Create(&msg)
+
+	// Notify driver if assigned
+	if order.DriverID != nil {
+		var driver model.Driver
+		if h.db.Where("id = ?", order.DriverID).First(&driver).Error == nil {
+			service.SendToUser(h.db, driver.UserID,
+				"Pesan dari Customer 💬",
+				req.Text,
+				map[string]string{"order_id": orderID, "type": "chat"},
+			)
+		}
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
 // --- Settings Helper ---

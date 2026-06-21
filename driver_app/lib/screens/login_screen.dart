@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../providers/auth_provider.dart';
+import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success && authProvider.user?.role == 'driver') {
+        await NotificationService.uploadToken(ApiClient());
         Navigator.pushReplacementNamed(context, '/job_board');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -46,6 +49,43 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isLoading = true);
+    try {
+      await GoogleSignIn.instance.initialize();
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal mendapatkan token Google')));
+        return;
+      }
+
+      final client = ApiClient();
+      final res = await client.googleLogin(idToken, 'driver');
+      if (!mounted) return;
+      if (res['token'] != null) {
+        final role = res['user']?['role'];
+        if (role != 'driver') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Akun ini bukan akun driver')));
+          return;
+        }
+        await client.saveToken(res['token'], res['refresh_token'] ?? '');
+        await NotificationService.uploadToken(client);
+        Navigator.pushReplacementNamed(context, '/job_board');
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google login gagal: ${e.description}')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Google login gagal: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -129,7 +169,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              const Row(children: [
+                Expanded(child: Divider()),
+                Padding(padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('atau', style: TextStyle(color: Colors.grey))),
+                Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _handleGoogleLogin,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.g_mobiledata, size: 28),
+                label: const Text('Masuk dengan Google'),
+              ),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, '/register'),
                 child: const Text('Belum punya akun? Daftar sebagai Driver'),

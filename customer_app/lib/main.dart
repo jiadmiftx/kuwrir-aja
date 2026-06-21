@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -11,6 +12,7 @@ import 'screens/cart_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/service_home_screen.dart';
+import 'screens/chat_screen.dart';
 import 'cubits/merchant_list_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
 import 'cubits/cart_cubit.dart';
@@ -27,6 +29,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await NotificationService.init();
+  NotificationService.setupForegroundHandler();
   runApp(const KuwrirCustomerApp());
 }
 
@@ -81,6 +85,14 @@ class KuwrirCustomerApp extends StatelessWidget {
                 return MaterialPageRoute(
                   builder: (ctx) => OrderTrackingScreen(
                     orderId: args['order_id'] as String,
+                  ),
+                );
+              case '/chat':
+                final args = settings.arguments as Map<String, dynamic>;
+                return MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                    orderId: args['order_id'] as String,
+                    orderNumber: args['order_number'] as String,
                   ),
                 );
               default:

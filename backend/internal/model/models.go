@@ -78,8 +78,10 @@ type User struct {
 	// No DB-level default: GORM omits zero-value fields with a `default` tag from
 	// INSERT, which would silently force is_active=true even when Register
 	// explicitly sets false for pending driver/merchant accounts.
-	IsActive bool `json:"is_active"`
+	IsActive        bool       `json:"is_active"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
+	FCMToken        string     `gorm:"type:text" json:"-"`
+	GoogleID        string     `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
 
 	// Relations
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
@@ -579,4 +581,14 @@ type WithdrawalRequest struct {
 	ProcessedAt       *time.Time `json:"processed_at,omitempty"`
 
 	Wallet Wallet `gorm:"foreignKey:WalletID" json:"wallet,omitempty"`
+}
+
+
+// ChatMessage stores in-order chat between customer and driver.
+type ChatMessage struct {
+	Base
+	OrderID    uuid.UUID `gorm:"type:uuid;not null;index" json:"order_id"`
+	SenderID   uuid.UUID `gorm:"type:uuid;not null" json:"sender_id"`
+	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | driver
+	Text       string    `gorm:"type:text;not null" json:"text"`
 }
