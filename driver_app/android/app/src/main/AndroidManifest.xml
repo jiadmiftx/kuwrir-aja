@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <application
-        android:label="KUWRIR Driver"
+        android:label="Cocourir Driver"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
