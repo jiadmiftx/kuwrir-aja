@@ -4,7 +4,6 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/job_board_cubit.dart';
 import '../cubits/active_delivery_cubit.dart';
 import 'active_delivery_screen.dart';
-import 'service_jobs_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
   const JobBoardScreen({super.key});
@@ -26,15 +25,9 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
       builder: (context, state) {
         final isOnline = state is JobBoardLoaded && state.isOnline;
 
-        return DefaultTabController(
-          length: 2,
-          child: Scaffold(
+        return Scaffold(
             appBar: AppBar(
               title: const Text('Job Board'),
-              bottom: const TabBar(tabs: [
-                Tab(icon: Icon(Icons.delivery_dining), text: 'Makanan'),
-                Tab(icon: Icon(Icons.handyman), text: 'Jasa'),
-              ]),
               actions: [
                 Row(
                   children: [
@@ -71,12 +64,8 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                 ),
               ],
             ),
-            body: TabBarView(children: [
-              _buildFoodTab(context, state),
-              const ServiceJobsScreen(),
-            ]),
-          ),
-        );
+            body: _buildFoodTab(context, state),
+          );
       },
     );
   }

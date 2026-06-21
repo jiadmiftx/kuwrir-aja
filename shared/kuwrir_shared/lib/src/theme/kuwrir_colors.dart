@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 /// KUWRIR brand colors
 class KuwrirColors {
-  // Primary - warm orange (product/appetite color)
-  static const Color primary = Color(0xFFFF6B35);
-  static const Color primaryLight = Color(0xFFFF8A5C);
-  static const Color primaryDark = Color(0xFFE55A2B);
+  // Primary - cocourir green
+  static const Color primary = Color(0xFF005B31);
+  static const Color primaryLight = Color(0xFF1A7A4A);
+  static const Color primaryDark = Color(0xFF004024);
 
   // Secondary - dark charcoal
   static const Color secondary = Color(0xFF1A1A2E);

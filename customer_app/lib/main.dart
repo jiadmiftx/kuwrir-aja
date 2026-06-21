@@ -11,7 +11,6 @@ import 'screens/merchant_detail_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'screens/search_screen.dart';
-import 'screens/service_home_screen.dart';
 import 'screens/chat_screen.dart';
 import 'cubits/merchant_list_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
@@ -161,7 +160,6 @@ class _CustomerHomeState extends State<CustomerHome> {
         index: _idx,
         children: const [
           HomeScreen(),
-          ServiceHomeScreen(),
           _OrdersScreen(),
           _ProfileScreen(),
         ],
@@ -174,10 +172,6 @@ class _CustomerHomeState extends State<CustomerHome> {
               icon: Icon(Icons.restaurant_menu_outlined),
               selectedIcon: Icon(Icons.restaurant_menu),
               label: 'Makanan'),
-          NavigationDestination(
-              icon: Icon(Icons.handyman_outlined),
-              selectedIcon: Icon(Icons.handyman),
-              label: 'Jasa'),
           NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
               selectedIcon: Icon(Icons.receipt_long),

@@ -8,7 +8,7 @@ class NotificationService {
   static const _channelName = 'KUWRIR Notifications';
 
   static Future<void> init() async {
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const android = AndroidInitializationSettings('@drawable/ic_notification');
     const ios = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -50,6 +50,7 @@ class NotificationService {
             _channelName,
             importance: Importance.high,
             priority: Priority.high,
+            icon: '@drawable/ic_notification',
           ),
           iOS: DarwinNotificationDetails(),
         ),
