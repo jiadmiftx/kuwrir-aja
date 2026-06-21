@@ -592,3 +592,12 @@ type ChatMessage struct {
 	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | driver
 	Text       string    `gorm:"type:text;not null" json:"text"`
 }
+
+// SupportMessage stores customer ↔ admin support chat.
+type SupportMessage struct {
+	Base
+	UserID     uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | admin
+	Text       string    `gorm:"type:text;not null" json:"text"`
+	IsRead     bool      `gorm:"default:false" json:"is_read"`
+}

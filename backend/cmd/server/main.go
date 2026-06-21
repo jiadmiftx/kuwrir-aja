@@ -22,6 +22,7 @@ import (
 	merchantHandler "github.com/kuwrir-platform/backend/internal/handler/merchant"
 	paymentHandler "github.com/kuwrir-platform/backend/internal/handler/payment"
 	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
+	supportHandler "github.com/kuwrir-platform/backend/internal/handler/support"
 	walletHandler "github.com/kuwrir-platform/backend/internal/handler/wallet"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
@@ -83,6 +84,8 @@ func main() {
 		&model.RefundRequest{},
 		// In-order chat messages
 		&model.ChatMessage{},
+		// Customer ↔ Admin support chat
+		&model.SupportMessage{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -128,12 +131,16 @@ func main() {
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 		{
+			// Support chat handler (used in both admin and customer sections)
+			supportH := supportHandler.NewHandler(db)
+
 			// Admin routes
 			adminRoutes := protected.Group("/admin")
 			adminRoutes.Use(middleware.RoleMiddleware("admin"))
 			{
 				adminH := adminHandler.NewHandler(db)
 				adminH.RegisterRoutes(adminRoutes)
+				supportH.RegisterAdminRoutes(adminRoutes)
 			}
 
 			// Merchant owner routes (auth required)
@@ -175,6 +182,7 @@ func main() {
 			custRoutes := protected.Group("")
 			custRoutes.Use(middleware.RoleMiddleware("customer"))
 			custH.RegisterRoutes(custRoutes)
+			supportH.RegisterCustomerRoutes(custRoutes)
 
 			// Driver order routes
 			driverOrderH := customerHandler.NewDriverOrderHandler(db)

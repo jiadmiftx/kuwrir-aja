@@ -11,6 +11,7 @@ import CustomersPage from '@/pages/CustomersPage'
 import PromotionsPage from '@/pages/PromotionsPage'
 import SettlementsPage from '@/pages/SettlementsPage'
 import RevenuePage from '@/pages/RevenuePage'
+import SupportChatsPage from '@/pages/SupportChatsPage'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/promos" element={<PromotionsPage />} />
                 <Route path="/settlements" element={<SettlementsPage />} />
                 <Route path="/revenue" element={<RevenuePage />} />
+                <Route path="/support" element={<SupportChatsPage />} />
               </Routes>
             </AdminLayout>
           }

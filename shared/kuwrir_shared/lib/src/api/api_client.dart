@@ -5,6 +5,7 @@ import 'api_config.dart';
 import '../models/merchant.dart';
 import '../models/product.dart';
 import '../models/order.dart';
+import '../models/support_message.dart';
 
 /// HTTP API client with JWT token management
 class ApiClient {
@@ -315,6 +316,35 @@ class ApiClient {
 
   Future<void> saveDeviceToken(String token) async {
     await put('/auth/device-token', {'token': token});
+  }
+
+  // --- Support Chat ---
+
+  Future<List<SupportMessage>> getSupportMessages() async {
+    final data = await get('/support/messages');
+    final list = data['messages'] as List? ?? [];
+    return list.map((m) => SupportMessage.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> sendSupportMessage(String text) async {
+    await post('/support/messages', {'text': text});
+  }
+
+  // Admin support
+  Future<List<Map<String, dynamic>>> getAdminSupportUsers() async {
+    final data = await get('/admin/support/users');
+    final list = data['users'] as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<SupportMessage>> getAdminUserMessages(String userId) async {
+    final data = await get('/admin/support/users/$userId/messages');
+    final list = data['messages'] as List? ?? [];
+    return list.map((m) => SupportMessage.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> sendAdminReply(String userId, String text) async {
+    await post('/admin/support/users/$userId/messages', {'text': text});
   }
 
   // --- Google Auth ---

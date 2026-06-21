@@ -12,6 +12,7 @@ import {
   Banknote,
   ClipboardList,
   TrendingUp,
+  MessageSquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/promos', icon: Tag, label: 'Promotions' },
   { to: '/settlements', icon: Banknote, label: 'Settlements' },
   { to: '/revenue', icon: TrendingUp, label: 'Revenue' },
+  { to: '/support', icon: MessageSquare, label: 'Support Chat' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

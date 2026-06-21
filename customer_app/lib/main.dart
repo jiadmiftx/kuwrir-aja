@@ -12,6 +12,7 @@ import 'screens/cart_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/support_chat_screen.dart';
 import 'cubits/merchant_list_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
 import 'cubits/cart_cubit.dart';
@@ -328,27 +329,112 @@ class _PromoScreen extends StatelessWidget {
   }
 }
 
-class _ChatListScreen extends StatelessWidget {
+class _ChatListScreen extends StatefulWidget {
   const _ChatListScreen();
 
   @override
+  State<_ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<_ChatListScreen> {
+  List<Order> _activeOrders = [];
+  bool _loading = false;
+  bool _loaded = false;
+
+  static const _chatStatuses = {'confirmed', 'preparing', 'ready', 'picked_up'};
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final api = context.read<ApiClient>();
+      final orders = await api.getMyOrders();
+      _activeOrders = orders.where((o) => _chatStatuses.contains(o.status)).toList();
+      _loaded = true;
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_loaded && !_loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 72, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            const Text('Belum ada chat aktif',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
-            const SizedBox(height: 8),
-            const Text('Chat tersedia saat pesanan sedang diantar',
-                style: TextStyle(color: Colors.grey)),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text('Chat'),
+        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              children: [
+                // Support chat tile
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: KuwrirColors.primary.withValues(alpha: 0.1),
+                    child: const Icon(Icons.support_agent, color: KuwrirColors.primary),
+                  ),
+                  title: const Text('Bantuan & Support',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Chat dengan tim admin KUWRIR'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportChatScreen()),
+                  ),
+                ),
+                const Divider(height: 1),
+                if (_activeOrders.isEmpty) ...[
+                  const SizedBox(height: 48),
+                  Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        const Text('Tidak ada chat pesanan aktif',
+                            style: TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        const Text('Chat muncul saat pesanan sedang diproses',
+                            style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('Pesanan Aktif',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(color: Colors.grey)),
+                  ),
+                  for (final o in _activeOrders)
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.orange.withValues(alpha: 0.12),
+                        child: const Icon(Icons.delivery_dining, color: Colors.orange),
+                      ),
+                      title: Text('#${o.orderNumber}',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(o.merchantName ?? o.senderName ?? '-'),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _StatusBadge(o.status),
+                        ],
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ChatScreen(orderId: o.id, orderNumber: o.orderNumber),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
     );
   }
 }
