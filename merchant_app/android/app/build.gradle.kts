@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.kuwrir.merchant"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -91,6 +93,7 @@ func main() {
 	// Seed default system settings and delivery zones
 	seedSettings(db)
 	seedDeliveryZones(db)
+	seedAdminUser(db)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -226,6 +229,41 @@ func seedSettings(db *gorm.DB) {
 
 // seedDeliveryZones creates the default delivery zone if none exist.
 // Admin can update zone details via the admin panel.
+// seedAdminUser creates the default admin account if none exists.
+// Credentials from ADMIN_PHONE / ADMIN_PASSWORD env vars (defaults: 08000000000 / admin123).
+func seedAdminUser(db *gorm.DB) {
+	var count int64
+	db.Model(&model.User{}).Where("role = ?", model.RoleAdmin).Count(&count)
+	if count > 0 {
+		return
+	}
+	phone := os.Getenv("ADMIN_PHONE")
+	if phone == "" {
+		phone = "08000000000"
+	}
+	password := os.Getenv("ADMIN_PASSWORD")
+	if password == "" {
+		password = "admin123"
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("seedAdminUser: failed to hash password: %v", err)
+		return
+	}
+	admin := model.User{
+		Name:     "Admin",
+		Phone:    phone,
+		Password: string(hashed),
+		Role:     model.RoleAdmin,
+		IsActive: true,
+	}
+	if err := db.Create(&admin).Error; err != nil {
+		log.Printf("seedAdminUser: failed to create admin: %v", err)
+		return
+	}
+	log.Printf("Admin user created — phone: %s", phone)
+}
+
 func seedDeliveryZones(db *gorm.DB) {
 	var count int64
 	db.Model(&model.DeliveryZone{}).Count(&count)
