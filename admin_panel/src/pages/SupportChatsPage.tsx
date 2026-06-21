@@ -45,7 +45,9 @@ export default function SupportChatsPage() {
       const res = await fetch('/api/v1/admin/support/users', { headers: authHeaders() })
       const data = await res.json()
       setUsers(data.users ?? [])
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
     setLoadingUsers(false)
   }
 
@@ -56,11 +58,12 @@ export default function SupportChatsPage() {
       })
       const data = await res.json()
       setMessages(data.messages ?? [])
-      // Refresh unread counts in user list
       setUsers((prev) =>
         prev.map((u) => (u.user_id === userId ? { ...u, unread_count: 0 } : u))
       )
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
   }
 
   const handleSelectUser = (user: SupportUser) => {
@@ -80,14 +83,16 @@ export default function SupportChatsPage() {
       })
       setReplyText('')
       await fetchMessages(selectedUser.user_id)
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
     setSending(false)
   }
 
   // Initial load + poll users every 5s
   useEffect(() => {
-    fetchUsers()
-    const interval = setInterval(fetchUsers, 5000)
+    void fetchUsers()
+    const interval = setInterval(() => { void fetchUsers() }, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -95,11 +100,12 @@ export default function SupportChatsPage() {
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current)
     if (!selectedUser) return
-    pollRef.current = setInterval(() => fetchMessages(selectedUser.user_id), 3000)
+    const userId = selectedUser.user_id
+    pollRef.current = setInterval(() => { void fetchMessages(userId) }, 3000)
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [selectedUser?.user_id])
+  }, [selectedUser])
 
   // Scroll to bottom on new messages
   useEffect(() => {
