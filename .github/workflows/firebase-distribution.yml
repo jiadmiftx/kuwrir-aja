@@ -52,7 +52,7 @@ jobs:
           channel: stable
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > customer_app/android/app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '%\n ' | base64 -d > customer_app/android/app/keystore.jks
       - run: flutter pub get
         working-directory: customer_app
       - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
@@ -84,7 +84,7 @@ jobs:
           channel: stable
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > driver_app/android/app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '%\n ' | base64 -d > driver_app/android/app/keystore.jks
       - run: flutter pub get
         working-directory: driver_app
       - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
@@ -116,7 +116,7 @@ jobs:
           channel: stable
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > merchant_app/android/app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '%\n ' | base64 -d > merchant_app/android/app/keystore.jks
       - run: flutter pub get
         working-directory: merchant_app
       - run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
