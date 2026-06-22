@@ -27,9 +27,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  runApp(const KuwrirMerchantApp());
   await NotificationService.init();
   NotificationService.setupForegroundHandler();
-  runApp(const KuwrirMerchantApp());
 }
 
 class KuwrirMerchantApp extends StatelessWidget {

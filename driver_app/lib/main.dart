@@ -25,8 +25,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await NotificationService.init();
-  NotificationService.setupForegroundHandler();
 
   final apiClient = ApiClient();
   runApp(
@@ -46,6 +44,8 @@ void main() async {
       ),
     ),
   );
+  await NotificationService.init();
+  NotificationService.setupForegroundHandler();
 }
 
 class KuwrirDriverApp extends StatelessWidget {

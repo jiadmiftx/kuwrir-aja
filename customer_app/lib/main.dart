@@ -29,9 +29,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  runApp(const KuwrirCustomerApp());
+  // Init notifications after runApp so Flutter renders first frame before
+  // requesting Android 13+ POST_NOTIFICATIONS permission
   await NotificationService.init();
   NotificationService.setupForegroundHandler();
-  runApp(const KuwrirCustomerApp());
 }
 
 class KuwrirCustomerApp extends StatelessWidget {
