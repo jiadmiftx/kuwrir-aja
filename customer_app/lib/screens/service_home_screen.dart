@@ -32,8 +32,8 @@ class _ServiceItem {
 final _mockMerchants = [
   _ServiceMerchant(
     id: 'laundry-1', name: 'Laundry Bersih Kilat', category: 'laundry',
-    address: 'Jl. Kuta No. 12, Lombok', description: 'Laundry kilat 1 hari, antar jemput gratis',
-    rating: 4.8, totalReviews: 124, lat: -8.8953, lng: 116.2833,
+    address: 'Jl. Pejanggik No. 12, Mataram', description: 'Laundry kilat 1 hari, antar jemput gratis',
+    rating: 4.8, totalReviews: 124, lat: -8.5833, lng: 116.1167,
     services: [
       _ServiceItem(id: 's1', name: 'Cuci + Setrika', description: 'Cuci bersih + disetrika rapi', price: 8000, priceUnit: 'per_kg', durationEstimate: '1 hari'),
       _ServiceItem(id: 's2', name: 'Cuci Kering', description: 'Cuci tanpa setrika', price: 5000, priceUnit: 'per_kg', durationEstimate: '1 hari'),
@@ -43,8 +43,8 @@ final _mockMerchants = [
   ),
   _ServiceMerchant(
     id: 'bengkel-1', name: 'Bengkel Motor Pak Dedi', category: 'bengkel',
-    address: 'Jl. Raya Kuta No. 45, Lombok', description: 'Servis motor panggilan, teknisi berpengalaman',
-    rating: 4.6, totalReviews: 87, lat: -8.8970, lng: 116.2850,
+    address: 'Jl. Sandubaya No. 45, Mataram', description: 'Servis motor panggilan, teknisi berpengalaman',
+    rating: 4.6, totalReviews: 87, lat: -8.5910, lng: 116.1240,
     services: [
       _ServiceItem(id: 's5', name: 'Servis Ringan', description: 'Ganti oli + filter + cek rem', price: 85000, priceUnit: 'per_service', durationEstimate: '1-2 jam'),
       _ServiceItem(id: 's6', name: 'Ganti Oli', description: 'Ganti oli mesin + filter oli', price: 45000, priceUnit: 'per_service', durationEstimate: '30 menit'),
@@ -54,8 +54,8 @@ final _mockMerchants = [
   ),
   _ServiceMerchant(
     id: 'cleaning-1', name: 'Clean Pro Lombok', category: 'cleaning',
-    address: 'Jl. Pariwisata No. 8, Lombok', description: 'Jasa cuci AC, kamar mandi, rumah',
-    rating: 4.7, totalReviews: 56, lat: -8.8940, lng: 116.2820,
+    address: 'Jl. Catur Warga No. 8, Mataram', description: 'Jasa cuci AC, kamar mandi, rumah',
+    rating: 4.7, totalReviews: 56, lat: -8.5800, lng: 116.1100,
     services: [
       _ServiceItem(id: 's9', name: 'Cuci AC (1 unit)', description: 'Cuci filter + coil AC split', price: 120000, priceUnit: 'per_service', durationEstimate: '1 jam'),
       _ServiceItem(id: 's10', name: 'Bersih Kamar Mandi', description: 'Deep cleaning kamar mandi', price: 100000, priceUnit: 'per_service', durationEstimate: '2 jam'),
@@ -63,8 +63,8 @@ final _mockMerchants = [
   ),
   _ServiceMerchant(
     id: 'salon-1', name: 'Salon Kecantikan Dewi', category: 'salon',
-    address: 'Jl. Pantai Kuta No. 3, Lombok', description: 'Salon panggilan ke rumah',
-    rating: 4.9, totalReviews: 203, lat: -8.8960, lng: 116.2840,
+    address: 'Jl. Panca Usaha No. 3, Mataram', description: 'Salon panggilan ke rumah',
+    rating: 4.9, totalReviews: 203, lat: -8.5860, lng: 116.1190,
     services: [
       _ServiceItem(id: 's11', name: 'Creambath + Blow', description: 'Perawatan rambut lengkap', price: 150000, priceUnit: 'per_service', durationEstimate: '1.5 jam'),
       _ServiceItem(id: 's12', name: 'Manicure + Pedicure', description: 'Perawatan kuku tangan & kaki', price: 120000, priceUnit: 'per_service', durationEstimate: '1 jam'),

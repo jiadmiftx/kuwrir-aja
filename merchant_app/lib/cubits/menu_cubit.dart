@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
@@ -44,13 +45,19 @@ class MenuCubit extends Cubit<MenuState> {
     await load();
   }
 
-  Future<void> createProduct(String catId, Map<String, dynamic> data) async {
-    await _api.createProduct(catId, data);
+  Future<void> createProduct(String catId, Map<String, dynamic> data, {File? image}) async {
+    final product = await _api.createProduct(catId, data);
+    if (image != null) {
+      await _api.uploadProductImage(product.id, image);
+    }
     await load();
   }
 
-  Future<void> updateProduct(String productId, Map<String, dynamic> data) async {
+  Future<void> updateProduct(String productId, Map<String, dynamic> data, {File? image}) async {
     await _api.updateProduct(productId, data);
+    if (image != null) {
+      await _api.uploadProductImage(productId, image);
+    }
     await load();
   }
 

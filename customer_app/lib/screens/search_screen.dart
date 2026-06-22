@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../cubits/location_cubit.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -10,16 +13,13 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
+  static const _kRecentSearchesKey = 'recent_searches';
+
   final _controller = TextEditingController();
   bool _hasQuery = false;
   late final TabController _tabController;
 
-  final List<String> _recentSearches = [
-    'Ayam Taliwang',
-    'Nasi Campur',
-    'Sate Rembiga',
-    'Es Kelapa',
-  ];
+  List<String> _recentSearches = [];
 
   @override
   void initState() {
@@ -29,6 +29,30 @@ class _SearchScreenState extends State<SearchScreen>
       final hasQuery = _controller.text.trim().isNotEmpty;
       if (hasQuery != _hasQuery) setState(() => _hasQuery = hasQuery);
     });
+    _loadRecentSearches();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_kRecentSearchesKey) ?? [];
+    if (mounted) setState(() => _recentSearches = saved);
+  }
+
+  Future<void> _saveSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final updated = [trimmed, ..._recentSearches.where((s) => s != trimmed)]
+        .take(8)
+        .toList();
+    await prefs.setStringList(_kRecentSearchesKey, updated);
+    if (mounted) setState(() => _recentSearches = updated);
+  }
+
+  Future<void> _clearRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kRecentSearchesKey);
+    if (mounted) setState(() => _recentSearches = []);
   }
 
   @override
@@ -75,7 +99,7 @@ class _SearchScreenState extends State<SearchScreen>
                   : null,
             ),
             style: const TextStyle(fontSize: 14),
-            onSubmitted: (_) {},
+            onSubmitted: _saveSearch,
           ),
         ),
         bottom: PreferredSize(
@@ -97,7 +121,9 @@ class _SearchScreenState extends State<SearchScreen>
                 _controller.selection = TextSelection.fromPosition(
                   TextPosition(offset: s.length),
                 );
+                _saveSearch(s);
               },
+              onClearRecent: _clearRecentSearches,
             ),
           ),
         ],
@@ -111,12 +137,11 @@ class _SearchScreenState extends State<SearchScreen>
 class _DeliveryAddressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final address = context.select((LocationCubit c) => c.state.address);
     return Material(
       color: KuwrirColors.surface,
       child: InkWell(
-        onTap: () {
-          // TODO: open address picker
-        },
+        onTap: () => context.read<LocationCubit>().detectGps(),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
@@ -149,7 +174,7 @@ class _DeliveryAddressBar extends StatelessWidget {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      'Jl. Pantai Kuta No. 12, Kuta, Lombok Tengah',
+                      address,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -188,11 +213,38 @@ class _DeliveryAddressBar extends StatelessWidget {
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends StatefulWidget {
   final List<String> recentSearches;
   final ValueChanged<String> onTap;
+  final VoidCallback onClearRecent;
 
-  const _EmptyState({required this.recentSearches, required this.onTap});
+  const _EmptyState({
+    required this.recentSearches,
+    required this.onTap,
+    required this.onClearRecent,
+  });
+
+  @override
+  State<_EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends State<_EmptyState> {
+  List<Merchant> _popular = [];
+  bool _loadingPopular = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPopular();
+  }
+
+  Future<void> _loadPopular() async {
+    try {
+      final api = context.read<ApiClient>();
+      _popular = await api.getPopularMerchants();
+    } catch (_) {}
+    if (mounted) setState(() => _loadingPopular = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,128 +254,146 @@ class _EmptyState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Pencarian Terakhir',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: KuwrirColors.textPrimary,
+          if (widget.recentSearches.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Pencarian Terakhir',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.textPrimary,
+                      ),
+                ),
+                TextButton(
+                  onPressed: widget.onClearRecent,
+                  style: TextButton.styleFrom(
+                    foregroundColor: KuwrirColors.primary,
+                    minimumSize: Size.zero,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Hapus semua', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.recentSearches.map((search) {
+                return InkWell(
+                  onTap: () => widget.onTap(search),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: KuwrirColors.border),
                     ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  foregroundColor: KuwrirColors.primary,
-                  minimumSize: Size.zero,
-                  padding: EdgeInsets.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Hapus semua', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: recentSearches.map((search) {
-              return InkWell(
-                onTap: () => onTap(search),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: KuwrirColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: KuwrirColors.border),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.history,
+                            size: 14, color: KuwrirColors.textSecondary),
+                        const SizedBox(width: 5),
+                        Text(search,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: KuwrirColors.textPrimary)),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.history,
-                          size: 14, color: KuwrirColors.textSecondary),
-                      const SizedBox(width: 5),
-                      Text(search,
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: KuwrirColors.textPrimary)),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 28),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 28),
+          ],
           Text(
-            'Populer di Kuta',
+            'Populer di Mataram',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: KuwrirColors.textPrimary,
                 ),
           ),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.9,
-            children: const [
-              _CategoryCard(emoji: '🍗', label: 'Ayam\nTaliwang', color: Color(0xFFFF6B35)),
-              _CategoryCard(emoji: '🍚', label: 'Nasi\nCampur', color: Color(0xFF22C55E)),
-              _CategoryCard(emoji: '🥘', label: 'Sate\nRembiga', color: Color(0xFFF59E0B)),
-              _CategoryCard(emoji: '🥤', label: 'Es &\nMinuman', color: Color(0xFF3B82F6)),
-              _CategoryCard(emoji: '🍰', label: 'Kue &\nDessert', color: Color(0xFFEC4899)),
-              _CategoryCard(emoji: '🌶️', label: 'Makanan\nPedas', color: Color(0xFFEF4444)),
-            ],
-          ),
+          if (_loadingPopular)
+            const Center(
+                child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            ))
+          else if (_popular.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text('Belum ada merchant populer',
+                  style: TextStyle(color: KuwrirColors.textSecondary)),
+            )
+          else
+            ..._popular.map((m) => _PopularMerchantTile(merchant: m)),
         ],
       ),
     );
   }
 }
 
-class _CategoryCard extends StatelessWidget {
-  final String emoji;
-  final String label;
-  final Color color;
-
-  const _CategoryCard({
-    required this.emoji,
-    required this.label,
-    required this.color,
-  });
+class _PopularMerchantTile extends StatelessWidget {
+  final Merchant merchant;
+  const _PopularMerchantTile({required this.merchant});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {},
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: KuwrirColors.surface,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color.withValues(alpha: 0.85),
-                  height: 1.3,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => Navigator.pushNamed(context, '/merchant',
+              arguments: {'id': merchant.id, 'name': merchant.name}),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.storefront, color: KuwrirColors.primary),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(merchant.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(merchant.address,
+                          style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 2),
+                    Text(merchant.rating.toStringAsFixed(1),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -5,10 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TrendingUp, ShoppingBag, Truck, Smartphone, RefreshCw } from 'lucide-react'
-
-const token = () => localStorage.getItem('token')
-const apiFetch = (path: string) =>
-  fetch(path, { headers: { Authorization: `Bearer ${token()}` } })
+import { apiFetch } from '@/lib/api'
 
 const fmt = (n: number) => 'IDR ' + Math.round(n).toLocaleString('id-ID')
 
@@ -80,9 +77,8 @@ export default function RevenuePage() {
   const processRefund = async (id: string, approve: boolean) => {
     setProcessingRefund(id)
     try {
-      const res = await fetch(`/api/v1/admin/refunds/${id}/process`, {
+      const res = await apiFetch(`/api/v1/admin/refunds/${id}/process`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ approve, admin_note: approve ? 'Approved by admin' : 'Rejected by admin' }),
       })
       const data = await res.json()

@@ -14,6 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Tag, Plus, Pencil, Trash2, Power, Loader2 } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Promo {
   id: string
@@ -29,12 +30,6 @@ interface Promo {
   starts_at: string
   expires_at: string
 }
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
-    ...opts,
-  })
 
 const fmt = (v: number) => 'Rp ' + v.toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })

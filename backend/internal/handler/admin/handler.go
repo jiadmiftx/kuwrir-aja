@@ -352,10 +352,18 @@ func (h *Handler) CreateDriverDeposit(c *gin.Context) {
 
 func (h *Handler) GetOrders(c *gin.Context) {
 	status := c.DefaultQuery("status", "")
+	fromDate := c.DefaultQuery("from_date", "")
+	toDate := c.DefaultQuery("to_date", "")
 	var orders []model.Order
-	q := h.db.Preload("Merchant").Preload("Customer").Preload("Driver").Preload("Items")
+	q := h.db.Preload("Merchant").Preload("Customer").Preload("Driver.User").Preload("Items")
 	if status != "" {
 		q = q.Where("status = ?", status)
+	}
+	if fromDate != "" {
+		q = q.Where("created_at >= ?", fromDate)
+	}
+	if toDate != "" {
+		q = q.Where("created_at <= ?", toDate)
 	}
 	q.Order("created_at DESC").Find(&orders)
 	c.JSON(http.StatusOK, gin.H{"orders": orders})

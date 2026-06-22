@@ -153,32 +153,47 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location row
-          BlocBuilder<LocationCubit, LocationState>(
-            builder: (context, loc) {
-              return GestureDetector(
-                onTap: () => _openLocationPicker(loc),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Colors.white70, size: 16),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: loc.detecting
-                          ? const Text('Mendeteksi lokasi...',
-                              style: TextStyle(color: Colors.white70, fontSize: 13))
-                          : Text(
-                              loc.address,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                    ),
-                    const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
-                  ],
+          // Location row + profile icon
+          Row(
+            children: [
+              Expanded(
+                child: BlocBuilder<LocationCubit, LocationState>(
+                  builder: (context, loc) {
+                    return GestureDetector(
+                      onTap: () => _openLocationPicker(loc),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: loc.detecting
+                                ? const Text('Mendeteksi lokasi...',
+                                    style: TextStyle(color: Colors.white70, fontSize: 13))
+                                : Text(
+                                    loc.address,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                          ),
+                          const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/profile'),
+                child: const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.white24,
+                  child: Icon(Icons.person, color: Colors.white, size: 18),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text('Mau pesan apa hari ini?',

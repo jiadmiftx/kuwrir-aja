@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   CheckCircle, XCircle, Eye, Loader2, Bike, FileText, RefreshCw, Clock,
 } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Application {
   id: string
@@ -40,12 +41,6 @@ interface Application {
 }
 
 type DocKey = 'ktp_url' | 'sim_url' | 'stnk_url' | 'selfie_url' | 'vehicle_photo_url'
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
-    ...opts,
-  })
 
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })

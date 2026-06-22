@@ -84,14 +84,18 @@ class LocationCubit extends Cubit<LocationState> {
       final placemarks = await placemarkFromCoordinates(lat, lng);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        final parts = [p.subLocality, p.locality, p.subAdministrativeArea]
-            .where((s) => s != null && s.isNotEmpty)
-            .take(2)
-            .toList();
+        final parts = [
+          p.street,
+          p.thoroughfare,
+          p.subLocality,
+          p.locality,
+          p.subAdministrativeArea,
+          p.administrativeArea,
+        ].where((s) => s != null && s.trim().isNotEmpty).cast<String>().toSet().take(2).toList();
         if (parts.isNotEmpty) return parts.join(', ');
       }
     } catch (_) {}
-    return '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+    return 'Lokasi saat ini';
   }
 
   Future<void> _save(double lat, double lng, String address) async {

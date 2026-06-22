@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
+import 'register_screen.dart';
 
 class MerchantLoginScreen extends StatefulWidget {
   const MerchantLoginScreen({super.key});
@@ -46,7 +47,7 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
         _showError(res['error'] ?? 'Login gagal');
       }
     } catch (e) {
-      _showError('Koneksi gagal: $e');
+      _showError(_friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -71,6 +72,14 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
         }
         await client.saveToken(res['token'], res['refresh_token'] ?? '');
         await NotificationService.uploadToken(client);
+        final hasMerchantProfile = res['has_merchant_profile'] ?? false;
+        if (!hasMerchantProfile) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MerchantRegisterScreen(startAtStep: 1)),
+          );
+          return;
+        }
         final isActive = res['user']?['is_active'] ?? false;
         Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
       } else {
@@ -79,10 +88,18 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
     } on GoogleSignInException catch (e) {
       if (e.code != GoogleSignInExceptionCode.canceled) _showError('Google login gagal: ${e.description}');
     } catch (e) {
-      _showError('Google login gagal: $e');
+      _showError(_friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _friendlyError(Object e) {
+    if (e is ApiException) return e.message;
+    if (e.toString().contains('TimeoutException')) {
+      return 'Koneksi lambat, coba lagi.';
+    }
+    return 'Terjadi kesalahan, periksa koneksi internet Anda.';
   }
 
   void _showError(String msg) =>

@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2 } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Merchant {
   id: string
@@ -23,9 +24,6 @@ interface Merchant {
   is_open: boolean
   created_at: string
 }
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }, ...opts })
 
 export default function MerchantsPage() {
   const [search, setSearch] = useState('')

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/menu_cubit.dart';
 
@@ -185,57 +187,170 @@ class _CategorySection extends StatelessWidget {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     final descCtrl = TextEditingController();
+    final skuCtrl = TextEditingController();
+    final stockCtrl = TextEditingController();
+    File? imageFile;
+    bool trackStock = false;
+    final cubit = context.read<MenuCubit>();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Tambah ke $catName'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nama Produk'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Harga Dasar (IDR)',
-                  hintText: '50000',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Tambah ke $catName'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProductImagePicker(
+                  imageFile: imageFile,
+                  onPick: (file) => setState(() => imageFile = file),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Deskripsi (opsional)',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Nama Produk'),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Harga Dasar (IDR)',
+                    hintText: '50000',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Deskripsi (opsional)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: skuCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'SKU (opsional)',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Lacak Stok', style: TextStyle(fontSize: 14)),
+                  value: trackStock,
+                  onChanged: (v) => setState(() => trackStock = v),
+                ),
+                if (trackStock)
+                  TextField(
+                    controller: stockCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Jumlah Stok'),
+                  ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final price = double.tryParse(priceCtrl.text) ?? 0;
+                if (name.isNotEmpty && price > 0) {
+                  cubit.createProduct(catId, {
+                    'name': name,
+                    'price': price,
+                    'description': descCtrl.text.trim(),
+                    'is_available': true,
+                    'sku': skuCtrl.text.trim(),
+                    'track_stock': trackStock,
+                    'stock_quantity': int.tryParse(stockCtrl.text) ?? 0,
+                  }, image: imageFile);
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Tambah'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              final price = double.tryParse(priceCtrl.text) ?? 0;
-              if (name.isNotEmpty && price > 0) {
-                context.read<MenuCubit>().createProduct(catId, {
-                  'name': name,
-                  'price': price,
-                  'description': descCtrl.text.trim(),
-                  'is_available': true,
-                });
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Tambah'),
-          ),
+      ),
+    );
+  }
+}
+
+/// Tap-to-pick product photo, shared by add/edit product dialogs.
+class _ProductImagePicker extends StatelessWidget {
+  final File? imageFile;
+  final String? existingUrl;
+  final ValueChanged<File> onPick;
+
+  const _ProductImagePicker({
+    required this.imageFile,
+    required this.onPick,
+    this.existingUrl,
+  });
+
+  Future<void> _pick(BuildContext context) async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Foto'),
+              onTap: () => Navigator.pop(context, ImageSource.camera)),
+          ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galeri'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery)),
+        ]),
+      ),
+    );
+    if (src == null) return;
+    final xfile = await ImagePicker().pickImage(source: src, imageQuality: 80, maxWidth: 1200);
+    if (xfile == null) return;
+    onPick(File(xfile.path));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _pick(context),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: double.infinity,
+        height: 120,
+        decoration: BoxDecoration(
+          color: KuwrirColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: KuwrirColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: imageFile != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(imageFile!, fit: BoxFit.cover, width: double.infinity),
+              )
+            : (existingUrl != null && existingUrl!.isNotEmpty)
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(existingUrl!, fit: BoxFit.cover, width: double.infinity,
+                        errorBuilder: (_, __, ___) => _placeholder()),
+                  )
+                : _placeholder(),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add_a_photo_outlined, color: KuwrirColors.primary),
+          const SizedBox(height: 4),
+          Text('Upload Foto Produk',
+              style: TextStyle(fontSize: 12, color: KuwrirColors.primary)),
         ],
       ),
     );
@@ -318,41 +433,72 @@ class _ProductTile extends StatelessWidget {
     final nameCtrl = TextEditingController(text: product.name);
     final priceCtrl = TextEditingController(text: product.price.toStringAsFixed(0));
     final descCtrl = TextEditingController(text: product.description ?? '');
+    final skuCtrl = TextEditingController(text: product.sku ?? '');
+    final stockCtrl = TextEditingController(text: product.stockQuantity.toString());
+    File? imageFile;
+    bool trackStock = product.trackStock;
+    final cubit = context.read<MenuCubit>();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Produk'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nama')),
-              const SizedBox(height: 8),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Harga (IDR)'),
-              ),
-              const SizedBox(height: 8),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Deskripsi')),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Edit Produk'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProductImagePicker(
+                  imageFile: imageFile,
+                  existingUrl: product.imageUrl,
+                  onPick: (file) => setState(() => imageFile = file),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nama')),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Harga (IDR)'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Deskripsi')),
+                const SizedBox(height: 8),
+                TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU (opsional)')),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Lacak Stok', style: TextStyle(fontSize: 14)),
+                  value: trackStock,
+                  onChanged: (v) => setState(() => trackStock = v),
+                ),
+                if (trackStock)
+                  TextField(
+                    controller: stockCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Jumlah Stok'),
+                  ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            ElevatedButton(
+              onPressed: () {
+                cubit.updateProduct(product.id, {
+                  'name': nameCtrl.text.trim(),
+                  'price': double.tryParse(priceCtrl.text) ?? product.price,
+                  'description': descCtrl.text.trim(),
+                  'sku': skuCtrl.text.trim(),
+                  'track_stock': trackStock,
+                  'stock_quantity': int.tryParse(stockCtrl.text) ?? 0,
+                }, image: imageFile);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          ElevatedButton(
-            onPressed: () {
-              context.read<MenuCubit>().updateProduct(product.id, {
-                'name': nameCtrl.text.trim(),
-                'price': double.tryParse(priceCtrl.text) ?? product.price,
-                'description': descCtrl.text.trim(),
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
       ),
     );
   }

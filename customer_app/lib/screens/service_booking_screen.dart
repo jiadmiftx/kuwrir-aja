@@ -18,7 +18,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
   final Map<String, double> _customWeight = {}; // for per_kg services
 
   double _weightKg = 3.0;
-  final _addressCtrl = TextEditingController(text: 'Jl. Pantai Kuta No. 5, Lombok');
+  final _addressCtrl = TextEditingController(text: 'Jl. Majapahit No. 5, Mataram');
   final _notesCtrl = TextEditingController();
   DateTime? _scheduledAt;
   bool _loading = false;

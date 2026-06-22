@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Search, Bike, HandCoins, History, Loader2, Ban, CheckCircle } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Driver {
   id: string
@@ -32,9 +33,6 @@ interface Deposit {
   notes: string
   verified_at: string
 }
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }, ...opts })
 
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 

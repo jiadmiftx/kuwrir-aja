@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { MessageSquare, Send, Loader2 } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
 
 interface SupportUser {
   user_id: string
@@ -22,11 +23,6 @@ interface SupportMessage {
   created_at: string
 }
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem('token')}`,
-  'Content-Type': 'application/json',
-})
-
 const fmt = (d: string) =>
   new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 
@@ -42,7 +38,7 @@ export default function SupportChatsPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/v1/admin/support/users', { headers: authHeaders() })
+      const res = await apiFetch('/api/v1/admin/support/users')
       const data = await res.json()
       setUsers(data.users ?? [])
     } catch {
@@ -53,9 +49,7 @@ export default function SupportChatsPage() {
 
   const fetchMessages = async (userId: string) => {
     try {
-      const res = await fetch(`/api/v1/admin/support/users/${userId}/messages`, {
-        headers: authHeaders(),
-      })
+      const res = await apiFetch(`/api/v1/admin/support/users/${userId}/messages`)
       const data = await res.json()
       setMessages(data.messages ?? [])
       setUsers((prev) =>
@@ -76,9 +70,8 @@ export default function SupportChatsPage() {
     if (!replyText.trim() || !selectedUser || sending) return
     setSending(true)
     try {
-      await fetch(`/api/v1/admin/support/users/${selectedUser.user_id}/messages`, {
+      await apiFetch(`/api/v1/admin/support/users/${selectedUser.user_id}/messages`, {
         method: 'POST',
-        headers: authHeaders(),
         body: JSON.stringify({ text: replyText.trim() }),
       })
       setReplyText('')

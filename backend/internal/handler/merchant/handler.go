@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		merchants.GET("", h.ListMerchants)
 		merchants.GET("/nearby", h.NearbyMerchants)
 		merchants.GET("/search", h.SearchMerchants)
+		merchants.GET("/popular", h.PopularMerchants)
 		merchants.GET("/:id", h.GetMerchant)
 		merchants.GET("/:id/products", h.GetProducts)
 	}
@@ -62,6 +63,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		owner.PUT("/products/:productId", h.UpdateProduct)
 		owner.DELETE("/products/:productId", h.DeleteProduct)
 		owner.PUT("/products/:productId/toggle", h.ToggleProductAvailability)
+		owner.POST("/products/:productId/image", h.UploadProductImage)
 
 		// Product Variant management
 		owner.POST("/products/:productId/variants", h.CreateVariant)
@@ -167,6 +169,16 @@ func (h *Handler) SearchMerchants(c *gin.Context) {
 		true, true, searchTerm, searchTerm).
 		Find(&merchants)
 
+	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
+}
+
+// PopularMerchants returns top-rated open merchants for the "Popular" home/search section
+func (h *Handler) PopularMerchants(c *gin.Context) {
+	var merchants []model.Merchant
+	h.db.Where("is_active = ? AND is_verified = ?", true, true).
+		Order("rating DESC, total_reviews DESC").
+		Limit(6).
+		Find(&merchants)
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
 }
 
@@ -533,6 +545,42 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 
 	h.db.Model(&model.Product{}).Where("id = ?", productID).Updates(updates)
 	c.JSON(http.StatusOK, gin.H{"message": "Product updated"})
+}
+
+// UploadProductImage uploads a photo for a product owned by the calling merchant.
+func (h *Handler) UploadProductImage(c *gin.Context) {
+	productID := c.Param("productId")
+	userID := c.GetString("user_id")
+
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var product model.Product
+	if err := h.db.
+		Joins("JOIN product_categories ON product_categories.id = products.category_id").
+		Where("products.id = ? AND product_categories.merchant_id = ?", productID, merchant.ID).
+		First(&product).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "products")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(&product).Update("image_url", url)
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
 func (h *Handler) DeleteProduct(c *gin.Context) {

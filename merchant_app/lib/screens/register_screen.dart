@@ -10,7 +10,11 @@ import 'pending_screen.dart';
 /// Merchant registration: data diri + data toko + upload 3 dokumen
 /// Single-step form (semua sekaligus)
 class MerchantRegisterScreen extends StatefulWidget {
-  const MerchantRegisterScreen({super.key});
+  /// Step to start at. Use 1 to skip account creation (e.g. after Google
+  /// sign-in already created the user account) and go straight to store info.
+  final int startAtStep;
+
+  const MerchantRegisterScreen({super.key, this.startAtStep = 0});
 
   @override
   State<MerchantRegisterScreen> createState() => _MerchantRegisterScreenState();
@@ -18,7 +22,13 @@ class MerchantRegisterScreen extends StatefulWidget {
 
 class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  int _step = 0; // 0: akun, 1: toko, 2: dokumen
+  late int _step; // 0: akun, 1: toko, 2: dokumen
+
+  @override
+  void initState() {
+    super.initState();
+    _step = widget.startAtStep;
+  }
 
   // Akun
   final _nameCtrl = TextEditingController();
@@ -276,7 +286,12 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
           child: const Text('Lanjut →'),
         )),
         const SizedBox(height: 12),
-        OutlinedButton(onPressed: () => setState(() => _step = 0), child: const Text('← Kembali')),
+        OutlinedButton(
+          onPressed: () => widget.startAtStep > 0
+              ? Navigator.pop(context)
+              : setState(() => _step = 0),
+          child: const Text('← Kembali'),
+        ),
       ],
     );
   }

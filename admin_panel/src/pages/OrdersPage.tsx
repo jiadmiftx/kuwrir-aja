@@ -8,12 +8,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card'
 import { Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
-
-const token = () => localStorage.getItem('token')
-const apiFetch = (path: string, opts?: RequestInit) =>
-  fetch(path, { headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, ...opts })
+import { apiFetch } from '@/lib/api'
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -36,19 +35,59 @@ interface Order {
   app_service_fee?: number
   created_at: string
   driver_id?: string | null
-  Customer?: { name: string }
-  Merchant?: { name: string }
-  Driver?: { User?: { name: string } }
+  customer?: { name: string }
+  merchant?: {
+    name: string
+    phone: string
+    address: string
+    rating: number
+    total_reviews: number
+  }
+  driver?: {
+    user?: { name: string; phone: string }
+    vehicle_type: string
+    vehicle_plate: string
+    rating: number
+    total_delivered: number
+    is_online: boolean
+  }
 }
 
 interface NearbyDriver {
   id: string
   distance_km: number
-  User?: { name: string; phone: string }
+  user?: { name: string; phone: string }
   vehicle_type: string
   vehicle_plate: string
   rating: number
   total_delivered: number
+}
+
+type DatePeriod = 'all' | 'today' | 'week' | 'month' | 'year' | 'custom'
+
+function getDateRange(period: DatePeriod, customFrom: string, customTo: string): { from?: string; to?: string } {
+  const now = new Date()
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  switch (period) {
+    case 'today':
+      return { from: startOfDay(now).toISOString() }
+    case 'week': {
+      const start = startOfDay(now)
+      start.setDate(start.getDate() - start.getDay())
+      return { from: start.toISOString() }
+    }
+    case 'month':
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString() }
+    case 'year':
+      return { from: new Date(now.getFullYear(), 0, 1).toISOString() }
+    case 'custom':
+      return {
+        from: customFrom ? new Date(customFrom).toISOString() : undefined,
+        to: customTo ? new Date(customTo + 'T23:59:59').toISOString() : undefined,
+      }
+    default:
+      return {}
+  }
 }
 
 export default function OrdersPage() {
@@ -56,6 +95,9 @@ export default function OrdersPage() {
   const [tab, setTab] = useState('all')
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [datePeriod, setDatePeriod] = useState<DatePeriod>('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   // Assign driver dialog
   const [assignOrder, setAssignOrder] = useState<Order | null>(null)
@@ -65,8 +107,14 @@ export default function OrdersPage() {
   const [assigning, setAssigning] = useState(false)
 
   const fetchOrders = async () => {
+    setIsLoading(true)
     try {
-      const res = await apiFetch('/api/v1/admin/orders')
+      const { from, to } = getDateRange(datePeriod, customFrom, customTo)
+      const params = new URLSearchParams()
+      if (from) params.set('from_date', from)
+      if (to) params.set('to_date', to)
+      const qs = params.toString()
+      const res = await apiFetch(`/api/v1/admin/orders${qs ? `?${qs}` : ''}`)
       const data = await res.json()
       if (res.ok) setOrders(data.orders ?? [])
     } catch (e) {
@@ -76,7 +124,10 @@ export default function OrdersPage() {
     }
   }
 
-  useEffect(() => { fetchOrders() }, [])
+  useEffect(() => {
+    fetchOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datePeriod, customFrom, customTo])
 
   const openAssignDialog = async (order: Order) => {
     setAssignOrder(order)
@@ -120,7 +171,7 @@ export default function OrdersPage() {
   const filtered = orders.filter((o) => {
     const matchSearch =
       o.order_number.toLowerCase().includes(search.toLowerCase()) ||
-      (o.Customer?.name || '').toLowerCase().includes(search.toLowerCase())
+      (o.customer?.name || '').toLowerCase().includes(search.toLowerCase())
     const matchTab = tab === 'all' || o.status === tab
     return matchSearch && matchTab
   })
@@ -177,8 +228,8 @@ export default function OrdersPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search order number or customer..."
@@ -187,6 +238,35 @@ export default function OrdersPage() {
                 className="pl-9"
               />
             </div>
+            <Select value={datePeriod} onValueChange={(v) => setDatePeriod(v as DatePeriod)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Periode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Waktu</SelectItem>
+                <SelectItem value="today">Hari Ini</SelectItem>
+                <SelectItem value="week">Minggu Ini</SelectItem>
+                <SelectItem value="month">Bulan Ini</SelectItem>
+                <SelectItem value="year">Tahun Ini</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            {datePeriod === 'custom' && (
+              <>
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="w-[150px]"
+                />
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="w-[150px]"
+                />
+              </>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -225,17 +305,56 @@ export default function OrdersPage() {
                     return (
                       <TableRow key={order.id}>
                         <TableCell className="font-mono text-sm">{order.order_number}</TableCell>
-                        <TableCell>{order.Customer?.name || 'Walk-in'}</TableCell>
-                        <TableCell>{order.Merchant?.name}</TableCell>
+                        <TableCell>
+                          {order.merchant?.name ? (
+                            <HoverCard>
+                              <HoverCardTrigger className="font-medium underline decoration-dotted">
+                                {order.merchant.name}
+                              </HoverCardTrigger>
+                              <HoverCardContent>
+                                <div className="font-semibold">{order.merchant.name}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">{order.merchant.address}</div>
+                                <div className="mt-2 flex items-center gap-3 text-xs">
+                                  <span>📞 {order.merchant.phone || '-'}</span>
+                                  <span>⭐ {(order.merchant.rating ?? 0).toFixed(1)} ({order.merchant.total_reviews ?? 0})</span>
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={order.delivery_type === 'self' ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800'}>
                             {order.delivery_type === 'self' ? 'Self' : 'Platform'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {order.Driver?.User?.name
-                            ? <span className="text-green-700 font-medium">{order.Driver.User.name}</span>
-                            : order.status === 'ready'
+                          {order.driver?.user?.name ? (
+                            <HoverCard>
+                              <HoverCardTrigger className="font-medium text-green-700 underline decoration-dotted">
+                                {order.driver.user.name}
+                              </HoverCardTrigger>
+                              <HoverCardContent>
+                                <div className="font-semibold">{order.driver.user.name}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {order.driver.vehicle_type} · {order.driver.vehicle_plate}
+                                </div>
+                                <div className="mt-2 flex items-center gap-3 text-xs">
+                                  <span>📞 {order.driver.user.phone || '-'}</span>
+                                  <span>⭐ {(order.driver.rating ?? 0).toFixed(1)}</span>
+                                  <span>📦 {order.driver.total_delivered ?? 0}</span>
+                                </div>
+                                <div className="mt-2 text-xs">
+                                  {order.driver.is_online ? (
+                                    <span className="text-green-600">● Online</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">● Offline</span>
+                                  )}
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          ) : order.status === 'ready'
                             ? <span className="text-orange-500">Unassigned</span>
                             : <span className="text-muted-foreground">—</span>
                           }
@@ -294,7 +413,7 @@ export default function OrdersPage() {
                     }`}
                   >
                     <div>
-                      <div className="font-medium">{d.User?.name}</div>
+                      <div className="font-medium">{d.user?.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {d.vehicle_type} · {d.vehicle_plate} · ⭐ {d.rating.toFixed(1)} · {d.total_delivered} antar
                       </div>

@@ -7,6 +7,7 @@ import {
   ShoppingBag, Store, Bike, Users, TrendingUp, DollarSign,
   Clock, AlertCircle,
 } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
 
 type BadgeVariant = VariantProps<typeof badgeVariants>['variant']
 
@@ -29,10 +30,7 @@ export default function DashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/v1/admin/dashboard/stats', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await apiFetch('/api/v1/admin/dashboard/stats')
       if (res.ok) setStats(await res.json())
     } catch (e) {
       console.error(e)

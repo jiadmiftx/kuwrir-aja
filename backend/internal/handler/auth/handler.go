@@ -61,9 +61,10 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	Token        string     `json:"token"`
-	RefreshToken string     `json:"refresh_token"`
-	User         model.User `json:"user"`
+	Token              string     `json:"token"`
+	RefreshToken       string     `json:"refresh_token"`
+	User               model.User `json:"user"`
+	HasMerchantProfile *bool      `json:"has_merchant_profile,omitempty"`
 }
 
 // --- Handlers ---
@@ -232,11 +233,19 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, AuthResponse{
+	resp := AuthResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
 		User:         user,
-	})
+	}
+	if user.Role == model.RoleMerchant {
+		var count int64
+		h.db.Model(&model.Merchant{}).Where("user_id = ?", user.ID).Count(&count)
+		hasProfile := count > 0
+		resp.HasMerchantProfile = &hasProfile
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // SaveDeviceToken stores the FCM device token for push notifications.

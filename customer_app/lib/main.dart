@@ -13,6 +13,7 @@ import 'screens/order_tracking_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/support_chat_screen.dart';
+import 'screens/profile_screen.dart';
 import 'cubits/merchant_list_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
 import 'cubits/cart_cubit.dart';
@@ -97,6 +98,8 @@ class KuwrirCustomerApp extends StatelessWidget {
                     orderNumber: args['order_number'] as String,
                   ),
                 );
+              case '/profile':
+                return MaterialPageRoute(builder: (_) => const ProfileScreen());
               default:
                 return null;
             }

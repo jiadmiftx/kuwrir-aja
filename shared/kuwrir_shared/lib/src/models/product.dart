@@ -33,6 +33,7 @@ class Product {
   final bool isAvailable;
   final bool trackStock;
   final int stockQuantity;
+  final String? sku;
   final List<ProductVariant> variants;
 
   const Product({
@@ -46,6 +47,7 @@ class Product {
     this.isAvailable = true,
     this.trackStock = false,
     this.stockQuantity = 0,
+    this.sku,
     this.variants = const [],
   });
 
@@ -60,6 +62,7 @@ class Product {
         isAvailable: json['is_available'] as bool? ?? true,
         trackStock: json['track_stock'] as bool? ?? false,
         stockQuantity: (json['stock_quantity'] as num?)?.toInt() ?? 0,
+        sku: json['sku'] as String?,
         variants: (json['variants'] as List<dynamic>?)
                 ?.map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
                 .toList() ??

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
@@ -136,6 +137,12 @@ class ApiClient {
     return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
   }
 
+  Future<List<Merchant>> getPopularMerchants() async {
+    final data = await get('/merchants/popular', auth: false);
+    final list = data['merchants'] as List<dynamic>? ?? [];
+    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
   Future<Merchant> getMerchant(String id) async {
     final data = await get('/merchants/$id');
     return Merchant.fromJson(data['merchant'] as Map<String, dynamic>);
@@ -227,8 +234,23 @@ class ApiClient {
     await post('/my-store/categories', {'name': name});
   }
 
-  Future<void> createProduct(String catId, Map<String, dynamic> body) async {
-    await post('/my-store/categories/$catId/products', body);
+  Future<Product> createProduct(String catId, Map<String, dynamic> body) async {
+    final data = await post('/my-store/categories/$catId/products', body);
+    return Product.fromJson(data['product'] as Map<String, dynamic>);
+  }
+
+  /// Uploads a photo for a product owned by the calling merchant.
+  /// Returns the new image URL.
+  Future<String> uploadProductImage(String productId, File imageFile) async {
+    final token = await _getToken();
+    final uri = Uri.parse('$baseUrl/my-store/products/$productId/image');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    final streamed = await req.send().timeout(_kTimeout);
+    final body = await http.Response.fromStream(streamed);
+    final data = _handleResponse(body);
+    return data['image_url'] as String;
   }
 
   Future<void> updateProduct(String productId, Map<String, dynamic> body) async {

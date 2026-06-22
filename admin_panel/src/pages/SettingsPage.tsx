@@ -11,13 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Save, Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { calcPreviewFees, calcSelfDeliverFees } from '@/lib/fee-calc'
-
-const token = () => localStorage.getItem('token')
-const apiFetch = (path: string, opts?: RequestInit) =>
-  fetch(path, {
-    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-    ...opts,
-  })
+import { apiFetch } from '@/lib/api'
 
 interface Setting {
   key: string

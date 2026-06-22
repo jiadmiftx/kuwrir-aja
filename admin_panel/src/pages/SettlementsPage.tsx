@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TrendingUp, HandCoins, Store, CheckCircle, Loader2, RefreshCw } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Summary {
   total_driver_cash: number
@@ -38,12 +39,6 @@ interface Settlement {
   reference: string
   merchant?: { name: string }
 }
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
-    ...opts,
-  })
 
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })

@@ -7,6 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Search, ShieldAlert, ShieldCheck, Loader2, Users } from 'lucide-react'
+import { apiFetch as api } from '@/lib/api'
 
 interface Customer {
   id: string
@@ -16,9 +17,6 @@ interface Customer {
   is_active: boolean
   created_at: string
 }
-
-const api = (path: string, opts?: RequestInit) =>
-  fetch(path, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }, ...opts })
 
 const fmt = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
