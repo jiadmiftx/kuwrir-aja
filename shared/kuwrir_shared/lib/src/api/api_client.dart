@@ -60,12 +60,14 @@ class ApiClient {
     return headers;
   }
 
+  static const _kTimeout = Duration(seconds: 15);
+
   /// GET request
   Future<Map<String, dynamic>> get(String endpoint, {bool auth = true}) async {
     final response = await _client.get(
       Uri.parse('$baseUrl$endpoint'),
       headers: await _headers(auth: auth),
-    );
+    ).timeout(_kTimeout);
     return _handleResponse(response);
   }
 
@@ -79,7 +81,7 @@ class ApiClient {
       Uri.parse('$baseUrl$endpoint'),
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
-    );
+    ).timeout(_kTimeout);
     return _handleResponse(response);
   }
 
@@ -93,7 +95,7 @@ class ApiClient {
       Uri.parse('$baseUrl$endpoint'),
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
-    );
+    ).timeout(_kTimeout);
     return _handleResponse(response);
   }
 
@@ -107,7 +109,7 @@ class ApiClient {
       Uri.parse('$baseUrl$endpoint'),
       headers: await _headers(auth: auth),
       body: jsonEncode(body),
-    );
+    ).timeout(_kTimeout);
     return _handleResponse(response);
   }
 

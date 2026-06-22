@@ -120,9 +120,27 @@ class _SplashRouterState extends State<_SplashRouter> {
   }
 
   Future<void> _checkAuth() async {
-    final token = await ApiClient().isAuthenticated();
+    final api = ApiClient();
+    final hasToken = await api.isAuthenticated();
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, token ? '/home' : '/login');
+    if (!hasToken) {
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+    try {
+      final res = await api.get('/auth/me');
+      if (!mounted) return;
+      final role = res['user']?['role'];
+      if (role != 'customer') {
+        await api.clearTokens();
+        if (mounted) Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (_) {
+      await api.clearTokens();
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
   @override
