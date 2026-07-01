@@ -36,10 +36,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 text-4xl">📦</div>
-          <CardTitle className="text-2xl font-bold">KUWRIR Admin</CardTitle>
+          <img src="/logo_cocourir.png" alt="Cocourir" className="mx-auto mb-3 h-14 w-auto object-contain" />
+          <CardTitle className="text-2xl font-bold">Cocourir Admin</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Login to manage your food delivery platform
+            Login untuk mengelola platform pengiriman makanan
           </p>
         </CardHeader>
         <CardContent>

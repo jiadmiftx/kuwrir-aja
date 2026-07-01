@@ -2,7 +2,7 @@
 class ApiConfig {
   /// Base URL of the KUWRIR backend API
   /// Use machine IP instead of localhost so simulators/emulators can connect
-  static const String baseUrl = 'http://43.134.172.254:8090/api/v1';
+  static const String baseUrl = 'https://api.cocourir.com/api/v1';
 
   /// Request timeout in seconds
   static const int timeoutSeconds = 30;
