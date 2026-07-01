@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cocourir — Pesan Makanan Se-Lombok</title>
+  <meta name="description" content="Platform pengiriman makanan lokal pertama untuk seluruh Lombok. Ongkir flat, tanpa surge, tanpa biaya tersembunyi. Dari warung favoritmu langsung ke pintu rumahmu.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+  <style>
+    /* ── Tokens ───────────────────────────────────────────── */
+    :root {
+      --g950: oklch(0.20 0.07 150);
+      --g900: oklch(0.26 0.10 149);
+      --g800: oklch(0.32 0.13 148);
+      --g700: oklch(0.40 0.16 148);
+      --g600: oklch(0.48 0.18 148);
+      --g500: oklch(0.56 0.18 147);
+      --g400: oklch(0.65 0.16 146);
+      --g200: oklch(0.83 0.09 146);
+      --g100: oklch(0.92 0.04 146);
+      --g50:  oklch(0.97 0.015 148);
+      --g10:  oklch(0.99 0.005 148);
+
+      --amber: oklch(0.76 0.15 74);
+      --amber-d: oklch(0.60 0.16 68);
+
+      --ink: oklch(0.17 0.025 148);
+      --ink-mid: oklch(0.42 0.05 148);
+      --ink-soft: oklch(0.62 0.035 148);
+
+      --ff: 'Figtree', system-ui, sans-serif;
+
+      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-lg: 24px;
+      --radius-xl: 36px;
+
+      --shadow-card: 0 2px 8px oklch(0.20 0.07 150 / 0.10), 0 8px 32px oklch(0.20 0.07 150 / 0.07);
+      --shadow-float: 0 8px 24px oklch(0.20 0.07 150 / 0.18), 0 24px 64px oklch(0.20 0.07 150 / 0.10);
+    }
+
+    /* ── Reset ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--ff);
+      font-size: 17px;
+      line-height: 1.65;
+      color: var(--ink);
+      background: var(--g10);
+      overflow-x: hidden;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; }
+    ul { list-style: none; }
+
+    /* ── Utilities ────────────────────────────────────────── */
+    .container { width: min(1200px, 100% - 2rem); margin-inline: auto; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+
+    /* ── Animations ───────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.94); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      @keyframes float { 0%, 100% { transform: none; } }
+    }
+
+    /* ── Nav ──────────────────────────────────────────────── */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 0 1rem;
+      background: oklch(0.20 0.07 150 / 0);
+      transition: background 0.3s, backdrop-filter 0.3s;
+    }
+    .nav.scrolled {
+      background: oklch(0.20 0.07 150 / 0.92);
+      backdrop-filter: blur(16px);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+      gap: 2rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .logo-icon {
+      width: 34px; height: 34px;
+      background: var(--amber);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    .nav-links a {
+      color: oklch(1 0 0 / 0.80);
+      font-size: 0.93rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .btn-nav {
+      background: var(--amber);
+      color: var(--g950);
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 0.55rem 1.25rem;
+      border-radius: 100px;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-nav:hover { background: oklch(0.82 0.14 76); transform: translateY(-1px); }
+
+    /* ── Hero ─────────────────────────────────────────────── */
+    .hero {
+      min-height: 100svh;
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 40%, oklch(0.45 0.20 148 / 0.5) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 20% 80%, oklch(0.32 0.14 148 / 0.4) 0%, transparent 55%),
+        var(--g950);
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      gap: 3rem;
+      padding: 120px 0 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(oklch(1 0 0 / 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+    .hero-left { padding-left: max(2rem, calc(50vw - 600px)); }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--amber);
+      color: var(--g950);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 100px;
+      margin-bottom: 1.5rem;
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .hero h1 {
+      font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.25rem;
+      animation: fadeUp 0.6s 0.08s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--amber);
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 1.8vw, 1.15rem);
+      line-height: 1.65;
+      color: oklch(1 0 0 / 0.75);
+      max-width: 42ch;
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.6s 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.20s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .btn-primary {
+      background: var(--amber);
+      color: var(--g950);
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.85rem 2rem;
+      border-radius: 100px;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px var(--amber) / 0.35;
+    }
+    .btn-primary:hover {
+      background: oklch(0.82 0.14 76);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px var(--amber) / 0.45;
+    }
+    .btn-outline {
+      background: transparent;
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.85rem 2rem;
+      border-radius: 100px;
+      border: 1.5px solid oklch(1 0 0 / 0.30);
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    }
+    .btn-outline:hover {
+      border-color: oklch(1 0 0 / 0.60);
+      background: oklch(1 0 0 / 0.06);
+      transform: translateY(-2px);
+    }
+    .hero-right {
+      padding-right: max(2rem, calc(50vw - 600px));
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      animation: scaleIn 0.8s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .hero-image-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 520px;
+    }
+    .hero-img-main {
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: var(--radius-xl);
+      object-fit: cover;
+      box-shadow: var(--shadow-float);
+    }
+    .hero-badge {
+      position: absolute;
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 0.75rem 1.1rem;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--ink);
+      animation: float 4s ease-in-out infinite;
+    }
+    .hero-badge.badge-1 {
+      top: -12px; left: -20px;
+      animation-delay: 0s;
+    }
+    .hero-badge.badge-2 {
+      bottom: 20px; right: -16px;
+      animation-delay: 1.5s;
+    }
+    .badge-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--g600);
+      flex-shrink: 0;
+    }
+    .badge-dot.amber { background: var(--amber); }
+    .hero-badges-icon { font-size: 1.25rem; }
+
+    /* ── Stats strip ──────────────────────────────────────── */
+    .stats {
+      background: var(--g900);
+      padding: 1.75rem 1rem;
+    }
+    .stats-inner {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-around;
+      flex-wrap: wrap;
+    }
+    .stat-item {
+      text-align: center;
+      color: #fff;
+    }
+    .stat-num {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--amber);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.83rem;
+      color: oklch(1 0 0 / 0.65);
+      margin-top: 0.25rem;
+      font-weight: 500;
+    }
+    .stat-div {
+      width: 1px;
+      background: oklch(1 0 0 / 0.12);
+      align-self: stretch;
+    }
+
+    /* ── How it works ─────────────────────────────────────── */
+    .how {
+      padding: clamp(5rem, 10vw, 8rem) 1rem;
+      background: var(--g10);
+    }
+    .section-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--g600);
+      margin-bottom: 0.85rem;
+    }
+    .section-title {
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+    .section-sub {
+      font-size: 1.05rem;
+      color: var(--ink-mid);
+      max-width: 50ch;
+      line-height: 1.7;
+      margin-bottom: 3.5rem;
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      position: relative;
+    }
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 52px;
+      left: calc(16.67% + 24px);
+      right: calc(16.67% + 24px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--g400), var(--g600), var(--g400));
+      z-index: 0;
+    }
+    .step {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 2rem;
+      position: relative;
+      z-index: 1;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s;
+    }
+    .step:hover { transform: translateY(-6px); box-shadow: var(--shadow-float); }
+    .step-num {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--g600);
+      color: #fff;
+      font-size: 1.3rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .step:nth-child(2) .step-num { background: var(--g500); }
+    .step:nth-child(3) .step-num { background: var(--amber); color: var(--g950); }
+    .step h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.6rem;
+    }
+    .step p { color: var(--ink-mid); font-size: 0.95rem; line-height: 1.65; }
+    .step-role {
+      display: inline-block;
+      margin-top: 1.25rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--g600);
+      background: var(--g100);
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+    }
+    .step:nth-child(3) .step-role { color: var(--amber-d); background: oklch(0.96 0.06 74); }
+
+    /* ── Food showcase ────────────────────────────────────── */
+    .food {
+      background: var(--g950);
+      padding: clamp(4rem, 8vw, 7rem) 1rem;
+      overflow: hidden;
+    }
+    .food .section-label { color: var(--g400); }
+    .food .section-title { color: #fff; }
+    .food .section-sub { color: oklch(1 0 0 / 0.60); }
+    .food-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      grid-template-rows: 220px 220px;
+      gap: 12px;
+    }
+    .food-cell {
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      background: var(--g900);
+    }
+    .food-cell:first-child { grid-row: 1 / 3; }
+    .food-cell img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .food-cell:hover img { transform: scale(1.05); }
+    .food-cell-label {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 1.25rem 1rem 1rem;
+      background: linear-gradient(to top, oklch(0.15 0.06 148 / 0.90) 0%, transparent 100%);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    /* ── Benefits ─────────────────────────────────────────── */
+    .benefits {
+      padding: clamp(5rem, 10vw, 8rem) 1rem;
+      background: var(--g10);
+    }
+    .benefit-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 3rem;
+      background: var(--g100);
+      padding: 6px;
+      border-radius: 100px;
+      width: fit-content;
+    }
+    .tab-btn {
+      padding: 0.6rem 1.5rem;
+      border-radius: 100px;
+      font-size: 0.93rem;
+      font-weight: 600;
+      color: var(--ink-mid);
+      background: transparent;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--g600);
+      color: #fff;
+      box-shadow: 0 2px 10px var(--g600) / 0.30;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .benefit-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .benefit-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-float); }
+    .benefit-icon {
+      width: 48px; height: 48px;
+      background: var(--g100);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .benefit-card h4 {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.4rem;
+    }
+    .benefit-card p { font-size: 0.9rem; color: var(--ink-mid); line-height: 1.6; }
+    .benefit-highlight {
+      grid-column: 1 / -1;
+      background: var(--g950);
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: 2rem 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .benefit-highlight p { font-size: 1rem; color: oklch(1 0 0 / 0.70); max-width: 50ch; }
+    .benefit-highlight strong { color: #fff; }
+    .highlight-num {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--amber);
+      letter-spacing: -0.05em;
+      white-space: nowrap;
+    }
+
+    /* ── Comparison ───────────────────────────────────────── */
+    .comparison {
+      padding: clamp(5rem, 10vw, 8rem) 1rem;
+      background: var(--g50);
+    }
+    .comp-table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+    }
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.93rem;
+    }
+    .comp-table th, .comp-table td {
+      padding: 1rem 1.5rem;
+      text-align: left;
+    }
+    .comp-table thead th {
+      background: var(--g950);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+    .comp-table thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .comp-table thead th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .comp-table thead .col-us {
+      background: var(--g600);
+      color: #fff;
+      position: relative;
+    }
+    .comp-table thead .col-us::after {
+      content: '✦ Platform Kami';
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: oklch(1 0 0 / 0.70);
+      margin-top: 2px;
+    }
+    .comp-table tbody tr { border-bottom: 1px solid var(--g100); }
+    .comp-table tbody tr:last-child { border-bottom: none; }
+    .comp-table tbody tr:hover td { background: var(--g50); }
+    .comp-table td:first-child { font-weight: 600; color: var(--ink); }
+    .comp-table .col-us { background: oklch(0.96 0.03 148); font-weight: 700; color: var(--g700); }
+    .comp-table tbody tr:hover .col-us { background: oklch(0.93 0.05 148); }
+    .icon-check { color: var(--g600); font-size: 1.1rem; }
+    .icon-x { color: oklch(0.58 0.22 28); font-size: 1rem; }
+    .icon-meh { color: var(--ink-soft); }
+    .badge-winner {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: var(--g100);
+      color: var(--g700);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 100px;
+    }
+
+    /* ── Coverage ─────────────────────────────────────────── */
+    .coverage {
+      padding: clamp(4rem, 8vw, 6rem) 1rem;
+      background: var(--g800);
+      color: #fff;
+      text-align: center;
+    }
+    .coverage .section-label { color: var(--g400); }
+    .coverage .section-title { color: #fff; margin-bottom: 0.75rem; }
+    .coverage .section-sub { color: oklch(1 0 0 / 0.65); margin-inline: auto; }
+    .area-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-top: 2.5rem;
+    }
+    .area-chip {
+      padding: 0.55rem 1.25rem;
+      border-radius: 100px;
+      background: oklch(1 0 0 / 0.10);
+      border: 1px solid oklch(1 0 0 / 0.15);
+      color: #fff;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .area-chip:hover, .area-chip.active {
+      background: var(--g600);
+      border-color: var(--g600);
+    }
+
+    /* ── CTA Merchant ─────────────────────────────────────── */
+    .cta-merchant {
+      padding: clamp(5rem, 10vw, 8rem) 1rem;
+      background: var(--g10);
+    }
+    .cta-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    .cta-split img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-float);
+    }
+    .cta-body .section-title { margin-bottom: 1rem; }
+    .cta-perks {
+      margin: 1.75rem 0 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .perk {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.9rem;
+      font-size: 0.95rem;
+    }
+    .perk-dot {
+      width: 24px; height: 24px;
+      background: var(--g100);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--g600);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-weight: 800;
+    }
+    .perk strong { display: block; font-weight: 700; color: var(--ink); }
+    .perk span { color: var(--ink-mid); font-size: 0.88rem; }
+    .btn-green {
+      background: var(--g600);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 0.9rem 2rem;
+      border-radius: 100px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px var(--g600) / 0.30;
+    }
+    .btn-green:hover {
+      background: var(--g700);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 28px var(--g700) / 0.40;
+    }
+
+    /* ── CTA Driver ───────────────────────────────────────── */
+    .cta-driver {
+      background: var(--g950);
+      padding: clamp(5rem, 10vw, 8rem) 1rem;
+      color: #fff;
+    }
+    .cta-driver .section-label { color: var(--g400); }
+    .cta-driver .section-title { color: #fff; }
+    .cta-driver .section-sub { color: oklch(1 0 0 / 0.65); }
+    .driver-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    .driver-earning-card {
+      background: var(--g900);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .driver-earning-card::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: var(--g700);
+      opacity: 0.3;
+    }
+    .earning-label { font-size: 0.83rem; color: oklch(1 0 0 / 0.55); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .earning-big { font-size: 3.8rem; font-weight: 800; letter-spacing: -0.06em; color: var(--amber); line-height: 1; margin-bottom: 0.5rem; }
+    .earning-sub { font-size: 0.9rem; color: oklch(1 0 0 / 0.60); margin-bottom: 2rem; }
+    .earning-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: oklch(1 0 0 / 0.06);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+    }
+    .breakdown-row span { color: oklch(1 0 0 / 0.70); }
+    .breakdown-row strong { color: var(--amber); font-weight: 800; }
+    .breakdown-row.total-row { background: var(--amber); }
+    .breakdown-row.total-row span, .breakdown-row.total-row strong { color: var(--g950); }
+    .driver-perks { margin-top: 2rem; }
+    .driver-perk {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      padding: 1rem 0;
+      border-bottom: 1px solid oklch(1 0 0 / 0.08);
+    }
+    .driver-perk:last-child { border-bottom: none; }
+    .driver-perk-icon { font-size: 1.4rem; }
+    .driver-perk h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .driver-perk p { font-size: 0.87rem; color: oklch(1 0 0 / 0.60); }
+    .cta-driver .btn-green {
+      background: var(--amber);
+      color: var(--g950);
+      box-shadow: 0 4px 20px var(--amber) / 0.35;
+    }
+    .cta-driver .btn-green:hover { background: oklch(0.82 0.14 76); }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .footer {
+      background: oklch(0.14 0.04 148);
+      color: oklch(1 0 0 / 0.55);
+      padding: 4rem 1rem 2rem;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 3rem;
+      margin-bottom: 3rem;
+    }
+    .footer-brand .logo { margin-bottom: 1rem; }
+    .footer-brand p { font-size: 0.88rem; line-height: 1.7; max-width: 30ch; }
+    .footer-col h5 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: oklch(1 0 0 / 0.80);
+      margin-bottom: 1rem;
+    }
+    .footer-col ul { display: flex; flex-direction: column; gap: 0.6rem; }
+    .footer-col a {
+      font-size: 0.88rem;
+      transition: color 0.2s;
+    }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom {
+      border-top: 1px solid oklch(1 0 0 / 0.08);
+      padding-top: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.83rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-contact {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    .contact-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: oklch(1 0 0 / 0.60);
+      font-size: 0.83rem;
+      transition: color 0.2s;
+    }
+    .contact-pill:hover { color: #fff; }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding-top: 100px; text-align: center; gap: 2.5rem; }
+      .hero-left { padding-left: 1rem; padding-right: 1rem; }
+      .hero h1 { font-size: clamp(2.2rem, 8vw, 3rem); }
+      .hero-sub { margin-inline: auto; }
+      .hero-actions { justify-content: center; }
+      .hero-right { padding-left: 1rem; padding-right: 1rem; }
+      .hero-badge.badge-1 { top: -8px; left: 8px; }
+      .hero-badge.badge-2 { bottom: 12px; right: 8px; }
+      .steps { grid-template-columns: 1fr; gap: 1rem; }
+      .steps::before { display: none; }
+      .tab-panel.active { grid-template-columns: 1fr; }
+      .food-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+      .food-cell:first-child { grid-row: auto; grid-column: 1 / -1; aspect-ratio: 16/7; }
+      .cta-split, .driver-split { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .comp-table th, .comp-table td { padding: 0.75rem 1rem; }
+    }
+
+    @media (max-width: 560px) {
+      .nav-links { display: none; }
+      .stats-inner { gap: 0; }
+      .stat-div { display: none; }
+      .stat-item { flex: 1; }
+      .benefit-tabs { width: 100%; justify-content: stretch; }
+      .tab-btn { flex: 1; text-align: center; padding: 0.6rem 0.75rem; font-size: 0.83rem; }
+      .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ─────────────────────────────────────────────────── -->
+<nav class="nav" id="nav" role="navigation" aria-label="Navigasi utama">
+  <div class="nav-inner container">
+    <a href="/" class="logo" aria-label="Cocourir - Halaman Utama">
+      <div class="logo-icon" aria-hidden="true">🛵</div>
+      Cocourir
+    </a>
+    <ul class="nav-links" role="list">
+      <li><a href="#how">Cara Kerja</a></li>
+      <li><a href="#benefits">Keunggulan</a></li>
+      <li><a href="#merchant">Buka Toko</a></li>
+      <li><a href="#driver">Jadi Driver</a></li>
+    </ul>
+    <a href="#merchant" class="btn-nav">Daftar Gratis</a>
+  </div>
+</nav>
+
+<!-- ── Hero ────────────────────────────────────────────────── -->
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="hero-left">
+    <div class="hero-eyebrow" aria-label="Platform lokal Lombok">
+      🌴 Platform Lokal Lombok #1
+    </div>
+    <h1 id="hero-heading">
+      Pesan Makanan<br>
+      <em>Favoritmu,</em><br>
+      Antar Se-Lombok
+    </h1>
+    <p class="hero-sub">
+      Dari warung ayam taliwang sampai kafe pinggir pantai. Ongkir flat, tidak surge, tanpa biaya tersembunyi. Lebih murah dari yang kamu kira.
+    </p>
+    <div class="hero-actions">
+      <a href="#food" class="btn-primary">Lihat Menu Sekitar</a>
+      <a href="#merchant" class="btn-outline">Buka Toko Gratis</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="hero-image-wrap">
+      <img
+        src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=85"
+        alt="Pilihan makanan lezat dari merchant Cocourir — ayam bakar, nasi campur, dan kuliner khas Lombok"
+        class="hero-img-main"
+        loading="eager"
+      >
+      <div class="hero-badge badge-1" aria-hidden="true">
+        <div class="badge-dot"></div>
+        <span>Driver aktif di sekitarmu</span>
+      </div>
+      <div class="hero-badge badge-2" aria-hidden="true">
+        <div class="badge-dot amber"></div>
+        <span>Ongkir flat, tidak surge</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ────────────────────────────────────────────────── -->
+<div class="stats" role="region" aria-label="Statistik platform">
+  <div class="stats-inner container">
+    <div class="stat-item">
+      <div class="stat-num">Rp 0</div>
+      <div class="stat-label">Biaya daftar merchant</div>
+    </div>
+    <div class="stat-div" aria-hidden="true"></div>
+    <div class="stat-item">
+      <div class="stat-num">80%</div>
+      <div class="stat-label">Pendapatan driver per order</div>
+    </div>
+    <div class="stat-div" aria-hidden="true"></div>
+    <div class="stat-item">
+      <div class="stat-num">Flat</div>
+      <div class="stat-label">Ongkir dalam kota, tidak surge</div>
+    </div>
+    <div class="stat-div" aria-hidden="true"></div>
+    <div class="stat-item">
+      <div class="stat-num">Lombok</div>
+      <div class="stat-label">Mulai dari Mataram sampai Kuta</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── How it works ─────────────────────────────────────────── -->
+<section class="how" id="how" aria-labelledby="how-heading">
+  <div class="container">
+    <p class="section-label reveal">Cara Kerja</p>
+    <h2 class="section-title reveal" id="how-heading">Semudah tiga langkah</h2>
+    <p class="section-sub reveal">Dari pilih menu sampai makanan di tangan kamu, semua berjalan mulus tanpa ribet.</p>
+    <div class="steps">
+      <article class="step reveal">
+        <div class="step-num" aria-hidden="true">1</div>
+        <h3>Pilih & Pesan</h3>
+        <p>Browse ratusan menu dari merchant lokal Lombok favoritmu. Pilih, pesan, bayar di app — selesai dalam hitungan detik.</p>
+        <span class="step-role">Customer</span>
+      </article>
+      <article class="step reveal" style="transition-delay: 0.1s">
+        <div class="step-num" aria-hidden="true">2</div>
+        <h3>Merchant Siapkan</h3>
+        <p>Merchant menerima pesananmu langsung di Merchant App. Dimasak segar, dikemas dengan baik, siap dijemput driver.</p>
+        <span class="step-role">Merchant</span>
+      </article>
+      <article class="step reveal" style="transition-delay: 0.2s">
+        <div class="step-num" aria-hidden="true">3</div>
+        <h3>Driver Antar ke Pintu</h3>
+        <p>Driver lokal menjemput dan mengantarkan pesananmu. Track real-time di app. Bayar tunai atau digital, terserah kamu.</p>
+        <span class="step-role">Driver Lokal</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── Food showcase ─────────────────────────────────────────── -->
+<section class="food" id="food" aria-labelledby="food-heading">
+  <div class="container">
+    <p class="section-label reveal">Kuliner Lombok</p>
+    <h2 class="section-title reveal" id="food-heading">Dari warung langganan<br>sampai restoran baru</h2>
+    <p class="section-sub reveal">Merchant Cocourir menjual dengan harga asli mereka. Tidak ada markup gila-gilaan. Yang kamu bayar adalah harga jujur.</p>
+    <div class="food-grid reveal">
+      <div class="food-cell">
+        <img
+          src="https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=800&q=80"
+          alt="Pilihan menu lengkap dari berbagai merchant Cocourir Lombok"
+          loading="lazy"
+        >
+        <div class="food-cell-label">Menu Pilihan Hari Ini</div>
+      </div>
+      <div class="food-cell">
+        <img
+          src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80"
+          alt="Ayam bakar dan makanan panggang khas Lombok"
+          loading="lazy"
+        >
+        <div class="food-cell-label">Ayam Bakar Lokal</div>
+      </div>
+      <div class="food-cell">
+        <img
+          src="https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=80"
+          alt="Mie dan hidangan berkuah segar dari warung Lombok"
+          loading="lazy"
+        >
+        <div class="food-cell-label">Soto & Mie Kuah</div>
+      </div>
+      <div class="food-cell">
+        <img
+          src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80"
+          alt="Makanan siap saji dari merchant Cocourir"
+          loading="lazy"
+        >
+        <div class="food-cell-label">Siap Antar</div>
+      </div>
+      <div class="food-cell">
+        <img
+          src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=600&q=80"
+          alt="Sarapan dan menu pagi dari merchant Cocourir"
+          loading="lazy"
+        >
+        <div class="food-cell-label">Menu Pagi</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Benefits ─────────────────────────────────────────────── -->
+<section class="benefits" id="benefits" aria-labelledby="benefits-heading">
+  <div class="container">
+    <p class="section-label reveal">Keunggulan</p>
+    <h2 class="section-title reveal" id="benefits-heading">Cocourir lebih adil<br>untuk semua pihak</h2>
+    <p class="section-sub reveal">Tidak ada pihak yang diperas. Merchant untung, driver untung, customer senang. Begitu harusnya platform lokal bekerja.</p>
+
+    <div class="benefit-tabs reveal" role="tablist" aria-label="Pilih tipe pengguna">
+      <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-customer" onclick="switchTab('customer', this)">Customer</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-merchant" onclick="switchTab('merchant', this)">Merchant</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-driver" onclick="switchTab('driver', this)">Driver</button>
+    </div>
+
+    <!-- Customer -->
+    <div class="tab-panel active" id="tab-customer" role="tabpanel">
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">🛵</div>
+        <div>
+          <h4>Ongkir Flat Se-Lombok</h4>
+          <p>Tidak surge saat hujan atau jam makan siang. Harga ongkir sama pagi, siang, dan malam. Kamu bisa prediksi biaya sejak awal.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">💰</div>
+        <div>
+          <h4>Tidak Ada Biaya Tersembunyi</h4>
+          <p>Tidak ada biaya layanan aplikasi, biaya kemasan platform, atau biaya admin. Yang kamu bayar: harga makanan + ongkir. Selesai.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">🏷️</div>
+        <div>
+          <h4>Harga Lebih Jujur</h4>
+          <p>Merchant tidak perlu naikkan harga untuk nutup komisi platform. Harga di Cocourir lebih dekat ke harga warungnya langsung.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">⚡</div>
+        <div>
+          <h4>Driver Lokal, Cepat Datang</h4>
+          <p>Jaringan driver berbasis area. Tidak perlu nunggu driver dari ujung kota lain. Familiar dengan jalanan Lombok, lebih cepat sampai.</p>
+        </div>
+      </article>
+      <div class="benefit-highlight">
+        <div>
+          <strong>Contoh nyata:</strong>
+          <p>Order nasi campur Rp 20.000 + ongkir Rp 10.000 = total <strong>Rp 30.000</strong>. Tidak ada tambahan apapun. Di platform lain bisa sampai Rp 38.000–42.000.</p>
+        </div>
+        <div class="highlight-num">30rb<span style="font-size:1.5rem; color: oklch(1 0 0 / 0.50)"> aja</span></div>
+      </div>
+    </div>
+
+    <!-- Merchant -->
+    <div class="tab-panel" id="tab-merchant" role="tabpanel">
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">🎯</div>
+        <div>
+          <h4>Nol Komisi dari Harga Produk</h4>
+          <p>Platform lain potong 20–30% setiap transaksi. Di Cocourir, harga yang kamu tetapkan adalah yang masuk ke dompetmu. Penuh.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">📣</div>
+        <div>
+          <h4>Listing & Promosi Gratis</h4>
+          <p>Tidak bayar daftar, tidak bayar iklan, tidak ada biaya bulanan. Tokomu tampil di aplikasi tanpa biaya apapun dari awal.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">💳</div>
+        <div>
+          <h4>Pencairan Cepat H+1</h4>
+          <p>Hasil penjualan masuk ke wallet merchant langsung setelah order selesai. Bisa dicairkan ke rekening bank keesokan hari kerja.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">📊</div>
+        <div>
+          <h4>Laporan Transparan Real-time</h4>
+          <p>Pantau penjualan, order masuk, dan saldo wallet kapan saja dari Merchant App. Tidak ada angka yang perlu kamu tebak-tebak.</p>
+        </div>
+      </article>
+      <div class="benefit-highlight">
+        <div>
+          <strong>Contoh nyata:</strong>
+          <p>Jual nasi kotak Rp 20.000. Di GoFood merchant terima ±Rp 14.000 (setelah potong 30%). Di Cocourir merchant terima <strong>Rp 20.000 penuh</strong>. Per 100 order selisihnya Rp 600.000.</p>
+        </div>
+        <div class="highlight-num">0%<span style="font-size:1.5rem; color: oklch(1 0 0 / 0.50)"> komisi</span></div>
+      </div>
+    </div>
+
+    <!-- Driver -->
+    <div class="tab-panel" id="tab-driver" role="tabpanel">
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">💸</div>
+        <div>
+          <h4>80% untuk Driver</h4>
+          <p>Platform lain ambil 20–30% lebih. Di Cocourir, dari setiap ongkir kamu dapat 80% langsung masuk wallet. Ongkir Rp 15.000 → kamu dapat Rp 12.000.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">🕐</div>
+        <div>
+          <h4>Tidak Ada Target Wajib</h4>
+          <p>Kerja kapan mau, ambil berapa order mau. Tidak ada hukuman kalau tidak capai target. Kamu yang atur waktumu sendiri.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">⭐</div>
+        <div>
+          <h4>Poin & Bonus Transparan</h4>
+          <p>Kumpulkan poin dari setiap order, tukarkan jadi bonus tunai. Syaratnya jelas, bisa dicek kapan saja di app. Tidak ada kejutan.</p>
+        </div>
+      </article>
+      <article class="benefit-card">
+        <div class="benefit-icon" aria-hidden="true">🛡️</div>
+        <div>
+          <h4>Aturan Suspend yang Adil</h4>
+          <p>Suspend hanya dengan alasan yang jelas dan tertulis. Ada mekanisme banding 7 hari. Tidak aktif? Bisa reaktivasi dalam 1 hari kerja.</p>
+        </div>
+      </article>
+      <div class="benefit-highlight">
+        <div>
+          <strong>Simulasi penghasilan:</strong>
+          <p>10 order/hari × ongkir rata-rata Rp 12.000 × 80% = <strong>Rp 96.000/hari</strong>. Sebulan aktif 25 hari = <strong>Rp 2.400.000</strong> hanya dari pengantaran, belum termasuk bonus.</p>
+        </div>
+        <div class="highlight-num">96rb<span style="font-size:1.5rem; color: oklch(1 0 0 / 0.50)">/hari</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparison ────────────────────────────────────────────── -->
+<section class="comparison" id="comparison" aria-labelledby="comp-heading">
+  <div class="container">
+    <p class="section-label reveal">Perbandingan</p>
+    <h2 class="section-title reveal" id="comp-heading">Cocourir vs platform lain</h2>
+    <p class="section-sub reveal">Bukan soal siapa yang lebih besar. Soal siapa yang lebih adil untuk semua pihak di Lombok.</p>
+    <div class="comp-table-wrap reveal">
+      <table class="comp-table">
+        <caption class="sr-only">Perbandingan fitur Cocourir dengan platform pengiriman makanan lain</caption>
+        <thead>
+          <tr>
+            <th scope="col">Aspek</th>
+            <th scope="col" class="col-us">Cocourir</th>
+            <th scope="col">GoFood / GrabFood</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Komisi per produk (merchant)</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>0%</strong> — merchant terima harga penuh</td>
+            <td><span class="icon-x">✗</span> 20–30% dipotong tiap order</td>
+          </tr>
+          <tr>
+            <td>Biaya daftar & promosi merchant</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Gratis selamanya</strong></td>
+            <td><span class="icon-x">✗</span> Berbayar untuk tampil di atas</td>
+          </tr>
+          <tr>
+            <td>Ongkir customer</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Flat per zona, tidak surge</strong></td>
+            <td><span class="icon-x">✗</span> Naik saat hujan / jam sibuk</td>
+          </tr>
+          <tr>
+            <td>Biaya layanan / app fee</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Tidak ada</strong></td>
+            <td><span class="icon-x">✗</span> Rp 1.000–5.000 per order</td>
+          </tr>
+          <tr>
+            <td>Bagi hasil driver</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>80% untuk driver</strong></td>
+            <td><span class="icon-meh">~</span> Bervariasi, sering lebih rendah</td>
+          </tr>
+          <tr>
+            <td>Target wajib driver</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Tidak ada</strong></td>
+            <td><span class="icon-x">✗</span> Ada — tidak capai = insentif hangus</td>
+          </tr>
+          <tr>
+            <td>Transparansi pendapatan</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Real-time, terlihat sebelum ambil order</strong></td>
+            <td><span class="icon-meh">~</span> Kadang baru terlihat setelah selesai</td>
+          </tr>
+          <tr>
+            <td>Respons dukungan</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Langsung ke admin lokal</strong></td>
+            <td><span class="icon-x">✗</span> Bot / tiket / antrian panjang</td>
+          </tr>
+          <tr>
+            <td>Fokus area</td>
+            <td class="col-us"><span class="icon-check">✓</span> <strong>Khusus Lombok</strong> — komunitas lokal</td>
+            <td><span class="icon-meh">~</span> Nasional — merchant kecil tenggelam</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── Coverage ──────────────────────────────────────────────── -->
+<section class="coverage" id="coverage" aria-labelledby="coverage-heading">
+  <div class="container">
+    <p class="section-label reveal">Area Layanan</p>
+    <h2 class="section-title reveal" id="coverage-heading">Melayani seluruh Lombok</h2>
+    <p class="section-sub reveal">Dari kota Mataram sampai pantai Kuta, dari Senggigi sampai Selong. Platform lokal yang tahu jalan-jalan Lombok lebih baik dari siapapun.</p>
+    <div class="area-grid reveal" role="list">
+      <span class="area-chip active" role="listitem">Mataram</span>
+      <span class="area-chip" role="listitem">Senggigi</span>
+      <span class="area-chip" role="listitem">Cakranegara</span>
+      <span class="area-chip" role="listitem">Praya</span>
+      <span class="area-chip" role="listitem">Kuta Lombok</span>
+      <span class="area-chip" role="listitem">Selong</span>
+      <span class="area-chip" role="listitem">Selong Belanak</span>
+      <span class="area-chip" role="listitem">Gerung</span>
+      <span class="area-chip" role="listitem">Lembar</span>
+      <span class="area-chip" role="listitem">Tanjung</span>
+      <span class="area-chip" role="listitem">Pemenang</span>
+      <span class="area-chip" role="listitem">& terus berkembang</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Merchant ──────────────────────────────────────────── -->
+<section class="cta-merchant" id="merchant" aria-labelledby="merchant-heading">
+  <div class="container">
+    <div class="cta-split">
+      <img
+        src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80"
+        alt="Merchant Cocourir menyajikan makanan lezat untuk diantar ke seluruh Lombok"
+        class="reveal"
+        loading="lazy"
+      >
+      <div class="cta-body">
+        <p class="section-label reveal">Untuk Merchant</p>
+        <h2 class="section-title reveal" id="merchant-heading">Buka toko di Cocourir, jangkau lebih banyak pembeli</h2>
+        <p class="section-sub reveal" style="margin-bottom: 0;">Tidak perlu naikkan harga untuk nutup komisi. Kamu jual dengan hargamu, kami yang bantu distribusikan.</p>
+        <ul class="cta-perks reveal">
+          <li class="perk">
+            <div class="perk-dot" aria-hidden="true">✓</div>
+            <div>
+              <strong>Nol biaya pendaftaran</strong>
+              <span>Daftar sekarang, mulai jual hari ini, tanpa modal tambahan</span>
+            </div>
+          </li>
+          <li class="perk">
+            <div class="perk-dot" aria-hidden="true">✓</div>
+            <div>
+              <strong>0% komisi dari harga produkmu</strong>
+              <span>Harga yang kamu set = harga yang kamu terima. Penuh.</span>
+            </div>
+          </li>
+          <li class="perk">
+            <div class="perk-dot" aria-hidden="true">✓</div>
+            <div>
+              <strong>Merchant App yang mudah</strong>
+              <span>Kelola menu, terima order, dan tarik saldo dari genggaman tanganmu</span>
+            </div>
+          </li>
+          <li class="perk">
+            <div class="perk-dot" aria-hidden="true">✓</div>
+            <div>
+              <strong>Didukung tim lokal Lombok</strong>
+              <span>Ada masalah? Hubungi admin lokal yang ngerti kondisi di sini</span>
+            </div>
+          </li>
+        </ul>
+        <a href="https://wa.me/628XXXXXXXXXX?text=Halo+Cocourir,+saya+ingin+daftarkan+toko+saya" class="btn-green reveal" target="_blank" rel="noopener noreferrer">
+          Daftarkan Tokomu Sekarang
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Driver ────────────────────────────────────────────── -->
+<section class="cta-driver" id="driver" aria-labelledby="driver-heading">
+  <div class="container">
+    <div class="driver-split">
+      <div class="cta-body">
+        <p class="section-label reveal">Untuk Driver</p>
+        <h2 class="section-title reveal" id="driver-heading">Penghasilan jelas, potongan paling kecil</h2>
+        <p class="section-sub reveal" style="margin-bottom: 0;">80% ongkir langsung masuk kantongmu. Tidak ada target paksa. Tidak ada kejutan potongan aneh-aneh.</p>
+        <div class="driver-perks">
+          <div class="driver-perk reveal">
+            <div class="driver-perk-icon" aria-hidden="true">🏆</div>
+            <div>
+              <h4>Poin & Bonus Nyata</h4>
+              <p>Setiap order kamu poin. Kumpulkan, tukarkan jadi uang tunai. Ada bonus surge, bonus referral, bonus tier.</p>
+            </div>
+          </div>
+          <div class="driver-perk reveal" style="transition-delay: 0.1s">
+            <div class="driver-perk-icon" aria-hidden="true">🕐</div>
+            <div>
+              <h4>Bebas Atur Jadwal</h4>
+              <p>Online kapan mau, offline kapan mau. Tidak ada sistem poin kehadiran atau hukuman kalau tidak aktif sehari.</p>
+            </div>
+          </div>
+          <div class="driver-perk reveal" style="transition-delay: 0.2s">
+            <div class="driver-perk-icon" aria-hidden="true">🤝</div>
+            <div>
+              <h4>Aturan Transparan & Adil</h4>
+              <p>Syarat suspend tertulis dan jelas. Kalau ada masalah, ada mekanisme banding. Admin lokal yang kamu kenal.</p>
+            </div>
+          </div>
+        </div>
+        <a href="https://wa.me/628XXXXXXXXXX?text=Halo+Cocourir,+saya+ingin+daftar+jadi+driver" class="btn-green reveal" target="_blank" rel="noopener noreferrer">
+          Daftar Jadi Driver Cocourir
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="driver-earning-card reveal">
+        <div class="earning-label">Simulasi Penghasilan Harian</div>
+        <div class="earning-big">96rb</div>
+        <div class="earning-sub">10 order × rata-rata ongkir Rp 12.000 × 80%</div>
+        <div class="earning-breakdown" role="table" aria-label="Rincian penghasilan driver">
+          <div class="breakdown-row" role="row">
+            <span role="cell">Ongkir per order</span>
+            <strong role="cell">Rp 12.000</strong>
+          </div>
+          <div class="breakdown-row" role="row">
+            <span role="cell">Bagian driver (80%)</span>
+            <strong role="cell">Rp 9.600</strong>
+          </div>
+          <div class="breakdown-row" role="row">
+            <span role="cell">Potongan platform (20%)</span>
+            <strong role="cell">Rp 2.400</strong>
+          </div>
+          <div class="breakdown-row" role="row">
+            <span role="cell">10 order sehari</span>
+            <strong role="cell">× 10</strong>
+          </div>
+          <div class="breakdown-row total-row" role="row">
+            <span role="cell">Total per hari</span>
+            <strong role="cell">Rp 96.000</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────── -->
+<footer class="footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="logo" aria-label="Cocourir - Beranda">
+          <div class="logo-icon" aria-hidden="true">🛵</div>
+          Cocourir
+        </a>
+        <p>Platform pengiriman makanan lokal untuk seluruh Lombok. Adil untuk merchant, driver, dan customer.</p>
+      </div>
+      <nav aria-label="Tautan platform">
+        <div class="footer-col">
+          <h5>Platform</h5>
+          <ul>
+            <li><a href="#how">Cara Kerja</a></li>
+            <li><a href="#benefits">Keunggulan</a></li>
+            <li><a href="#comparison">Perbandingan</a></li>
+            <li><a href="#coverage">Area Layanan</a></li>
+          </ul>
+        </div>
+      </nav>
+      <nav aria-label="Tautan mitra">
+        <div class="footer-col">
+          <h5>Mitra</h5>
+          <ul>
+            <li><a href="#merchant">Buka Toko</a></li>
+            <li><a href="#driver">Jadi Driver</a></li>
+            <li><a href="#">Download App</a></li>
+          </ul>
+        </div>
+      </nav>
+      <nav aria-label="Tautan legal">
+        <div class="footer-col">
+          <h5>Legal</h5>
+          <ul>
+            <li><a href="#">Syarat & Ketentuan</a></li>
+            <li><a href="#">Kebijakan Privasi</a></li>
+            <li><a href="#">Akad Kemitraan</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 Cocourir. Platform lokal untuk Lombok.</span>
+      <div class="footer-contact">
+        <a href="https://wa.me/628XXXXXXXXXX" class="contact-pill" target="_blank" rel="noopener noreferrer" aria-label="Hubungi via WhatsApp">
+          <span aria-hidden="true">📱</span> WhatsApp Admin
+        </a>
+        <a href="mailto:halo@cocourir.id" class="contact-pill" aria-label="Kirim email ke Cocourir">
+          <span aria-hidden="true">✉</span> halo@cocourir.id
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Nav scroll state
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Tab switching
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    document.getElementById('tab-' + id).classList.add('active');
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+  }
+
+  // Scroll reveal
+  const observer = new IntersectionObserver(
+    entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }),
+    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+  );
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = el.style.transitionDelay || `${i * 0.04}s`;
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>
