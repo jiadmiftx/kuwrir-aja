@@ -46,7 +46,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <aside className="hidden w-64 flex-col border-r bg-sidebar lg:flex">
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 px-6">
-          <img src="/logo_cocourir.png" alt="Cocourir" className="h-8 w-auto object-contain" />
+          <img src="/logo_cocourir.svg" alt="Cocourir" className="h-8 w-auto object-contain" />
           <h1 className="text-xl font-bold text-sidebar-foreground">Cocourir</h1>
           <span className="ml-auto rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             Admin
