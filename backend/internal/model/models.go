@@ -547,21 +547,25 @@ type WalletTransaction struct {
 }
 
 // DeliveryZone defines city-based delivery pricing zones for admin configuration.
-// The nearest active zone to the merchant is used when calculating delivery fees.
+// Zones can be nested: parent = kota/kabupaten (has fees), child = kecamatan (has polygon, inherits fees).
 type DeliveryZone struct {
 	Base
 	CityName  string  `gorm:"type:varchar(100);not null" json:"city_name"`
 	Latitude  float64 `gorm:"not null" json:"latitude"`
 	Longitude float64 `gorm:"not null" json:"longitude"`
 	RadiusKm  float64 `gorm:"default:5" json:"radius_km"`      // inside-zone radius (fallback when no polygon)
-	BaseFee   float64 `gorm:"default:15000" json:"base_fee"`   // flat fee within zone
-	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km outside zone
+	BaseFee   float64 `gorm:"default:15000" json:"base_fee"`   // flat fee within zone (parent zones only)
+	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km outside zone (parent zones only)
 	IsDefault bool    `gorm:"default:false" json:"is_default"` // fallback when no zone matches
 	IsActive  bool    `gorm:"default:true" json:"is_active"`
 
 	// OSM polygon boundary — when set, used for accurate point-in-polygon detection
 	OsmRelationID   *int64  `json:"osm_relation_id,omitempty"`
 	BoundaryGeoJSON *string `gorm:"type:text" json:"boundary_geojson,omitempty"`
+
+	// Hierarchy: nil = parent zone (kota), non-nil = child zone (kecamatan)
+	ParentZoneID *uuid.UUID    `gorm:"type:uuid;index" json:"parent_zone_id,omitempty"`
+	Children     []DeliveryZone `gorm:"-" json:"children,omitempty"` // populated by handler, not a DB column
 }
 
 // RefundRequest tracks a customer's refund request and admin resolution.

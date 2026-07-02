@@ -19,6 +19,7 @@ import { apiFetch as api } from '@/lib/api'
 interface DeliveryZone {
   id: string
   city_name: string
+  parent_zone_id?: string | null
 }
 
 interface Merchant {
@@ -205,7 +206,7 @@ export default function MerchantsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Unassigned</SelectItem>
-                        {zones.map(z => (
+                        {zones.filter(z => !z.parent_zone_id).map(z => (
                           <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>
                         ))}
                       </SelectContent>

@@ -32,6 +32,8 @@ interface DeliveryZone {
   is_active: boolean
   osm_relation_id?: number
   boundary_geojson?: string
+  parent_zone_id?: string | null
+  children?: DeliveryZone[]
 }
 
 interface NominatimResult {
@@ -64,7 +66,7 @@ const defaultSettings: Setting[] = [
   { key: 'max_cod_amount', value: '500000', label: 'Maximum COD Order Amount (IDR)' },
 ]
 
-const emptyZone = (): Partial<DeliveryZone> => ({
+const emptyZone = (parentZoneId?: string): Partial<DeliveryZone> => ({
   city_name: '',
   latitude: 0,
   longitude: 0,
@@ -75,6 +77,7 @@ const emptyZone = (): Partial<DeliveryZone> => ({
   is_active: true,
   boundary_geojson: undefined,
   osm_relation_id: undefined,
+  parent_zone_id: parentZoneId ?? null,
 })
 
 export default function SettingsPage() {
@@ -180,6 +183,12 @@ export default function SettingsPage() {
   const openAddZone = () => {
     setEditZone(null)
     setZoneForm(emptyZone())
+    setZoneDialog(true)
+  }
+
+  const openAddKecamatan = (parentZoneId: string) => {
+    setEditZone(null)
+    setZoneForm(emptyZone(parentZoneId))
     setZoneDialog(true)
   }
 
@@ -423,35 +432,71 @@ export default function SettingsPage() {
                   </TableHeader>
                   <TableBody>
                     {zones.map((zone) => (
-                      <TableRow key={zone.id}>
-                        <TableCell className="font-medium">
-                          {zone.city_name}
-                          {zone.is_default && (
-                            <Badge className="ml-2" variant="secondary">default</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {zone.latitude.toFixed(4)}, {zone.longitude.toFixed(4)}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {zone.boundary_geojson ? <span className="text-muted-foreground">— (polygon)</span> : `${zone.radius_km} km`}
-                        </TableCell>
-                        <TableCell>IDR {zone.base_fee.toLocaleString('id-ID')}</TableCell>
-                        <TableCell>IDR {zone.per_km_fee.toLocaleString('id-ID')}/km</TableCell>
-                        <TableCell>
-                          <Badge variant={zone.is_active ? 'default' : 'secondary'}>
-                            {zone.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEditZone(zone)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteZone(zone.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        {/* Parent zone row */}
+                        <TableRow key={zone.id} className="bg-muted/20">
+                          <TableCell className="font-semibold">
+                            {zone.city_name}
+                            {zone.is_default && (
+                              <Badge className="ml-2" variant="secondary">default</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {zone.latitude.toFixed(4)}, {zone.longitude.toFixed(4)}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {zone.boundary_geojson ? <span className="text-muted-foreground">— (polygon)</span> : `${zone.radius_km} km`}
+                          </TableCell>
+                          <TableCell>IDR {zone.base_fee.toLocaleString('id-ID')}</TableCell>
+                          <TableCell>IDR {zone.per_km_fee.toLocaleString('id-ID')}/km</TableCell>
+                          <TableCell>
+                            <Badge variant={zone.is_active ? 'default' : 'secondary'}>
+                              {zone.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="flex gap-1">
+                            <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => openAddKecamatan(zone.id)}>
+                              <Plus className="h-3 w-3 mr-1" /> Kecamatan
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEditZone(zone)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteZone(zone.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {/* Child zone rows (kecamatan) */}
+                        {zone.children?.map((child) => (
+                          <TableRow key={child.id} className="text-sm">
+                            <TableCell className="pl-8 text-muted-foreground">
+                              <span className="mr-2">└─</span>
+                              {child.city_name}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {child.latitude.toFixed(4)}, {child.longitude.toFixed(4)}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {child.boundary_geojson ? '✓ polygon' : `${child.radius_km} km`}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">dari parent</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">dari parent</TableCell>
+                            <TableCell>
+                              <Badge variant={child.is_active ? 'default' : 'secondary'} className="text-xs">
+                                {child.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="flex gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEditZone(child)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteZone(child.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
                     ))}
                   </TableBody>
                 </Table>
@@ -504,12 +549,34 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* Parent Zone selector */}
             <div className="space-y-2">
-              <Label>City Name</Label>
+              <Label>Tipe Zone</Label>
+              <Select
+                value={zoneForm.parent_zone_id ?? 'none'}
+                onValueChange={(v) => setZoneForm((f) => ({ ...f, parent_zone_id: v === 'none' ? null : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tipe zone..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Zone Utama (Kota/Kabupaten)</SelectItem>
+                  {zones.filter(z => !z.parent_zone_id).map(z => (
+                    <SelectItem key={z.id} value={z.id}>Kecamatan dalam {z.city_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {zoneForm.parent_zone_id && (
+                <p className="text-xs text-muted-foreground">Fee (base_fee, per_km_fee) diambil dari zone induk.</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>{zoneForm.parent_zone_id ? 'Nama Kecamatan' : 'Nama Kota/Kabupaten'}</Label>
               <Input
                 value={zoneForm.city_name || ''}
                 onChange={(e) => setZoneForm((f) => ({ ...f, city_name: e.target.value }))}
-                placeholder="e.g. Kuta, Lombok"
+                placeholder={zoneForm.parent_zone_id ? 'e.g. Kecamatan Narmada' : 'e.g. Lombok Barat'}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -547,27 +614,30 @@ export default function SettingsPage() {
                   onChange={(e) => setZoneForm((f) => ({ ...f, radius_km: parseFloat(e.target.value) }))}
                 />
               </div>
-              <div className="space-y-2">
+              <div className={`space-y-2 ${zoneForm.parent_zone_id ? 'opacity-40' : ''}`}>
                 <Label>Base Fee (IDR)</Label>
                 <Input
                   type="number"
+                  disabled={!!zoneForm.parent_zone_id}
                   value={zoneForm.base_fee || 15000}
                   onChange={(e) => setZoneForm((f) => ({ ...f, base_fee: parseFloat(e.target.value) }))}
                 />
               </div>
-              <div className="space-y-2">
+              <div className={`space-y-2 ${zoneForm.parent_zone_id ? 'opacity-40' : ''}`}>
                 <Label>Per KM (IDR)</Label>
                 <Input
                   type="number"
+                  disabled={!!zoneForm.parent_zone_id}
                   value={zoneForm.per_km_fee || 10000}
                   onChange={(e) => setZoneForm((f) => ({ ...f, per_km_fee: parseFloat(e.target.value) }))}
                 />
               </div>
             </div>
             <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className={`flex items-center gap-2 text-sm cursor-pointer ${zoneForm.parent_zone_id ? 'opacity-40' : ''}`}>
                 <input
                   type="checkbox"
+                  disabled={!!zoneForm.parent_zone_id}
                   checked={zoneForm.is_default || false}
                   onChange={(e) => setZoneForm((f) => ({ ...f, is_default: e.target.checked }))}
                 />

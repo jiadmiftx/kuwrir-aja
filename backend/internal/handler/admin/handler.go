@@ -698,14 +698,17 @@ func (h *Handler) AdminConfirmCODDeposit(c *gin.Context) {
 
 // ─── DELIVERY ZONES ──────────────────────────────────────────────────────────
 
-// GetDeliveryZones returns all city delivery zones.
+// GetDeliveryZones returns parent zones with their children (kecamatan) embedded.
 func (h *Handler) GetDeliveryZones(c *gin.Context) {
-	var zones []model.DeliveryZone
-	h.db.Order("city_name ASC").Find(&zones)
-	c.JSON(http.StatusOK, gin.H{"zones": zones})
+	var parents []model.DeliveryZone
+	h.db.Where("parent_zone_id IS NULL").Order("city_name ASC").Find(&parents)
+	for i := range parents {
+		h.db.Where("parent_zone_id = ?", parents[i].ID).Order("city_name ASC").Find(&parents[i].Children)
+	}
+	c.JSON(http.StatusOK, gin.H{"zones": parents})
 }
 
-// CreateDeliveryZone adds a new city reference point for delivery pricing.
+// CreateDeliveryZone adds a new delivery zone (parent = kota, or child = kecamatan).
 func (h *Handler) CreateDeliveryZone(c *gin.Context) {
 	var req struct {
 		CityName        string  `json:"city_name" binding:"required"`
@@ -717,23 +720,37 @@ func (h *Handler) CreateDeliveryZone(c *gin.Context) {
 		IsDefault       bool    `json:"is_default"`
 		OsmRelationID   *int64  `json:"osm_relation_id"`
 		BoundaryGeoJSON *string `json:"boundary_geojson"`
+		ParentZoneID    *string `json:"parent_zone_id"` // nil = parent zone, else = kecamatan
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.RadiusKm == 0 {
-		req.RadiusKm = 5
-	}
-	if req.BaseFee == 0 {
-		req.BaseFee = 15000
-	}
-	if req.PerKmFee == 0 {
-		req.PerKmFee = 10000
+
+	var parentUID *uuid.UUID
+	if req.ParentZoneID != nil && *req.ParentZoneID != "" {
+		uid, err := uuid.Parse(*req.ParentZoneID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid parent_zone_id"})
+			return
+		}
+		parentUID = &uid
 	}
 
-	if req.IsDefault {
-		h.db.Model(&model.DeliveryZone{}).Where("is_default = ?", true).Update("is_default", false)
+	isChild := parentUID != nil
+	if !isChild {
+		if req.RadiusKm == 0 {
+			req.RadiusKm = 5
+		}
+		if req.BaseFee == 0 {
+			req.BaseFee = 15000
+		}
+		if req.PerKmFee == 0 {
+			req.PerKmFee = 10000
+		}
+		if req.IsDefault {
+			h.db.Model(&model.DeliveryZone{}).Where("is_default = ?", true).Update("is_default", false)
+		}
 	}
 
 	zone := model.DeliveryZone{
@@ -743,10 +760,11 @@ func (h *Handler) CreateDeliveryZone(c *gin.Context) {
 		RadiusKm:        req.RadiusKm,
 		BaseFee:         req.BaseFee,
 		PerKmFee:        req.PerKmFee,
-		IsDefault:       req.IsDefault,
+		IsDefault:       req.IsDefault && !isChild,
 		IsActive:        true,
 		OsmRelationID:   req.OsmRelationID,
 		BoundaryGeoJSON: req.BoundaryGeoJSON,
+		ParentZoneID:    parentUID,
 	}
 	if err := h.db.Create(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zone"})
@@ -775,27 +793,39 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 		IsActive        bool    `json:"is_active"`
 		OsmRelationID   *int64  `json:"osm_relation_id"`
 		BoundaryGeoJSON *string `json:"boundary_geojson"`
+		ParentZoneID    *string `json:"parent_zone_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if req.IsDefault {
+	var parentUID *uuid.UUID
+	if req.ParentZoneID != nil && *req.ParentZoneID != "" {
+		uid, err := uuid.Parse(*req.ParentZoneID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid parent_zone_id"})
+			return
+		}
+		parentUID = &uid
+	}
+
+	if req.IsDefault && parentUID == nil {
 		h.db.Model(&model.DeliveryZone{}).Where("id != ? AND is_default = ?", id, true).Update("is_default", false)
 	}
 
 	updates := map[string]interface{}{
-		"city_name":         req.CityName,
-		"latitude":          req.Latitude,
-		"longitude":         req.Longitude,
-		"radius_km":         req.RadiusKm,
-		"base_fee":          req.BaseFee,
-		"per_km_fee":        req.PerKmFee,
-		"is_default":        req.IsDefault,
-		"is_active":         req.IsActive,
-		"osm_relation_id":   req.OsmRelationID,
-		"boundary_geojson":  req.BoundaryGeoJSON,
+		"city_name":        req.CityName,
+		"latitude":         req.Latitude,
+		"longitude":        req.Longitude,
+		"radius_km":        req.RadiusKm,
+		"base_fee":         req.BaseFee,
+		"per_km_fee":       req.PerKmFee,
+		"is_default":       req.IsDefault && parentUID == nil,
+		"is_active":        req.IsActive,
+		"osm_relation_id":  req.OsmRelationID,
+		"boundary_geojson": req.BoundaryGeoJSON,
+		"parent_zone_id":   parentUID,
 	}
 	h.db.Model(&zone).Updates(updates)
 	c.JSON(http.StatusOK, gin.H{"zone": zone})

@@ -20,6 +20,7 @@ import { apiFetch as api } from '@/lib/api'
 interface DeliveryZone {
   id: string
   city_name: string
+  parent_zone_id?: string | null
 }
 
 interface Driver {
@@ -253,7 +254,7 @@ export default function DriversPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Semua Wilayah</SelectItem>
-                        {zones.map(z => (
+                        {zones.filter(z => !z.parent_zone_id).map(z => (
                           <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>
                         ))}
                       </SelectContent>

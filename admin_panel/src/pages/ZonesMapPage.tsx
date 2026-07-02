@@ -27,6 +27,8 @@ interface Zone {
   is_active: boolean
   is_default: boolean
   boundary_geojson?: string
+  parent_zone_id?: string | null
+  children?: Zone[]
 }
 
 interface Driver {
@@ -124,52 +126,76 @@ export default function ZonesMapPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
 
-            {/* Zone areas: GeoJSON polygon if available, else circle */}
-            {showZones && zones.filter(z => z.is_active && z.latitude && z.longitude).map((zone, i) => {
+            {/* Zone areas: parent zones + their kecamatan children */}
+            {showZones && zones.filter(z => z.is_active).map((zone, i) => {
               const color = ZONE_COLORS[i % ZONE_COLORS.length]
-              const popup = (
-                <Popup>
-                  <div className="space-y-1 text-sm min-w-[180px]">
-                    <div className="font-semibold text-base">{zone.city_name}</div>
-                    {zone.is_default && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">Default</span>}
-                    {zone.boundary_geojson
-                      ? <div className="text-xs text-green-600">✓ Batas wilayah polygon</div>
-                      : <div>Radius: {zone.radius_km} km</div>
-                    }
-                    <div>Base fee: {fmt(zone.base_fee)}</div>
-                    <div>Per KM extra: {fmt(zone.per_km_fee)}/km</div>
-                    <div className="text-xs text-gray-500">
-                      {drivers.filter(d => d.zone_id === zone.id).length} driver ·{' '}
-                      {merchants.filter(m => m.zone_id === zone.id).length} merchant
+
+              const renderZoneLayer = (z: Zone, col: string, isChild = false) => {
+                const popup = (
+                  <Popup>
+                    <div className="space-y-1 text-sm min-w-[180px]">
+                      {isChild && <div className="text-xs text-muted-foreground">Kecamatan · {zone.city_name}</div>}
+                      <div className="font-semibold text-base">{z.city_name}</div>
+                      {z.is_default && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">Default</span>}
+                      {z.boundary_geojson
+                        ? <div className="text-xs text-green-600">✓ Polygon kecamatan</div>
+                        : <div>Radius: {z.radius_km} km</div>
+                      }
+                      {!isChild && <>
+                        <div>Base fee: {fmt(z.base_fee)}</div>
+                        <div>Per KM extra: {fmt(z.per_km_fee)}/km</div>
+                        <div className="text-xs text-gray-500">
+                          {drivers.filter(d => d.zone_id === z.id).length} driver ·{' '}
+                          {merchants.filter(m => m.zone_id === z.id).length} merchant
+                        </div>
+                      </>}
                     </div>
-                  </div>
-                </Popup>
-              )
-              if (zone.boundary_geojson) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                let geoData: any = null
-                try { geoData = JSON.parse(zone.boundary_geojson) } catch { /* skip */ }
-                if (geoData) {
+                  </Popup>
+                )
+                if (z.boundary_geojson) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  let geoData: any = null
+                  try { geoData = JSON.parse(z.boundary_geojson) } catch { /* skip */ }
+                  if (geoData) {
+                    return (
+                      <GeoJSONLayer
+                        key={z.id}
+                        data={geoData}
+                        style={() => ({
+                          color: col,
+                          fillColor: col,
+                          fillOpacity: isChild ? 0.06 : 0.1,
+                          weight: isChild ? 1 : 2,
+                          dashArray: isChild ? '4 4' : undefined,
+                        })}
+                      >
+                        {popup}
+                      </GeoJSONLayer>
+                    )
+                  }
+                }
+                if (!isChild) {
                   return (
-                    <GeoJSONLayer
-                      key={zone.id}
-                      data={geoData}
-                      style={() => ({ color, fillColor: color, fillOpacity: 0.1, weight: 2 })}
+                    <Circle
+                      key={z.id}
+                      center={[z.latitude, z.longitude]}
+                      radius={z.radius_km * 1000}
+                      pathOptions={{ color: col, fillColor: col, fillOpacity: 0.08, weight: 2 }}
                     >
                       {popup}
-                    </GeoJSONLayer>
+                    </Circle>
                   )
                 }
+                return null
               }
+
               return (
-                <Circle
-                  key={zone.id}
-                  center={[zone.latitude, zone.longitude]}
-                  radius={zone.radius_km * 1000}
-                  pathOptions={{ color, fillColor: color, fillOpacity: 0.08, weight: 2 }}
-                >
-                  {popup}
-                </Circle>
+                <>
+                  {renderZoneLayer(zone, color)}
+                  {zone.children?.filter(c => c.is_active).map(child =>
+                    renderZoneLayer(child, color, true)
+                  )}
+                </>
               )
             })}
 

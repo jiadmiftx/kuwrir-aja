@@ -967,36 +967,48 @@ func (h *Handler) loadSettings() settingsData {
 }
 
 // loadDeliveryZoneWithID finds the best matching active DeliveryZone for the given merchant lat/lng.
-// Priority: (1) zone whose polygon boundary contains the merchant, (2) nearest zone by distance.
-// Returns the matched zone, base fee, and per-km fee.
+// Priority: (1) child zone (kecamatan) polygon → return its parent zone's fees,
+//           (2) parent zone polygon, (3) nearest parent zone, (4) default zone.
 func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData) (zone *model.DeliveryZone, baseFee, perKmFee float64) {
-	var zones []model.DeliveryZone
-	h.db.Where("is_active = ?", true).Find(&zones)
+	// Priority 1: check kecamatan (child zones) by polygon
+	var children []model.DeliveryZone
+	h.db.Where("parent_zone_id IS NOT NULL AND is_active = true AND boundary_geojson IS NOT NULL").Find(&children)
+	for i := range children {
+		if pricing.PointInPolygon(lat, lng, *children[i].BoundaryGeoJSON) {
+			var parent model.DeliveryZone
+			if h.db.First(&parent, "id = ?", children[i].ParentZoneID).Error == nil {
+				return &parent, parent.BaseFee, parent.PerKmFee
+			}
+		}
+	}
 
-	if len(zones) == 0 {
+	// Priority 2+: search parent zones only
+	var parents []model.DeliveryZone
+	h.db.Where("parent_zone_id IS NULL AND is_active = true").Find(&parents)
+
+	if len(parents) == 0 {
 		return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
 	}
 
-	// Priority 1: zone with polygon that contains the merchant point
-	for i := range zones {
-		if zones[i].BoundaryGeoJSON != nil && pricing.PointInPolygon(lat, lng, *zones[i].BoundaryGeoJSON) {
-			return &zones[i], zones[i].BaseFee, zones[i].PerKmFee
+	// Priority 2: parent zone with polygon that contains the merchant
+	for i := range parents {
+		if parents[i].BoundaryGeoJSON != nil && pricing.PointInPolygon(lat, lng, *parents[i].BoundaryGeoJSON) {
+			return &parents[i], parents[i].BaseFee, parents[i].PerKmFee
 		}
 	}
 
-	// Priority 2: nearest zone by haversine distance (radius-only zones)
+	// Priority 3: nearest parent zone by haversine (within 50km)
 	var nearest *model.DeliveryZone
 	var defaultZone *model.DeliveryZone
 	minDist := math.MaxFloat64
-
-	for i := range zones {
-		if zones[i].IsDefault {
-			defaultZone = &zones[i]
+	for i := range parents {
+		if parents[i].IsDefault {
+			defaultZone = &parents[i]
 		}
-		d := haversineDistance(lat, lng, zones[i].Latitude, zones[i].Longitude)
+		d := haversineDistance(lat, lng, parents[i].Latitude, parents[i].Longitude)
 		if d < minDist {
 			minDist = d
-			nearest = &zones[i]
+			nearest = &parents[i]
 		}
 	}
 
