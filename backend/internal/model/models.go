@@ -121,6 +121,9 @@ type Merchant struct {
 	CanSelfDeliver  bool    `gorm:"default:false" json:"can_self_deliver"`
 	SelfDeliveryFee float64 `gorm:"default:0" json:"self_delivery_fee"`
 
+	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
+	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
+
 	// Verification documents (placeholder: local URLs, later: R2)
 	OwnerKtpURL        string `json:"owner_ktp_url,omitempty"`
 	BusinessLicenseURL string `json:"business_license_url,omitempty"` // SIUP / IUMK
@@ -195,6 +198,9 @@ type Driver struct {
 	TotalDelivered int       `gorm:"default:0" json:"total_delivered"`
 	CodHolding     float64   `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
 
+	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
+	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
+
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
@@ -231,8 +237,9 @@ type Order struct {
 	ReceiverName   string  `json:"receiver_name,omitempty"`
 	ReceiverPhone  string  `json:"receiver_phone,omitempty"`
 
-	DistanceKm float64 `json:"distance_km"`
-	Notes      string  `json:"notes,omitempty"`
+	DistanceKm float64    `json:"distance_km"`
+	ZoneID     *uuid.UUID `gorm:"type:uuid" json:"zone_id,omitempty"`
+	Notes      string     `json:"notes,omitempty"`
 
 	// Service-specific fields (service_type = "service")
 	PickupScheduledAt *time.Time `json:"pickup_scheduled_at,omitempty"` // waktu jemput yang diminta customer

@@ -2,6 +2,7 @@ package merchant
 
 import (
 	"fmt"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/pricing"
 	"github.com/kuwrir-platform/backend/internal/upload"
 )
 
@@ -21,6 +23,41 @@ type Handler struct {
 
 func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{db: db}
+}
+
+// autoAssignZone sets the nearest active zone on the merchant if none is assigned.
+func (h *Handler) autoAssignZone(merchant *model.Merchant) {
+	if merchant.ZoneID != nil {
+		return
+	}
+	var zones []model.DeliveryZone
+	h.db.Where("is_active = ?", true).Find(&zones)
+	if len(zones) == 0 {
+		return
+	}
+	var nearest *model.DeliveryZone
+	minDist := math.MaxFloat64
+	for i := range zones {
+		d := haversineKm(merchant.Latitude, merchant.Longitude, zones[i].Latitude, zones[i].Longitude)
+		if d < minDist {
+			minDist = d
+			nearest = &zones[i]
+		}
+	}
+	if nearest != nil && minDist <= 100 {
+		h.db.Model(merchant).Update("zone_id", nearest.ID)
+		merchant.ZoneID = &nearest.ID
+	}
+}
+
+func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
+	const R = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLng := (lng2 - lng1) * math.Pi / 180.0
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180.0)*math.Cos(lat2*math.Pi/180.0)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
 // RegisterRoutes sets up merchant routes
@@ -194,7 +231,8 @@ func (h *Handler) GetMerchant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"merchant": merchant})
 }
 
-// GetProducts returns the full product catalog for a merchant
+// GetProducts returns the full product catalog for a merchant, with prices
+// already including the platform markup (what the customer actually pays).
 func (h *Handler) GetProducts(c *gin.Context) {
 	id := c.Param("id")
 
@@ -207,6 +245,7 @@ func (h *Handler) GetProducts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
+	pricing.ApplyMarkupToCategories(h.db, categories)
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
@@ -315,6 +354,8 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		return
 	}
 
+	h.autoAssignZone(&merchant)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"merchant": merchant,
 		"message":  "Store registered. Admin will review within 1-2 business days.",
@@ -401,6 +442,14 @@ func (h *Handler) UpdateMyMerchant(c *gin.Context) {
 	if err := h.db.Model(&model.Merchant{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update merchant"})
 		return
+	}
+
+	// Re-assign zone if location changed and zone not yet set
+	if req.Latitude != nil || req.Longitude != nil {
+		var m model.Merchant
+		if h.db.Where("user_id = ?", userID).First(&m).Error == nil {
+			h.autoAssignZone(&m)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Merchant updated"})

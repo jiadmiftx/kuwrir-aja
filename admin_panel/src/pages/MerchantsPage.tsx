@@ -4,13 +4,22 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
+
+interface DeliveryZone {
+  id: string
+  city_name: string
+}
 
 interface Merchant {
   id: string
@@ -23,11 +32,14 @@ interface Merchant {
   is_verified: boolean
   is_open: boolean
   created_at: string
+  zone_id?: string | null
+  zone?: DeliveryZone
 }
 
 export default function MerchantsPage() {
   const [search, setSearch] = useState('')
   const [merchants, setMerchants] = useState<Merchant[]>([])
+  const [zones, setZones] = useState<DeliveryZone[]>([])
   const [selected, setSelected] = useState<Merchant | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -43,7 +55,31 @@ export default function MerchantsPage() {
     finally { setIsLoading(false) }
   }
 
-  useEffect(() => { fetchMerchants() }, [])
+  const fetchZones = async () => {
+    const res = await api('/api/v1/admin/delivery-zones')
+    if (res.ok) {
+      const data = await res.json()
+      setZones(data.zones ?? [])
+    }
+  }
+
+  const assignZone = async (merchantId: string, zoneId: string) => {
+    const res = await api(`/api/v1/admin/merchants/${merchantId}/zone`, {
+      method: 'PATCH',
+      body: JSON.stringify({ zone_id: zoneId === 'none' ? null : zoneId }),
+    })
+    if (res.ok) {
+      const z = zones.find(z => z.id === zoneId)
+      setMerchants(prev => prev.map(m =>
+        m.id === merchantId ? { ...m, zone_id: zoneId === 'none' ? undefined : zoneId, zone: z } : m
+      ))
+      toast.success('Zone updated')
+    } else {
+      toast.error('Failed to update zone')
+    }
+  }
+
+  useEffect(() => { fetchMerchants(); fetchZones() }, [])
 
   const verify = async (id: string, verified: boolean) => {
     setActionLoading(id + (verified ? '-approve' : '-reject'))
@@ -131,6 +167,7 @@ export default function MerchantsPage() {
               <TableRow>
                 <TableHead>Merchant</TableHead>
                 <TableHead>Location</TableHead>
+                <TableHead>Wilayah</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Open</TableHead>
@@ -139,11 +176,11 @@ export default function MerchantsPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8">
+                <TableRow><TableCell colSpan={7} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                 </TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No merchants found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No merchants found</TableCell></TableRow>
               ) : filtered.map(m => (
                 <TableRow key={m.id}>
                   <TableCell>
@@ -154,6 +191,22 @@ export default function MerchantsPage() {
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="h-3 w-3 shrink-0" />{m.address}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={m.zone_id ?? 'none'}
+                      onValueChange={val => val !== null && assignZone(m.id, val)}
+                    >
+                      <SelectTrigger className="h-8 w-36 text-xs">
+                        <SelectValue placeholder="Pilih wilayah" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {zones.map(z => (
+                          <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

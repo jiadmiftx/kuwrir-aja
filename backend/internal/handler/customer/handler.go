@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/pricing"
 	"github.com/kuwrir-platform/backend/internal/service"
 )
 
@@ -71,6 +72,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 
 	// 1. Load system settings
 	settings := h.loadSettings()
+	pricingSettings := pricing.LoadSettings(h.db)
 
 	// 2. Load merchant
 	var merchant model.Merchant
@@ -91,7 +93,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		req.DropoffLat, req.DropoffLng,
 	)
 
-	zoneBasisFee, zonePerKmFee := h.loadDeliveryZone(merchant.Latitude, merchant.Longitude, settings)
+	selectedZone, zoneBasisFee, zonePerKmFee := h.loadDeliveryZoneWithID(merchant.Latitude, merchant.Longitude, settings)
 	deliveryFee := zoneBasisFee
 	if distanceKm > 5.0 {
 		extraKm := distanceKm - 5.0
@@ -121,9 +123,10 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 			return
 		}
 
-		// Apply platform markup
-		markupAmount := product.Price * (settings.PlatformMarkupPct / 100.0)
-		priceWithMarkup := product.Price + markupAmount
+		// Apply platform markup — same formula/rounding as the catalog price the
+		// customer saw, so the charged total never drifts from what was displayed.
+		priceWithMarkup := pricing.ApplyMarkup(product.Price, pricingSettings)
+		markupAmount := priceWithMarkup - product.Price
 		itemTotal := priceWithMarkup * float64(reqItem.Quantity)
 
 		productID, _ := uuid.Parse(reqItem.ProductID)
@@ -247,6 +250,9 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		Notes:      req.Notes,
 		PlacedAt:   &now,
 		Items:      orderItems,
+	}
+	if selectedZone != nil {
+		order.ZoneID = &selectedZone.ID
 	}
 
 	if err := h.db.Create(&order).Error; err != nil {
@@ -522,11 +528,12 @@ func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 
 	var orders []model.Order
 	// Show: (a) unassigned orders, OR (b) orders admin pre-assigned to this specific driver
-	h.db.Where("status = ? AND (driver_id IS NULL OR driver_id = ?)", model.OrderStatusReady, driver.ID).
-		Preload("Merchant").
-		Preload("Customer").
-		Order("created_at ASC").
-		Find(&orders)
+	// If driver has a zone, only show orders from that zone (or orders with no zone = legacy/fallback)
+	query := h.db.Where("status = ? AND (driver_id IS NULL OR driver_id = ?)", model.OrderStatusReady, driver.ID)
+	if driver.ZoneID != nil {
+		query = query.Where("zone_id = ? OR zone_id IS NULL", driver.ZoneID)
+	}
+	query.Preload("Merchant").Preload("Customer").Order("created_at ASC").Find(&orders)
 
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
@@ -942,14 +949,15 @@ func (h *Handler) loadSettings() settingsData {
 	return s
 }
 
-// loadDeliveryZone finds the nearest active DeliveryZone to the given lat/lng.
+// loadDeliveryZoneWithID finds the nearest active DeliveryZone to the given lat/lng.
+// Returns the matched zone (for storing zone_id on order), base fee, and per-km fee.
 // Falls back to the default zone, then to system-setting values.
-func (h *Handler) loadDeliveryZone(lat, lng float64, fallback settingsData) (baseFee, perKmFee float64) {
+func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData) (zone *model.DeliveryZone, baseFee, perKmFee float64) {
 	var zones []model.DeliveryZone
 	h.db.Where("is_active = ?", true).Find(&zones)
 
 	if len(zones) == 0 {
-		return fallback.InsideZoneFee, fallback.FeePerKmOutside
+		return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
 	}
 
 	var nearest *model.DeliveryZone
@@ -967,14 +975,13 @@ func (h *Handler) loadDeliveryZone(lat, lng float64, fallback settingsData) (bas
 		}
 	}
 
-	// Use nearest zone if within 50km, else default zone, else first zone
 	if nearest != nil && minDist <= 50 {
-		return nearest.BaseFee, nearest.PerKmFee
+		return nearest, nearest.BaseFee, nearest.PerKmFee
 	}
 	if defaultZone != nil {
-		return defaultZone.BaseFee, defaultZone.PerKmFee
+		return defaultZone, defaultZone.BaseFee, defaultZone.PerKmFee
 	}
-	return nearest.BaseFee, nearest.PerKmFee
+	return nearest, nearest.BaseFee, nearest.PerKmFee
 }
 
 // haversineDistance calculates distance between two GPS coordinates in km

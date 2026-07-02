@@ -5,13 +5,22 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Search, Bike, HandCoins, History, Loader2, Ban, CheckCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
+
+interface DeliveryZone {
+  id: string
+  city_name: string
+}
 
 interface Driver {
   id: string
@@ -22,6 +31,8 @@ interface Driver {
   rating: number
   total_delivered: number
   cash_balance: number
+  zone_id?: string | null
+  zone?: DeliveryZone
   user?: { id: string; name: string; phone: string; is_active: boolean }
 }
 
@@ -39,6 +50,7 @@ const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 export default function DriversPage() {
   const [search, setSearch] = useState('')
   const [drivers, setDrivers] = useState<Driver[]>([])
+  const [zones, setZones] = useState<DeliveryZone[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -60,7 +72,31 @@ export default function DriversPage() {
     } finally { setIsLoading(false) }
   }
 
-  useEffect(() => { fetchDrivers() }, [])
+  const fetchZones = async () => {
+    const res = await api('/api/v1/admin/delivery-zones')
+    if (res.ok) {
+      const data = await res.json()
+      setZones(data.zones ?? [])
+    }
+  }
+
+  const assignZone = async (driverId: string, zoneId: string) => {
+    const res = await api(`/api/v1/admin/drivers/${driverId}/zone`, {
+      method: 'PATCH',
+      body: JSON.stringify({ zone_id: zoneId === 'none' ? null : zoneId }),
+    })
+    if (res.ok) {
+      const z = zones.find(z => z.id === zoneId)
+      setDrivers(prev => prev.map(d =>
+        d.id === driverId ? { ...d, zone_id: zoneId === 'none' ? undefined : zoneId, zone: z } : d
+      ))
+      toast.success('Zone updated')
+    } else {
+      toast.error('Failed to update zone')
+    }
+  }
+
+  useEffect(() => { fetchDrivers(); fetchZones() }, [])
 
   const toggleActive = async (driver: Driver) => {
     if (!driver.user) return
@@ -181,6 +217,7 @@ export default function DriversPage() {
               <TableRow>
                 <TableHead>Driver</TableHead>
                 <TableHead>Kendaraan</TableHead>
+                <TableHead>Wilayah</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Deliveries</TableHead>
                 <TableHead>Cash COD</TableHead>
@@ -189,11 +226,11 @@ export default function DriversPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8">
+                <TableRow><TableCell colSpan={7} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                 </TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No drivers found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No drivers found</TableCell></TableRow>
               ) : filtered.map(d => (
                 <TableRow key={d.id}>
                   <TableCell>
@@ -205,6 +242,22 @@ export default function DriversPage() {
                       <Bike className="h-4 w-4 text-muted-foreground" />
                       {d.vehicle_type} · {d.vehicle_plate}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={d.zone_id ?? 'none'}
+                      onValueChange={val => val !== null && assignZone(d.id, val)}
+                    >
+                      <SelectTrigger className="h-8 w-36 text-xs">
+                        <SelectValue placeholder="Pilih wilayah" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Semua Wilayah</SelectItem>
+                        {zones.map(z => (
+                          <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">

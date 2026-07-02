@@ -13,6 +13,7 @@ import {
   ClipboardList,
   TrendingUp,
   MessageSquare,
+  Map,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -28,6 +29,7 @@ const navItems = [
   { to: '/settlements', icon: Banknote, label: 'Settlements' },
   { to: '/revenue', icon: TrendingUp, label: 'Revenue' },
   { to: '/support', icon: MessageSquare, label: 'Support Chat' },
+  { to: '/zones-map', icon: Map, label: 'Zone Map' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

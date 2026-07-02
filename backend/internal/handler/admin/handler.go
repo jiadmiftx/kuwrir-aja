@@ -82,6 +82,10 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/delivery-zones", h.CreateDeliveryZone)
 	r.PUT("/delivery-zones/:id", h.UpdateDeliveryZone)
 	r.DELETE("/delivery-zones/:id", h.DeleteDeliveryZone)
+
+	// Zone assignment
+	r.PATCH("/drivers/:id/zone", h.AssignDriverZone)
+	r.PATCH("/merchants/:id/zone", h.AssignMerchantZone)
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -185,7 +189,7 @@ func (h *Handler) UpdateSetting(c *gin.Context) {
 
 func (h *Handler) GetDrivers(c *gin.Context) {
 	var drivers []model.Driver
-	if err := h.db.Preload("User").Find(&drivers).Error; err != nil {
+	if err := h.db.Preload("User").Preload("Zone").Find(&drivers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch drivers"})
 		return
 	}
@@ -203,7 +207,7 @@ func (h *Handler) GetCustomers(c *gin.Context) {
 
 func (h *Handler) GetMerchants(c *gin.Context) {
 	var merchants []model.Merchant
-	if err := h.db.Find(&merchants).Error; err != nil {
+	if err := h.db.Preload("Zone").Find(&merchants).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch merchants"})
 		return
 	}
@@ -792,6 +796,64 @@ func (h *Handler) DeleteDeliveryZone(c *gin.Context) {
 	id := c.Param("id")
 	h.db.Where("id = ?", id).Delete(&model.DeliveryZone{})
 	c.JSON(http.StatusOK, gin.H{"message": "Zone deleted"})
+}
+
+// ─── ZONE ASSIGNMENT ─────────────────────────────────────────────────────────
+
+// AssignDriverZone sets or clears the operating zone for a driver.
+func (h *Handler) AssignDriverZone(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		ZoneID *string `json:"zone_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{"zone_id": nil}
+	if req.ZoneID != nil && *req.ZoneID != "" {
+		parsed, err := uuid.Parse(*req.ZoneID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid zone_id"})
+			return
+		}
+		updates["zone_id"] = parsed
+	}
+
+	if err := h.db.Model(&model.Driver{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update driver zone"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Driver zone updated"})
+}
+
+// AssignMerchantZone sets or clears the operating zone for a merchant.
+func (h *Handler) AssignMerchantZone(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		ZoneID *string `json:"zone_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{"zone_id": nil}
+	if req.ZoneID != nil && *req.ZoneID != "" {
+		parsed, err := uuid.Parse(*req.ZoneID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid zone_id"})
+			return
+		}
+		updates["zone_id"] = parsed
+	}
+
+	if err := h.db.Model(&model.Merchant{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update merchant zone"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Merchant zone updated"})
 }
 
 // ─── DRIVER ASSIGNMENT ────────────────────────────────────────────────────────
