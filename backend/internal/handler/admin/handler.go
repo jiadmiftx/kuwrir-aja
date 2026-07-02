@@ -179,8 +179,11 @@ func (h *Handler) UpdateSetting(c *gin.Context) {
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Setting not found"})
-		return
+		// Key doesn't exist yet — create it (label defaults to key name)
+		if err := h.db.Create(&model.SystemSetting{Key: key, Value: req.Value, Label: key}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create setting"})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Setting updated"})
 }

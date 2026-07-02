@@ -5,24 +5,44 @@ import (
 	"math"
 )
 
-// geoJSONPolygon is the subset of GeoJSON Polygon we need.
 type geoJSONPolygon struct {
-	Type        string          `json:"type"`
-	Coordinates [][][2]float64  `json:"coordinates"` // [ring][point][lng, lat]
+	Type        string         `json:"type"`
+	Coordinates [][][2]float64 `json:"coordinates"` // [ring][point][lng, lat]
 }
 
-// PointInPolygon returns true if (lat, lng) is inside the GeoJSON Polygon string.
+type geoJSONMultiPolygon struct {
+	Type        string           `json:"type"`
+	Coordinates [][][][2]float64 `json:"coordinates"` // [polygon][ring][point][lng, lat]
+}
+
+// PointInPolygon returns true if (lat, lng) is inside the GeoJSON Polygon or MultiPolygon string.
 // Uses the ray casting algorithm. GeoJSON coordinates are [longitude, latitude].
-// Falls back to false on any parse error.
 func PointInPolygon(lat, lng float64, geoJSONStr string) bool {
-	var poly geoJSONPolygon
-	if err := json.Unmarshal([]byte(geoJSONStr), &poly); err != nil {
+	var base struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(geoJSONStr), &base); err != nil {
 		return false
 	}
-	if poly.Type != "Polygon" || len(poly.Coordinates) == 0 {
-		return false
+	switch base.Type {
+	case "Polygon":
+		var poly geoJSONPolygon
+		if err := json.Unmarshal([]byte(geoJSONStr), &poly); err != nil || len(poly.Coordinates) == 0 {
+			return false
+		}
+		return rayCast(lng, lat, poly.Coordinates[0])
+	case "MultiPolygon":
+		var mp geoJSONMultiPolygon
+		if err := json.Unmarshal([]byte(geoJSONStr), &mp); err != nil {
+			return false
+		}
+		for _, polygon := range mp.Coordinates {
+			if len(polygon) > 0 && rayCast(lng, lat, polygon[0]) {
+				return true
+			}
+		}
 	}
-	return rayCast(lng, lat, poly.Coordinates[0]) // outer ring only
+	return false
 }
 
 // rayCast checks point (x, y) against a ring of [lng, lat] pairs.

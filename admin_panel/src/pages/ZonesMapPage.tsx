@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Circle, GeoJSON, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, GeoJSON as GeoJSONLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -146,17 +146,18 @@ export default function ZonesMapPage() {
                 </Popup>
               )
               if (zone.boundary_geojson) {
-                let geoData: GeoJSON.GeoJsonObject | null = null
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let geoData: any = null
                 try { geoData = JSON.parse(zone.boundary_geojson) } catch { /* skip */ }
                 if (geoData) {
                   return (
-                    <GeoJSON
+                    <GeoJSONLayer
                       key={zone.id}
                       data={geoData}
                       style={() => ({ color, fillColor: color, fillOpacity: 0.1, weight: 2 })}
                     >
                       {popup}
-                    </GeoJSON>
+                    </GeoJSONLayer>
                   )
                 }
               }
