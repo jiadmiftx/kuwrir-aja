@@ -224,29 +224,43 @@ export default function SettingsPage() {
                 <CardDescription>Changes apply to all new orders immediately.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {settings.map((setting) => (
-                  <div key={setting.key} className="space-y-2">
-                    <Label htmlFor={setting.key}>{setting.label}</Label>
-                    {setting.key === MARKUP_MODE_KEY ? (
-                      <Select value={setting.value} onValueChange={(v) => v && updateValue(setting.key, v)}>
-                        <SelectTrigger id={setting.key}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percentage">Percentage (% dari harga produk)</SelectItem>
-                          <SelectItem value="fixed">Fixed (nominal tetap per produk)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id={setting.key}
-                        type="number"
-                        value={setting.value}
-                        onChange={(e) => updateValue(setting.key, e.target.value)}
-                      />
-                    )}
-                  </div>
-                ))}
+                {settings.map((setting) => {
+                  const isPctInput = setting.key === 'platform_markup_percentage'
+                  const isFixedInput = setting.key === 'product_markup_fixed_amount'
+                  const isInactive =
+                    (isPctInput && markupMode === 'fixed') ||
+                    (isFixedInput && markupMode === 'percentage')
+
+                  return (
+                    <div key={setting.key} className={`space-y-2 transition-opacity ${isInactive ? 'opacity-40' : ''}`}>
+                      <Label htmlFor={setting.key}>{setting.label}</Label>
+                      {setting.key === MARKUP_MODE_KEY ? (
+                        <Select value={setting.value} onValueChange={(v) => v && updateValue(setting.key, v)}>
+                          <SelectTrigger id={setting.key}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Percentage (% dari harga produk)</SelectItem>
+                            <SelectItem value="fixed">Fixed (nominal tetap per produk)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id={setting.key}
+                          type="number"
+                          value={setting.value}
+                          onChange={(e) => updateValue(setting.key, e.target.value)}
+                          disabled={isInactive}
+                        />
+                      )}
+                      {isInactive && (
+                        <p className="text-xs text-muted-foreground">
+                          Tidak berlaku saat mode = {markupMode}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
                 <Separator />
                 <Button onClick={handleSave} disabled={saving} className="w-full">
                   <Save className="mr-2 h-4 w-4" />
