@@ -705,13 +705,15 @@ func (h *Handler) GetDeliveryZones(c *gin.Context) {
 // CreateDeliveryZone adds a new city reference point for delivery pricing.
 func (h *Handler) CreateDeliveryZone(c *gin.Context) {
 	var req struct {
-		CityName  string  `json:"city_name" binding:"required"`
-		Latitude  float64 `json:"latitude" binding:"required"`
-		Longitude float64 `json:"longitude" binding:"required"`
-		RadiusKm  float64 `json:"radius_km"`
-		BaseFee   float64 `json:"base_fee"`
-		PerKmFee  float64 `json:"per_km_fee"`
-		IsDefault bool    `json:"is_default"`
+		CityName        string  `json:"city_name" binding:"required"`
+		Latitude        float64 `json:"latitude" binding:"required"`
+		Longitude       float64 `json:"longitude" binding:"required"`
+		RadiusKm        float64 `json:"radius_km"`
+		BaseFee         float64 `json:"base_fee"`
+		PerKmFee        float64 `json:"per_km_fee"`
+		IsDefault       bool    `json:"is_default"`
+		OsmRelationID   *int64  `json:"osm_relation_id"`
+		BoundaryGeoJSON *string `json:"boundary_geojson"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -727,20 +729,21 @@ func (h *Handler) CreateDeliveryZone(c *gin.Context) {
 		req.PerKmFee = 10000
 	}
 
-	// If this is set as default, unset other defaults
 	if req.IsDefault {
 		h.db.Model(&model.DeliveryZone{}).Where("is_default = ?", true).Update("is_default", false)
 	}
 
 	zone := model.DeliveryZone{
-		CityName:  req.CityName,
-		Latitude:  req.Latitude,
-		Longitude: req.Longitude,
-		RadiusKm:  req.RadiusKm,
-		BaseFee:   req.BaseFee,
-		PerKmFee:  req.PerKmFee,
-		IsDefault: req.IsDefault,
-		IsActive:  true,
+		CityName:        req.CityName,
+		Latitude:        req.Latitude,
+		Longitude:       req.Longitude,
+		RadiusKm:        req.RadiusKm,
+		BaseFee:         req.BaseFee,
+		PerKmFee:        req.PerKmFee,
+		IsDefault:       req.IsDefault,
+		IsActive:        true,
+		OsmRelationID:   req.OsmRelationID,
+		BoundaryGeoJSON: req.BoundaryGeoJSON,
 	}
 	if err := h.db.Create(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zone"})
@@ -759,14 +762,16 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 	}
 
 	var req struct {
-		CityName  string  `json:"city_name"`
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-		RadiusKm  float64 `json:"radius_km"`
-		BaseFee   float64 `json:"base_fee"`
-		PerKmFee  float64 `json:"per_km_fee"`
-		IsDefault bool    `json:"is_default"`
-		IsActive  bool    `json:"is_active"`
+		CityName        string  `json:"city_name"`
+		Latitude        float64 `json:"latitude"`
+		Longitude       float64 `json:"longitude"`
+		RadiusKm        float64 `json:"radius_km"`
+		BaseFee         float64 `json:"base_fee"`
+		PerKmFee        float64 `json:"per_km_fee"`
+		IsDefault       bool    `json:"is_default"`
+		IsActive        bool    `json:"is_active"`
+		OsmRelationID   *int64  `json:"osm_relation_id"`
+		BoundaryGeoJSON *string `json:"boundary_geojson"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -778,14 +783,16 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{
-		"city_name":  req.CityName,
-		"latitude":   req.Latitude,
-		"longitude":  req.Longitude,
-		"radius_km":  req.RadiusKm,
-		"base_fee":   req.BaseFee,
-		"per_km_fee": req.PerKmFee,
-		"is_default": req.IsDefault,
-		"is_active":  req.IsActive,
+		"city_name":         req.CityName,
+		"latitude":          req.Latitude,
+		"longitude":         req.Longitude,
+		"radius_km":         req.RadiusKm,
+		"base_fee":          req.BaseFee,
+		"per_km_fee":        req.PerKmFee,
+		"is_default":        req.IsDefault,
+		"is_active":         req.IsActive,
+		"osm_relation_id":   req.OsmRelationID,
+		"boundary_geojson":  req.BoundaryGeoJSON,
 	}
 	h.db.Model(&zone).Updates(updates)
 	c.JSON(http.StatusOK, gin.H{"zone": zone})

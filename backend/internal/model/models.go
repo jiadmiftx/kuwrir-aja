@@ -551,11 +551,15 @@ type DeliveryZone struct {
 	CityName  string  `gorm:"type:varchar(100);not null" json:"city_name"`
 	Latitude  float64 `gorm:"not null" json:"latitude"`
 	Longitude float64 `gorm:"not null" json:"longitude"`
-	RadiusKm  float64 `gorm:"default:5" json:"radius_km"`     // inside-zone radius
-	BaseFee   float64 `gorm:"default:15000" json:"base_fee"`  // fee within radius
-	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km beyond radius
+	RadiusKm  float64 `gorm:"default:5" json:"radius_km"`      // inside-zone radius (fallback when no polygon)
+	BaseFee   float64 `gorm:"default:15000" json:"base_fee"`   // flat fee within zone
+	PerKmFee  float64 `gorm:"default:10000" json:"per_km_fee"` // fee per km outside zone
 	IsDefault bool    `gorm:"default:false" json:"is_default"` // fallback when no zone matches
 	IsActive  bool    `gorm:"default:true" json:"is_active"`
+
+	// OSM polygon boundary — when set, used for accurate point-in-polygon detection
+	OsmRelationID   *int64  `json:"osm_relation_id,omitempty"`
+	BoundaryGeoJSON *string `gorm:"type:text" json:"boundary_geojson,omitempty"`
 }
 
 // RefundRequest tracks a customer's refund request and admin resolution.

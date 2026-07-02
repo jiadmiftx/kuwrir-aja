@@ -94,11 +94,20 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	)
 
 	selectedZone, zoneBasisFee, zonePerKmFee := h.loadDeliveryZoneWithID(merchant.Latitude, merchant.Longitude, settings)
-	deliveryFee := zoneBasisFee
-	if distanceKm > 5.0 {
-		extraKm := distanceKm - 5.0
-		deliveryFee = zoneBasisFee + (extraKm * zonePerKmFee)
+
+	var boundaryGeoJSON *string
+	var zoneRadiusKm float64 = 5.0
+	if selectedZone != nil {
+		boundaryGeoJSON = selectedZone.BoundaryGeoJSON
+		zoneRadiusKm = selectedZone.RadiusKm
 	}
+	deliveryFee := pricing.DeliveryFeeForDropoff(
+		req.DropoffLat, req.DropoffLng,
+		pricing.Settings{}, // not used in this call
+		zoneBasisFee, zonePerKmFee, zoneRadiusKm,
+		boundaryGeoJSON,
+		merchant.Latitude, merchant.Longitude,
+	)
 
 	// 4. Build order items with markup calculation
 	var orderItems []model.OrderItem
@@ -949,9 +958,9 @@ func (h *Handler) loadSettings() settingsData {
 	return s
 }
 
-// loadDeliveryZoneWithID finds the nearest active DeliveryZone to the given lat/lng.
-// Returns the matched zone (for storing zone_id on order), base fee, and per-km fee.
-// Falls back to the default zone, then to system-setting values.
+// loadDeliveryZoneWithID finds the best matching active DeliveryZone for the given merchant lat/lng.
+// Priority: (1) zone whose polygon boundary contains the merchant, (2) nearest zone by distance.
+// Returns the matched zone, base fee, and per-km fee.
 func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData) (zone *model.DeliveryZone, baseFee, perKmFee float64) {
 	var zones []model.DeliveryZone
 	h.db.Where("is_active = ?", true).Find(&zones)
@@ -960,9 +969,17 @@ func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData
 		return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
 	}
 
+	// Priority 1: zone with polygon that contains the merchant point
+	for i := range zones {
+		if zones[i].BoundaryGeoJSON != nil && pricing.PointInPolygon(lat, lng, *zones[i].BoundaryGeoJSON) {
+			return &zones[i], zones[i].BaseFee, zones[i].PerKmFee
+		}
+	}
+
+	// Priority 2: nearest zone by haversine distance (radius-only zones)
 	var nearest *model.DeliveryZone
-	minDist := math.MaxFloat64
 	var defaultZone *model.DeliveryZone
+	minDist := math.MaxFloat64
 
 	for i := range zones {
 		if zones[i].IsDefault {
@@ -981,7 +998,10 @@ func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData
 	if defaultZone != nil {
 		return defaultZone, defaultZone.BaseFee, defaultZone.PerKmFee
 	}
-	return nearest, nearest.BaseFee, nearest.PerKmFee
+	if nearest != nil {
+		return nearest, nearest.BaseFee, nearest.PerKmFee
+	}
+	return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
 }
 
 // haversineDistance calculates distance between two GPS coordinates in km

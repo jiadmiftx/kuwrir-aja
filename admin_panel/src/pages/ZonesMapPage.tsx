@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Circle, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, GeoJSON, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +26,7 @@ interface Zone {
   per_km_fee: number
   is_active: boolean
   is_default: boolean
+  boundary_geojson?: string
 }
 
 interface Driver {
@@ -123,24 +124,18 @@ export default function ZonesMapPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
 
-            {/* Zone circles */}
-            {showZones && zones.filter(z => z.is_active && z.latitude && z.longitude).map((zone, i) => (
-              <Circle
-                key={zone.id}
-                center={[zone.latitude, zone.longitude]}
-                radius={zone.radius_km * 1000}
-                pathOptions={{
-                  color: ZONE_COLORS[i % ZONE_COLORS.length],
-                  fillColor: ZONE_COLORS[i % ZONE_COLORS.length],
-                  fillOpacity: 0.08,
-                  weight: 2,
-                }}
-              >
+            {/* Zone areas: GeoJSON polygon if available, else circle */}
+            {showZones && zones.filter(z => z.is_active && z.latitude && z.longitude).map((zone, i) => {
+              const color = ZONE_COLORS[i % ZONE_COLORS.length]
+              const popup = (
                 <Popup>
                   <div className="space-y-1 text-sm min-w-[180px]">
                     <div className="font-semibold text-base">{zone.city_name}</div>
                     {zone.is_default && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">Default</span>}
-                    <div>Radius: {zone.radius_km} km</div>
+                    {zone.boundary_geojson
+                      ? <div className="text-xs text-green-600">✓ Batas wilayah polygon</div>
+                      : <div>Radius: {zone.radius_km} km</div>
+                    }
                     <div>Base fee: {fmt(zone.base_fee)}</div>
                     <div>Per KM extra: {fmt(zone.per_km_fee)}/km</div>
                     <div className="text-xs text-gray-500">
@@ -149,8 +144,33 @@ export default function ZonesMapPage() {
                     </div>
                   </div>
                 </Popup>
-              </Circle>
-            ))}
+              )
+              if (zone.boundary_geojson) {
+                let geoData: GeoJSON.GeoJsonObject | null = null
+                try { geoData = JSON.parse(zone.boundary_geojson) } catch { /* skip */ }
+                if (geoData) {
+                  return (
+                    <GeoJSON
+                      key={zone.id}
+                      data={geoData}
+                      style={() => ({ color, fillColor: color, fillOpacity: 0.1, weight: 2 })}
+                    >
+                      {popup}
+                    </GeoJSON>
+                  )
+                }
+              }
+              return (
+                <Circle
+                  key={zone.id}
+                  center={[zone.latitude, zone.longitude]}
+                  radius={zone.radius_km * 1000}
+                  pathOptions={{ color, fillColor: color, fillOpacity: 0.08, weight: 2 }}
+                >
+                  {popup}
+                </Circle>
+              )
+            })}
 
             {/* Merchant markers */}
             {showMerchants && merchants.filter(m => m.latitude && m.longitude).map(m => (

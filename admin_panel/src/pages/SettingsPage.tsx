@@ -30,6 +30,16 @@ interface DeliveryZone {
   per_km_fee: number
   is_default: boolean
   is_active: boolean
+  osm_relation_id?: number
+  boundary_geojson?: string
+}
+
+interface NominatimResult {
+  osm_id: number
+  display_name: string
+  lat: string
+  lon: string
+  geojson?: { type: string; coordinates: unknown }
 }
 
 const MARKUP_MODE_KEY = 'product_markup_mode'
@@ -63,6 +73,8 @@ const emptyZone = (): Partial<DeliveryZone> => ({
   per_km_fee: 10000,
   is_default: false,
   is_active: true,
+  boundary_geojson: undefined,
+  osm_relation_id: undefined,
 })
 
 export default function SettingsPage() {
@@ -75,6 +87,9 @@ export default function SettingsPage() {
   const [editZone, setEditZone] = useState<DeliveryZone | null>(null)
   const [zoneForm, setZoneForm] = useState<Partial<DeliveryZone>>(emptyZone())
   const [zoneSaving, setZoneSaving] = useState(false)
+  const [citySearch, setCitySearch] = useState('')
+  const [cityResults, setCityResults] = useState<NominatimResult[]>([])
+  const [citySearching, setCitySearching] = useState(false)
 
   useEffect(() => {
     apiFetch('/api/v1/admin/settings')
@@ -91,6 +106,40 @@ export default function SettingsPage() {
       })
       .catch(() => {})
   }, [])
+
+  const searchCity = async () => {
+    if (!citySearch.trim()) return
+    setCitySearching(true)
+    setCityResults([])
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(citySearch)}&polygon_geojson=1&format=json&limit=5&countrycodes=id`,
+        { headers: { 'User-Agent': 'CocourirAdmin/1.0' } }
+      )
+      const data: NominatimResult[] = await res.json()
+      setCityResults(data.filter(r => r.geojson?.type === 'Polygon' || r.geojson?.type === 'MultiPolygon'))
+    } catch {
+      toast.error('Gagal mencari kota')
+    } finally {
+      setCitySearching(false)
+    }
+  }
+
+  const applyCity = (result: NominatimResult) => {
+    const geoJSON = result.geojson ? JSON.stringify(result.geojson) : undefined
+    const simpleName = result.display_name.split(',')[0].trim()
+    setZoneForm(f => ({
+      ...f,
+      city_name: simpleName,
+      latitude: parseFloat(result.lat),
+      longitude: parseFloat(result.lon),
+      osm_relation_id: result.osm_id,
+      boundary_geojson: geoJSON,
+    }))
+    setCityResults([])
+    setCitySearch('')
+    toast.success(`Batas wilayah "${simpleName}" berhasil diimport`)
+  }
 
   const fetchZones = () => {
     setZonesLoading(true)
@@ -411,12 +460,48 @@ export default function SettingsPage() {
       </Tabs>
 
       {/* Zone Dialog */}
-      <Dialog open={zoneDialog} onOpenChange={setZoneDialog}>
+      <Dialog open={zoneDialog} onOpenChange={(open) => { setZoneDialog(open); if (!open) { setCitySearch(''); setCityResults([]); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editZone ? 'Edit Delivery Zone' : 'Add Delivery Zone'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* OSM City Search */}
+            <div className="space-y-2">
+              <Label>Cari Batas Wilayah Kota (OpenStreetMap)</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Cth: Kota Mataram, Lombok Barat..."
+                  value={citySearch}
+                  onChange={(e) => setCitySearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchCity()}
+                />
+                <Button variant="outline" onClick={searchCity} disabled={citySearching} type="button">
+                  {citySearching ? '...' : 'Cari'}
+                </Button>
+              </div>
+              {cityResults.length > 0 && (
+                <div className="rounded-md border bg-popover shadow-sm">
+                  {cityResults.map((r) => (
+                    <button
+                      key={r.osm_id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b last:border-0"
+                      onClick={() => applyCity(r)}
+                    >
+                      <div className="font-medium">{r.display_name.split(',')[0]}</div>
+                      <div className="text-xs text-muted-foreground truncate">{r.display_name}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {zoneForm.boundary_geojson && (
+                <p className="text-xs text-green-600 font-medium">
+                  ✓ Batas wilayah polygon tersimpan (OSM)
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label>City Name</Label>
               <Input
