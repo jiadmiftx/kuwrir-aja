@@ -22,3 +22,5 @@ jobs:
             cd ~/kuwrir-aja
             git pull
             sudo cp landing/index.html /var/www/cocourir/landing/index.html
+            sudo cp landing/logo_cocourir.svg /var/www/cocourir/landing/logo_cocourir.svg
+            sudo cp landing/favicon.svg /var/www/cocourir/landing/favicon.svg
