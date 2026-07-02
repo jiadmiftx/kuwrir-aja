@@ -62,15 +62,19 @@ func rayCast(x, y float64, ring [][2]float64) bool {
 }
 
 // DeliveryFeeForDropoff calculates delivery fee given the merchant's zone and
-// the customer's dropoff point. If the zone has a polygon boundary, it uses
-// point-in-polygon to determine inside/outside; otherwise falls back to radius.
+// the customer's dropoff point. Polygon-based zones use the full merchant→dropoff
+// distance as the billable extra. Radius-based zones subtract the radius first.
 func DeliveryFeeForDropoff(dropLat, dropLng float64, zone Settings, baseFee, perKmFee float64, radiusKm float64, boundaryGeoJSON *string, merchantLat, merchantLng float64) float64 {
 	insideZone := isInsideZone(dropLat, dropLng, merchantLat, merchantLng, radiusKm, boundaryGeoJSON)
 	if insideZone {
 		return baseFee
 	}
-	// Outside zone: charge per-km based on distance from merchant to dropoff
 	distKm := haversineGeo(merchantLat, merchantLng, dropLat, dropLng)
+	if boundaryGeoJSON != nil && *boundaryGeoJSON != "" {
+		// polygon zone: polygon IS the boundary, full distance is billable
+		return baseFee + distKm*perKmFee
+	}
+	// radius zone fallback: distance beyond radius is billable
 	extraKm := math.Max(0, distKm-radiusKm)
 	return baseFee + extraKm*perKmFee
 }

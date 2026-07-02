@@ -433,7 +433,9 @@ export default function SettingsPage() {
                         <TableCell className="text-xs text-muted-foreground">
                           {zone.latitude.toFixed(4)}, {zone.longitude.toFixed(4)}
                         </TableCell>
-                        <TableCell>{zone.radius_km} km</TableCell>
+                        <TableCell className="text-xs">
+                          {zone.boundary_geojson ? <span className="text-muted-foreground">— (polygon)</span> : `${zone.radius_km} km`}
+                        </TableCell>
                         <TableCell>IDR {zone.base_fee.toLocaleString('id-ID')}</TableCell>
                         <TableCell>IDR {zone.per_km_fee.toLocaleString('id-ID')}/km</TableCell>
                         <TableCell>
@@ -531,10 +533,16 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Radius (km)</Label>
+              <div className={`space-y-2 ${zoneForm.boundary_geojson ? 'opacity-40' : ''}`}>
+                <Label>
+                  Radius (km)
+                  {zoneForm.boundary_geojson && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">— tidak dipakai</span>
+                  )}
+                </Label>
                 <Input
                   type="number"
+                  disabled={!!zoneForm.boundary_geojson}
                   value={zoneForm.radius_km || 5}
                   onChange={(e) => setZoneForm((f) => ({ ...f, radius_km: parseFloat(e.target.value) }))}
                 />
