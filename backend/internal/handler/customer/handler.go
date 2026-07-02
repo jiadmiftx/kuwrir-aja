@@ -193,8 +193,16 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	// Merchant receives their base product price only (platform service fee stays with platform)
 	merchantPayout := totalBasePrice
 
-	// 6. Apply tax on subtotal (product portion only)
-	taxAmount := subtotalWithMarkup * (settings.TaxPct / 100.0)
+	// 6. Apply tax: use merchant's own rate if set, else platform default; 0 if merchant is non-PKP
+	effectiveTaxRate := 0.0
+	if merchant.TaxEnabled {
+		if merchant.TaxRate != nil {
+			effectiveTaxRate = *merchant.TaxRate
+		} else {
+			effectiveTaxRate = settings.TaxPct
+		}
+	}
+	taxAmount := subtotalWithMarkup * (effectiveTaxRate / 100.0)
 
 	// 7. Grand total customer pays (app service fee is an explicit charge to customer)
 	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee + appServiceFee

@@ -120,6 +120,8 @@ type Merchant struct {
 	IsOpen          bool    `gorm:"default:false" json:"is_open"`
 	CanSelfDeliver  bool    `gorm:"default:false" json:"can_self_deliver"`
 	SelfDeliveryFee float64 `gorm:"default:0" json:"self_delivery_fee"`
+	TaxEnabled      bool     `gorm:"default:false" json:"tax_enabled"`
+	TaxRate         *float64 `json:"tax_rate,omitempty"` // nil = inherit platform default
 
 	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
 	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`

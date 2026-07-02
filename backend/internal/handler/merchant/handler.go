@@ -131,6 +131,8 @@ type UpdateMerchantRequest struct {
 	Longitude   *float64 `json:"longitude"`
 	LogoURL     *string  `json:"logo_url"`
 	BannerURL   *string  `json:"banner_url"`
+	TaxEnabled  *bool    `json:"tax_enabled"`
+	TaxRate     *float64 `json:"tax_rate"` // null = inherit platform default
 }
 
 type CreateCategoryRequest struct {
@@ -437,6 +439,12 @@ func (h *Handler) UpdateMyMerchant(c *gin.Context) {
 	}
 	if req.BannerURL != nil {
 		updates["banner_url"] = *req.BannerURL
+	}
+	if req.TaxEnabled != nil {
+		updates["tax_enabled"] = *req.TaxEnabled
+	}
+	if req.TaxRate != nil {
+		updates["tax_rate"] = *req.TaxRate
 	}
 
 	if err := h.db.Model(&model.Merchant{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {

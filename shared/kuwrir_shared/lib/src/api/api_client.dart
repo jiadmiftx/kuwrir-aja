@@ -281,6 +281,13 @@ class ApiClient {
     await put('/my-store/self-delivery-fee', {'self_delivery_fee': fee});
   }
 
+  Future<void> updateTaxSettings({required bool taxEnabled, double? taxRate}) async {
+    await put('/my-store', {
+      'tax_enabled': taxEnabled,
+      'tax_rate': taxRate,
+    });
+  }
+
   Future<Merchant> getMyMerchant() async {
     final data = await get('/my-store');
     return Merchant.fromJson(data['merchant'] as Map<String, dynamic>);

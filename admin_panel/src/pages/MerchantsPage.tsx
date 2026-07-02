@@ -34,6 +34,8 @@ interface Merchant {
   created_at: string
   zone_id?: string | null
   zone?: DeliveryZone
+  tax_enabled?: boolean
+  tax_rate?: number | null
 }
 
 export default function MerchantsPage() {
@@ -171,6 +173,7 @@ export default function MerchantsPage() {
                 <TableHead>Rating</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Open</TableHead>
+                <TableHead>Pajak</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -224,6 +227,13 @@ export default function MerchantsPage() {
                     <Badge variant={m.is_open ? 'default' : 'secondary'}>
                       {m.is_open ? 'Open' : 'Closed'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {m.tax_enabled
+                      ? <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          PKP {m.tax_rate != null ? `${m.tax_rate}%` : '(default)'}
+                        </Badge>
+                      : <Badge variant="outline" className="text-muted-foreground">Non-PKP</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

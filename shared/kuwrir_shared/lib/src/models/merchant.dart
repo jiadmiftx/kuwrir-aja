@@ -15,6 +15,8 @@ class Merchant {
   final bool isActive;
   final bool canSelfDeliver;
   final double selfDeliveryFee;
+  final bool taxEnabled;
+  final double? taxRate; // null = inherit platform default
   final double? distanceKm;
 
   const Merchant({
@@ -34,6 +36,8 @@ class Merchant {
     this.isActive = false,
     this.canSelfDeliver = false,
     this.selfDeliveryFee = 0,
+    this.taxEnabled = false,
+    this.taxRate,
     this.distanceKm,
   });
 
@@ -54,6 +58,8 @@ class Merchant {
         isActive: json['is_active'] as bool? ?? false,
         canSelfDeliver: json['can_self_deliver'] as bool? ?? false,
         selfDeliveryFee: (json['self_delivery_fee'] as num?)?.toDouble() ?? 0,
+        taxEnabled: json['tax_enabled'] as bool? ?? false,
+        taxRate: (json['tax_rate'] as num?)?.toDouble(),
         distanceKm: (json['distance_km'] as num?)?.toDouble(),
       );
 }

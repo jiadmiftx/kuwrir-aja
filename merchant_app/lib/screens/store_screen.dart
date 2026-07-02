@@ -12,6 +12,7 @@ class StoreScreen extends StatefulWidget {
 
 class _StoreScreenState extends State<StoreScreen> {
   final _selfDeliveryFeeCtrl = TextEditingController();
+  final _taxRateCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -22,6 +23,7 @@ class _StoreScreenState extends State<StoreScreen> {
   @override
   void dispose() {
     _selfDeliveryFeeCtrl.dispose();
+    _taxRateCtrl.dispose();
     super.dispose();
   }
 
@@ -267,6 +269,88 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
               ],
 
+              const SizedBox(height: 16),
+
+              // ── Tax / PKP Settings ──
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Pemungut Pajak (PKP)',
+                                    style: TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  merchant.taxEnabled
+                                      ? 'Aktif — PPN dikenakan ke pelanggan'
+                                      : 'Nonaktif — toko UMKM, tanpa PPN',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: merchant.taxEnabled
+                                          ? KuwrirColors.primary
+                                          : KuwrirColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: merchant.taxEnabled,
+                            onChanged: (v) => _toggleTax(context, v, merchant.taxRate),
+                            activeColor: KuwrirColors.primary,
+                          ),
+                        ],
+                      ),
+                      if (merchant.taxEnabled) ...[
+                        const SizedBox(height: 12),
+                        const Text('Rate Pajak (%)',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _taxRateCtrl
+                                  ..text = merchant.taxRate != null
+                                      ? merchant.taxRate!.toStringAsFixed(0)
+                                      : '',
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  hintText: 'Kosong = ikuti default platform (11%)',
+                                  suffixText: '%',
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () => _saveTaxRate(context),
+                              child: const Text('Simpan'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Biarkan kosong untuk menggunakan rate default platform',
+                          style: TextStyle(
+                              fontSize: 11, color: KuwrirColors.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 32),
             ],
           ),
@@ -275,6 +359,38 @@ class _StoreScreenState extends State<StoreScreen> {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Future<void> _toggleTax(BuildContext context, bool v, double? currentRate) async {
+    try {
+      final api = context.read<ApiClient>();
+      await api.updateTaxSettings(taxEnabled: v, taxRate: currentRate);
+      if (context.mounted) context.read<StoreCubit>().load();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    }
+  }
+
+  Future<void> _saveTaxRate(BuildContext context) async {
+    final rateText = _taxRateCtrl.text.trim();
+    final rate = rateText.isEmpty ? null : double.tryParse(rateText);
+    try {
+      final api = context.read<ApiClient>();
+      await api.updateTaxSettings(taxEnabled: true, taxRate: rate);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Rate pajak tersimpan')));
+        context.read<StoreCubit>().load();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    }
   }
 
   Future<void> _toggleSelfDeliver(BuildContext context, bool v) async {
