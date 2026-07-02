@@ -35,10 +35,10 @@ describe('calcPreviewFees', () => {
     expect(r.driverEarning).toBeCloseTo(expectedDriver) // 11250
   })
 
-  it('kuwrir revenue = markup + tax + delivery commission + app fee', () => {
+  it('platform revenue = markup + tax + delivery commission + app fee', () => {
     const r = calcPreviewFees(100000, defaultSettings)
     const expected = r.platformUjrah + r.taxAmount + r.deliveryCommissionAmt + r.appServiceFeeAmt
-    expect(r.kuwrirRevenue).toBeCloseTo(expected)
+    expect(r.platformRevenue).toBeCloseTo(expected)
   })
 
   it('total = food_with_markup + tax + delivery + app_fee', () => {

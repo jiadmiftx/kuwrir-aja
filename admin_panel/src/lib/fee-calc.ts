@@ -5,6 +5,8 @@ export interface FeeSettings {
   appServiceFeePct: number
   taxPct: number
   insideZoneFee: number
+  markupMode?: 'percentage' | 'fixed'
+  markupFixedAmount?: number
 }
 
 export interface FeeBreakdown {
@@ -15,18 +17,28 @@ export interface FeeBreakdown {
   deliveryCommissionAmt: number
   driverEarning: number
   total: number
-  kuwrirRevenue: number
+  platformRevenue: number
+}
+
+// Mirrors backend internal/pricing.ApplyMarkup — same formula/rounding so
+// this preview matches what the customer catalog actually shows.
+export function applyProductMarkup(price: number, s: Pick<FeeSettings, 'platformMarkupPct' | 'markupMode' | 'markupFixedAmount'>): number {
+  if (s.markupMode === 'fixed') {
+    return price + (s.markupFixedAmount ?? 0)
+  }
+  const marked = price * (1 + s.platformMarkupPct / 100)
+  return Math.ceil(marked / 500) * 500
 }
 
 export function calcPreviewFees(baseFood: number, s: FeeSettings): FeeBreakdown {
-  const platformUjrah = baseFood * (s.platformMarkupPct / 100)
-  const foodWithMarkup = baseFood + platformUjrah
+  const foodWithMarkup = applyProductMarkup(baseFood, s)
+  const platformUjrah = foodWithMarkup - baseFood
   const taxAmount = foodWithMarkup * (s.taxPct / 100)
   const appServiceFeeAmt = s.insideZoneFee * (s.appServiceFeePct / 100)
   const deliveryCommissionAmt = s.insideZoneFee * (s.deliveryCommissionPct / 100)
   const driverEarning = s.insideZoneFee - deliveryCommissionAmt
   const total = foodWithMarkup + taxAmount + s.insideZoneFee + appServiceFeeAmt
-  const kuwrirRevenue = platformUjrah + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
+  const platformRevenue = platformUjrah + taxAmount + deliveryCommissionAmt + appServiceFeeAmt
 
   return {
     foodWithMarkup,
@@ -36,7 +48,7 @@ export function calcPreviewFees(baseFood: number, s: FeeSettings): FeeBreakdown 
     deliveryCommissionAmt,
     driverEarning,
     total,
-    kuwrirRevenue,
+    platformRevenue,
   }
 }
 

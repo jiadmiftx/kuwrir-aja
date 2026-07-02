@@ -77,7 +77,7 @@ export default function DashboardPage() {
           color: 'text-orange-600',
         },
         {
-          title: 'Revenue KUWRIR',
+          title: 'Platform Revenue',
           value: fmt(stats.revenue.this_month),
           sub: 'bulan ini',
           badge: 'markup + komisi',
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">KUWRIR Admin — Kuta, Lombok</p>
+          <p className="text-muted-foreground">Cocourir Admin — Lombok</p>
         </div>
         <button
           onClick={fetchStats}

@@ -139,7 +139,7 @@ export default function RevenuePage() {
 
             <Card className="border-primary/30">
               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium">KUWRIR Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium">Platform Revenue</CardTitle>
                 <TrendingUp className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>

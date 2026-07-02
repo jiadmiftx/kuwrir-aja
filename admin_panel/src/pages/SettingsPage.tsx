@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -31,9 +32,13 @@ interface DeliveryZone {
   is_active: boolean
 }
 
+const MARKUP_MODE_KEY = 'product_markup_mode'
+
 const defaultSettings: Setting[] = [
   // Product margin — Wakalah/Ujrah (disclosed platform service fee on products)
-  { key: 'platform_markup_percentage', value: '15', label: 'Platform Ujrah / Service Fee on Products (%)' },
+  { key: MARKUP_MODE_KEY, value: 'percentage', label: 'Product Markup Mode' },
+  { key: 'platform_markup_percentage', value: '15', label: 'Platform Ujrah / Service Fee on Products (%) — used when mode = percentage' },
+  { key: 'product_markup_fixed_amount', value: '1000', label: 'Fixed Markup per Product (IDR) — used when mode = fixed' },
   // Delivery split
   { key: 'delivery_commission_percentage', value: '25', label: 'Platform Commission from Delivery Fee (%)' },
   { key: 'app_service_fee_percentage', value: '5', label: 'Platform Tech Fee from Delivery Fee (%)' },
@@ -174,6 +179,8 @@ export default function SettingsPage() {
   const selfDeliverComm = parseFloat(settings.find((s) => s.key === 'self_deliver_commission_percentage')?.value || '10')
   const tax = parseFloat(settings.find((s) => s.key === 'tax_percentage')?.value || '11')
   const insideFee = parseFloat(settings.find((s) => s.key === 'delivery_base_fee_inside_zone')?.value || '15000')
+  const markupMode = (settings.find((s) => s.key === MARKUP_MODE_KEY)?.value || 'percentage') as 'percentage' | 'fixed'
+  const markupFixedAmount = parseFloat(settings.find((s) => s.key === 'product_markup_fixed_amount')?.value || '1000')
 
   const baseFood = 50000
   const feeSettings = {
@@ -183,9 +190,11 @@ export default function SettingsPage() {
     appServiceFeePct: serviceFee,
     taxPct: tax,
     insideZoneFee: insideFee,
+    markupMode,
+    markupFixedAmount,
   }
   const preview = calcPreviewFees(baseFood, feeSettings)
-  const { platformUjrah, foodWithMarkup, taxAmount, appServiceFeeAmt, deliveryCommissionAmt, driverEarning, total, kuwrirRevenue } = preview
+  const { platformUjrah, foodWithMarkup, taxAmount, appServiceFeeAmt, deliveryCommissionAmt, driverEarning, total, platformRevenue } = preview
   const merchantReceives = baseFood
 
   const selfDeliverFee = 10000
@@ -218,12 +227,24 @@ export default function SettingsPage() {
                 {settings.map((setting) => (
                   <div key={setting.key} className="space-y-2">
                     <Label htmlFor={setting.key}>{setting.label}</Label>
-                    <Input
-                      id={setting.key}
-                      type="number"
-                      value={setting.value}
-                      onChange={(e) => updateValue(setting.key, e.target.value)}
-                    />
+                    {setting.key === MARKUP_MODE_KEY ? (
+                      <Select value={setting.value} onValueChange={(v) => v && updateValue(setting.key, v)}>
+                        <SelectTrigger id={setting.key}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">Percentage (% dari harga produk)</SelectItem>
+                          <SelectItem value="fixed">Fixed (nominal tetap per produk)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id={setting.key}
+                        type="number"
+                        value={setting.value}
+                        onChange={(e) => updateValue(setting.key, e.target.value)}
+                      />
+                    )}
                   </div>
                 ))}
                 <Separator />
@@ -246,8 +267,14 @@ export default function SettingsPage() {
                   <span>IDR {baseFood.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Platform Ujrah ({markup}%)</span>
+                  <span className="text-muted-foreground">
+                    + Platform Ujrah ({markupMode === 'fixed' ? `flat IDR ${markupFixedAmount.toLocaleString('id-ID')}` : `${markup}%, dibulatkan ke atas kelipatan 500`})
+                  </span>
                   <span className="text-primary">IDR {platformUjrah.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">→ Harga produk yang dilihat customer di katalog</span>
+                  <span className="font-medium">IDR {foodWithMarkup.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">+ Tax/PPN ({tax}%)</span>
@@ -276,8 +303,8 @@ export default function SettingsPage() {
                   <span>IDR {driverEarning.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between text-primary font-bold">
-                  <span>→ KUWRIR Revenue</span>
-                  <span>IDR {kuwrirRevenue.toLocaleString('id-ID')}</span>
+                  <span>→ Platform Revenue</span>
+                  <span>IDR {platformRevenue.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="text-xs text-muted-foreground pt-1 space-y-0.5">
                   <div>Ujrah produk: IDR {platformUjrah.toLocaleString('id-ID')} | PPN: IDR {taxAmount.toLocaleString('id-ID')}</div>
