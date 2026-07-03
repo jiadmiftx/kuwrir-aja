@@ -66,13 +66,19 @@ interface NominatimResult {
 
 // Overpass-derived kecamatan candidate. Full polygon is filled in afterwards
 // via a batched Nominatim /lookup call, same source as the kota search.
+// Most of Lombok has no kecamatan boundary in OSM at all, so candidates
+// commonly end up with no geojson — radiusKm is the fallback circle for
+// those, same pattern as kota zones without a polygon.
 interface KecamatanCandidate {
   osmId: number
   name: string
   lat?: number
   lon?: number
   geojson?: string
+  radiusKm?: number
 }
+
+const DEFAULT_KECAMATAN_RADIUS_KM = 3
 
 const fmt = (v: number) => 'Rp ' + v.toLocaleString('id-ID')
 const LOMBOK_CENTER: [number, number] = [-8.6524, 116.3241]
@@ -257,34 +263,33 @@ export default function DeliveryZonesPage() {
     setKecamatanFilter('')
     setManualSearch('')
     setManualResults([])
-    setManualPicked([])
 
     const existingChildIds = new Set((zone.children ?? []).filter((c) => c.osm_relation_id).map((c) => c.osm_relation_id!))
     setSelectedKecamatan(existingChildIds)
 
+    // Seed already-saved kecamatan as candidates up front (most won't have
+    // OSM coverage at all in Lombok), then let Overpass add more on top.
+    const savedAsCandidates: KecamatanCandidate[] = (zone.children ?? [])
+      .filter((c) => c.osm_relation_id)
+      .map((c) => ({
+        osmId: c.osm_relation_id!,
+        name: c.city_name,
+        lat: c.latitude,
+        lon: c.longitude,
+        geojson: c.boundary_geojson,
+        radiusKm: c.radius_km,
+      }))
+    setManualPicked(savedAsCandidates)
+    setKecamatanCandidates([])
+
     if (zone.osm_relation_id) {
       fetchKecamatan(zone.osm_relation_id).then(() => {
-        // Preserve any saved kecamatan without OSM coverage as manually-picked
+        // Avoid duplicate rows for kecamatan Overpass also found
         setKecamatanCandidates((cands) => {
-          const missing = (zone.children ?? []).filter(
-            (c) => c.osm_relation_id && !cands.some((cand) => cand.osmId === c.osm_relation_id)
-          )
-          if (missing.length) {
-            setManualPicked(
-              missing.map((c) => ({
-                osmId: c.osm_relation_id!,
-                name: c.city_name,
-                lat: c.latitude,
-                lon: c.longitude,
-                geojson: c.boundary_geojson,
-              }))
-            )
-          }
+          setManualPicked((picked) => picked.filter((p) => !cands.some((c) => c.osmId === p.osmId)))
           return cands
         })
       })
-    } else {
-      setKecamatanCandidates([])
     }
   }
 
@@ -319,11 +324,15 @@ export default function DeliveryZonesPage() {
     setManualResults([])
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(manualSearch)}&polygon_geojson=1&format=json&limit=5&countrycodes=id`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(manualSearch)}&polygon_geojson=1&format=json&limit=8&countrycodes=id`,
         { headers: { 'User-Agent': 'CocourirAdmin/1.0' } }
       )
       const data: NominatimResult[] = await res.json()
-      setManualResults(data.filter((r) => r.geojson?.type === 'Polygon' || r.geojson?.type === 'MultiPolygon'))
+      // Most kecamatan in this region have no OSM boundary at all, only the
+      // village/kelurahan points inside them — accept any match, not just
+      // polygons. Polygon hits (rare) still get precise boundaries; point
+      // hits fall back to a radius circle at save time.
+      setManualResults(data)
     } catch {
       toast.error('Gagal mencari kecamatan')
     } finally {
@@ -332,17 +341,30 @@ export default function DeliveryZonesPage() {
   }
 
   const pickManualKecamatan = (result: NominatimResult) => {
+    const isPolygon = result.geojson?.type === 'Polygon' || result.geojson?.type === 'MultiPolygon'
     const candidate: KecamatanCandidate = {
       osmId: result.osm_id,
       name: result.display_name.split(',')[0].trim(),
       lat: parseFloat(result.lat),
       lon: parseFloat(result.lon),
-      geojson: result.geojson ? JSON.stringify(result.geojson) : undefined,
+      geojson: isPolygon ? JSON.stringify(result.geojson) : undefined,
+      radiusKm: isPolygon ? undefined : DEFAULT_KECAMATAN_RADIUS_KM,
     }
     setManualPicked((prev) => (prev.some((p) => p.osmId === candidate.osmId) ? prev : [...prev, candidate]))
     setSelectedKecamatan((prev) => new Set(prev).add(candidate.osmId))
     setManualResults([])
     setManualSearch('')
+  }
+
+  const setCandidateRadius = (osmId: number, radiusKm: number) => {
+    setManualPicked((prev) => prev.map((c) => (c.osmId === osmId ? { ...c, radiusKm } : c)))
+    setKecamatanCandidates((prev) => prev.map((c) => (c.osmId === osmId ? { ...c, radiusKm } : c)))
+  }
+
+  // Nominatim's match for a manual pick is a village/kelurahan point, not
+  // the kecamatan itself — let the admin correct the name before saving.
+  const setCandidateName = (osmId: number, name: string) => {
+    setManualPicked((prev) => prev.map((c) => (c.osmId === osmId ? { ...c, name } : c)))
   }
 
   const handleDeleteZone = async (id: string) => {
@@ -388,11 +410,23 @@ export default function DeliveryZonesPage() {
             city_name: cand.name,
             latitude: cand.lat ?? form.latitude,
             longitude: cand.lon ?? form.longitude,
+            radius_km: cand.geojson ? undefined : (cand.radiusKm ?? DEFAULT_KECAMATAN_RADIUS_KM),
             osm_relation_id: cand.osmId,
             boundary_geojson: cand.geojson,
             parent_zone_id: zoneId,
             is_active: true,
           }),
+        })
+      }
+
+      // Update radius on already-saved kecamatan if the admin changed it
+      for (const [osmId, child] of existingByOsmId) {
+        if (!selectedKecamatan.has(osmId)) continue
+        const cand = allCandidates.find((c) => c.osmId === osmId)
+        if (!cand || cand.geojson || cand.radiusKm === undefined || cand.radiusKm === child.radius_km) continue
+        await api(`/api/v1/admin/delivery-zones/${child.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...child, radius_km: cand.radiusKm }),
         })
       }
 
@@ -549,7 +583,7 @@ export default function DeliveryZonesPage() {
                 </p>
 
                 {kecamatanLoading && (
-                  <p className="text-sm text-muted-foreground py-2">Mengambil daftar kecamatan...</p>
+                  <p className="text-sm text-muted-foreground py-2">Mengambil daftar kecamatan otomatis...</p>
                 )}
                 {kecamatanError && <p className="text-sm text-destructive py-1">{kecamatanError}</p>}
 
@@ -563,20 +597,29 @@ export default function DeliveryZonesPage() {
                     />
                     <div className="rounded-md border max-h-56 overflow-y-auto divide-y">
                       {filteredCandidates.map((c) => (
-                        <label
-                          key={c.osmId}
-                          className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent/50"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedKecamatan.has(c.osmId)}
-                            onChange={() => toggleKecamatan(c.osmId)}
-                          />
-                          {c.name}
-                          {!c.geojson && (
-                            <span className="text-xs text-muted-foreground ml-auto">tanpa polygon</span>
+                        <div key={c.osmId} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50">
+                          <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={selectedKecamatan.has(c.osmId)}
+                              onChange={() => toggleKecamatan(c.osmId)}
+                            />
+                            <span className="truncate">{c.name}</span>
+                          </label>
+                          {!c.geojson && selectedKecamatan.has(c.osmId) && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Input
+                                type="number"
+                                min={0.5}
+                                step={0.5}
+                                value={c.radiusKm ?? DEFAULT_KECAMATAN_RADIUS_KM}
+                                onChange={(e) => setCandidateRadius(c.osmId, parseFloat(e.target.value))}
+                                className="h-6 w-14 text-xs px-1"
+                              />
+                              <span className="text-xs text-muted-foreground">km</span>
+                            </div>
                           )}
-                        </label>
+                        </div>
                       ))}
                     </div>
                   </>
@@ -586,30 +629,59 @@ export default function DeliveryZonesPage() {
                   <p className="text-xs text-muted-foreground py-1">Cari kota di atas untuk mengambil daftar kecamatan otomatis.</p>
                 )}
                 {!kecamatanLoading && form.osm_relation_id && kecamatanCandidates.length === 0 && !kecamatanError && (
-                  <p className="text-xs text-muted-foreground py-1">Tidak ada kecamatan ditemukan untuk kota ini. Tambah manual di bawah.</p>
+                  <p className="text-xs text-muted-foreground py-1">
+                    Tidak ditemukan otomatis di OpenStreetMap (umum untuk area Lombok). Tambah manual di bawah — cari nama desa/kelurahan, lalu atur radius layanan.
+                  </p>
                 )}
 
                 {manualPicked.length > 0 && (
-                  <div className="rounded-md border max-h-40 overflow-y-auto divide-y">
+                  <div className="rounded-md border max-h-48 overflow-y-auto divide-y">
                     {manualPicked.map((c) => (
-                      <label key={c.osmId} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent/50">
-                        <input type="checkbox" checked={selectedKecamatan.has(c.osmId)} onChange={() => toggleKecamatan(c.osmId)} />
-                        {c.name}
-                        <span className="text-xs text-muted-foreground ml-auto">manual</span>
-                      </label>
+                      <div key={c.osmId} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50">
+                        <input
+                          type="checkbox"
+                          checked={selectedKecamatan.has(c.osmId)}
+                          onChange={() => toggleKecamatan(c.osmId)}
+                          className="shrink-0"
+                        />
+                        <Input
+                          value={c.name}
+                          onChange={(e) => setCandidateName(c.osmId, e.target.value)}
+                          className="h-7 text-sm flex-1 min-w-0"
+                        />
+                        <span className="text-xs text-muted-foreground shrink-0">manual</span>
+                        {!c.geojson && selectedKecamatan.has(c.osmId) && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Input
+                              type="number"
+                              min={0.5}
+                              step={0.5}
+                              value={c.radiusKm ?? DEFAULT_KECAMATAN_RADIUS_KM}
+                              onChange={(e) => setCandidateRadius(c.osmId, parseFloat(e.target.value))}
+                              className="h-6 w-14 text-xs px-1"
+                            />
+                            <span className="text-xs text-muted-foreground">km</span>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
 
-                {/* Manual fallback search */}
-                <details className="text-sm">
+                {/* Manual search — primary path in areas with no OSM kecamatan
+                    boundaries (most of Lombok). Kept open by default unless
+                    Overpass already found candidates above. */}
+                <details className="text-sm" open={kecamatanCandidates.length === 0}>
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    + Tambah kecamatan manual
+                    {kecamatanCandidates.length === 0 ? 'Tambah kecamatan manual' : '+ Tambah kecamatan lain secara manual'}
                   </summary>
                   <div className="mt-2 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Coba nama kecamatannya dulu (mis. "Narmada"). Kalau tidak ketemu, cari nama desa/kelurahan di dalamnya (mis. "Cakranegara"), lalu beri radius layanan.
+                    </p>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="Cth: Kecamatan Narmada..."
+                        placeholder="Cth: Narmada, Cakranegara..."
                         value={manualSearch}
                         onChange={(e) => setManualSearch(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && searchManualKecamatan()}
@@ -619,7 +691,7 @@ export default function DeliveryZonesPage() {
                       </Button>
                     </div>
                     {manualResults.length > 0 && (
-                      <div className="rounded-md border bg-popover shadow-sm">
+                      <div className="rounded-md border bg-popover shadow-sm max-h-56 overflow-y-auto">
                         {manualResults.map((r) => (
                           <button
                             key={r.osm_id}
@@ -807,37 +879,62 @@ export default function DeliveryZonesPage() {
 
                 {/* Pending kecamatan candidates while panel is open — grey when
                     unselected, primary color when checked, previewing the
-                    outside-zone/inside-zone split before saving. */}
+                    outside-zone/inside-zone split before saving. Most
+                    candidates in this region have no OSM polygon, so they
+                    fall back to a radius circle around their point. */}
                 {panelOpen &&
                   allCandidates.map((c) => {
-                    if (!c.geojson) return null
                     const selected = selectedKecamatan.has(c.osmId)
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    let geoData: any
-                    try {
-                      geoData = JSON.parse(c.geojson)
-                    } catch {
-                      return null
+                    const popup = (
+                      <Popup>
+                        <div className="text-sm font-medium">{c.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {selected ? 'Masuk area layanan' : 'Di luar area layanan'}
+                        </div>
+                      </Popup>
+                    )
+
+                    if (c.geojson) {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      let geoData: any
+                      try {
+                        geoData = JSON.parse(c.geojson)
+                      } catch {
+                        return null
+                      }
+                      return (
+                        <GeoJSONLayer
+                          key={`cand-${c.osmId}`}
+                          data={geoData}
+                          style={() => ({
+                            color: selected ? '#16a34a' : '#94a3b8',
+                            fillColor: selected ? '#16a34a' : '#94a3b8',
+                            fillOpacity: selected ? 0.18 : 0.05,
+                            weight: selected ? 2 : 1,
+                            dashArray: selected ? undefined : '3 5',
+                          })}
+                        >
+                          {popup}
+                        </GeoJSONLayer>
+                      )
                     }
+
+                    if (c.lat == null || c.lon == null) return null
                     return (
-                      <GeoJSONLayer
+                      <Circle
                         key={`cand-${c.osmId}`}
-                        data={geoData}
-                        style={() => ({
+                        center={[c.lat, c.lon]}
+                        radius={(c.radiusKm ?? DEFAULT_KECAMATAN_RADIUS_KM) * 1000}
+                        pathOptions={{
                           color: selected ? '#16a34a' : '#94a3b8',
                           fillColor: selected ? '#16a34a' : '#94a3b8',
                           fillOpacity: selected ? 0.18 : 0.05,
                           weight: selected ? 2 : 1,
                           dashArray: selected ? undefined : '3 5',
-                        })}
+                        }}
                       >
-                        <Popup>
-                          <div className="text-sm font-medium">{c.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {selected ? 'Masuk area layanan' : 'Di luar area layanan'}
-                          </div>
-                        </Popup>
-                      </GeoJSONLayer>
+                        {popup}
+                      </Circle>
                     )
                   })}
 
