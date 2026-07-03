@@ -12,7 +12,7 @@ import PromotionsPage from '@/pages/PromotionsPage'
 import SettlementsPage from '@/pages/SettlementsPage'
 import RevenuePage from '@/pages/RevenuePage'
 import SupportChatsPage from '@/pages/SupportChatsPage'
-import ZonesMapPage from '@/pages/ZonesMapPage'
+import DeliveryZonesPage from '@/pages/DeliveryZonesPage'
 
 export default function App() {
   return (
@@ -35,7 +35,7 @@ export default function App() {
                 <Route path="/settlements" element={<SettlementsPage />} />
                 <Route path="/revenue" element={<RevenuePage />} />
                 <Route path="/support" element={<SupportChatsPage />} />
-                <Route path="/zones-map" element={<ZonesMapPage />} />
+                <Route path="/delivery-zones" element={<DeliveryZonesPage />} />
               </Routes>
             </AdminLayout>
           }
