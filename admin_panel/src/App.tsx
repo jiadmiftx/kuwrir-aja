@@ -9,6 +9,7 @@ import DriversPage from '@/pages/DriversPage'
 import DriverApplicationsPage from '@/pages/DriverApplicationsPage'
 import CustomersPage from '@/pages/CustomersPage'
 import PromotionsPage from '@/pages/PromotionsPage'
+import FoodCategoriesPage from '@/pages/FoodCategoriesPage'
 import SettlementsPage from '@/pages/SettlementsPage'
 import RevenuePage from '@/pages/RevenuePage'
 import SupportChatsPage from '@/pages/SupportChatsPage'
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/driver-applications" element={<DriverApplicationsPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/promos" element={<PromotionsPage />} />
+                <Route path="/food-categories" element={<FoodCategoriesPage />} />
                 <Route path="/settlements" element={<SettlementsPage />} />
                 <Route path="/revenue" element={<RevenuePage />} />
                 <Route path="/support" element={<SupportChatsPage />} />

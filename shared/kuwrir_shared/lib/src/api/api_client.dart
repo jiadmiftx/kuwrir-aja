@@ -7,6 +7,8 @@ import '../models/merchant.dart';
 import '../models/product.dart';
 import '../models/order.dart';
 import '../models/support_message.dart';
+import '../models/food_category.dart';
+import '../models/promotion.dart';
 
 /// HTTP API client with JWT token management
 class ApiClient {
@@ -137,10 +139,40 @@ class ApiClient {
     return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
   }
 
-  Future<List<Merchant>> getPopularMerchants() async {
-    final data = await get('/merchants/popular', auth: false);
+  Future<List<Merchant>> getPopularMerchants({String? foodCategoryId}) async {
+    final query = foodCategoryId != null ? '?food_category_id=$foodCategoryId' : '';
+    final data = await get('/merchants/popular$query', auth: false);
     final list = data['merchants'] as List<dynamic>? ?? [];
     return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<Merchant>> getNearbyMerchants({
+    required double lat,
+    required double lng,
+    double radiusKm = 5,
+    String? foodCategoryId,
+  }) async {
+    final params = <String>[
+      'lat=$lat',
+      'lng=$lng',
+      'radius=$radiusKm',
+      if (foodCategoryId != null) 'food_category_id=$foodCategoryId',
+    ];
+    final data = await get('/merchants/nearby?${params.join('&')}', auth: false);
+    final list = data['merchants'] as List<dynamic>? ?? [];
+    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<FoodCategory>> getFoodCategories() async {
+    final data = await get('/food-categories', auth: false);
+    final list = data['food_categories'] as List<dynamic>? ?? [];
+    return list.map((c) => FoodCategory.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<Promotion>> getActivePromotions() async {
+    final data = await get('/promotions/active', auth: false);
+    final list = data['promotions'] as List<dynamic>? ?? [];
+    return list.map((p) => Promotion.fromJson(p as Map<String, dynamic>)).toList();
   }
 
   Future<Merchant> getMerchant(String id) async {
@@ -267,6 +299,19 @@ class ApiClient {
 
   Future<void> toggleProductAvailability(String productId, bool available) async {
     await put('/my-store/products/$productId/toggle', {'is_available': available});
+  }
+
+  Future<ProductVariant> createVariant(String productId, Map<String, dynamic> body) async {
+    final data = await post('/my-store/products/$productId/variants', body);
+    return ProductVariant.fromJson(data['variant'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteVariant(String variantId) async {
+    final headers = await _headers();
+    await _client.delete(
+      Uri.parse('$baseUrl/my-store/variants/$variantId'),
+      headers: headers,
+    );
   }
 
   Future<void> toggleStoreOpen(bool open) async {

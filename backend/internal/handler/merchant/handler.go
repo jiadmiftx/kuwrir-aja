@@ -73,6 +73,10 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		merchants.GET("/:id/products", h.GetProducts)
 	}
 
+	// Global food-category taxonomy — read-only for customer app (Home
+	// filter chips) and merchant app (product tagging picker).
+	public.GET("/food-categories", h.PublicFoodCategories)
+
 	// Merchant owner routes
 	owner := protected.Group("/my-store")
 	{
@@ -141,14 +145,32 @@ type CreateCategoryRequest struct {
 }
 
 type CreateProductRequest struct {
-	Name          string  `json:"name" binding:"required"`
-	Description   string  `json:"description"`
-	Price         float64 `json:"price" binding:"required,gt=0"`
-	ImageURL      string  `json:"image_url"`
-	SortOrder     int     `json:"sort_order"`
-	TrackStock    bool    `json:"track_stock"`
-	StockQuantity int     `json:"stock_quantity"`
-	SKU           string  `json:"sku"`
+	Name               string     `json:"name" binding:"required"`
+	Description        string     `json:"description"`
+	Price              float64    `json:"price" binding:"required,gt=0"`
+	ImageURL           string     `json:"image_url"`
+	SortOrder          int        `json:"sort_order"`
+	TrackStock         bool       `json:"track_stock"`
+	StockQuantity      int        `json:"stock_quantity"`
+	SKU                string     `json:"sku"`
+	FoodCategoryID     *uuid.UUID `json:"food_category_id"`
+	DiscountPrice      *float64   `json:"discount_price"`
+	PackagingFee       float64    `json:"packaging_fee"`
+	VisibleFromMinute  *int       `json:"visible_from_minute"`
+	VisibleUntilMinute *int       `json:"visible_until_minute"`
+}
+
+// validateDiscountPrice checks a discount price is sane relative to the
+// regular price — nil is always fine (no discount). Both bounds enforced
+// here rather than a binding tag since it's a cross-field comparison.
+func validateDiscountPrice(discount *float64, price float64) error {
+	if discount == nil {
+		return nil
+	}
+	if *discount <= 0 || *discount >= price {
+		return fmt.Errorf("discount_price must be greater than 0 and less than price")
+	}
+	return nil
 }
 
 type CreateVariantRequest struct {
@@ -156,6 +178,8 @@ type CreateVariantRequest struct {
 	Name       string  `json:"name" binding:"required"`
 	Price      float64 `json:"price"`
 	IsRequired bool    `json:"is_required"`
+	MinSelect  int     `json:"min_select"`
+	MaxSelect  int     `json:"max_select"`
 }
 
 // --- Public Handlers ---
@@ -172,21 +196,29 @@ func (h *Handler) ListMerchants(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
 }
 
-// NearbyMerchants finds merchants within a radius using PostGIS-compatible distance calculation
+// NearbyMerchants finds the nearest active food merchants to (lat, lng)
+// within radiusKm, using a Haversine approximation, and returns each
+// merchant's computed distance_km. Optionally filtered to merchants that
+// carry at least one product tagged with food_category_id.
 func (h *Handler) NearbyMerchants(c *gin.Context) {
 	lat := c.DefaultQuery("lat", "0")
 	lng := c.DefaultQuery("lng", "0")
 	radiusKm := c.DefaultQuery("radius", "5") // default 5km
+	foodCategoryID := c.Query("food_category_id")
+
+	const distanceExpr = "(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))"
+
+	query := h.db.Model(&model.Merchant{}).
+		Select("merchants.*, "+distanceExpr+" AS distance_km", lat, lng, lat).
+		Where("is_active = ? AND is_verified = ? AND is_open = ? AND type = ?", true, true, true, model.MerchantTypeFood).
+		Where(distanceExpr+" < ?", lat, lng, lat, radiusKm)
+
+	if foodCategoryID != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM products WHERE products.merchant_id = merchants.id AND products.food_category_id = ?)", foodCategoryID)
+	}
 
 	var merchants []model.Merchant
-	// Haversine formula approximation using plain SQL
-	err := h.db.Where("is_active = ? AND is_verified = ? AND is_open = ?", true, true, true).
-		Where("(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) < ?",
-			lat, lng, lat, radiusKm).
-		Order("rating DESC").
-		Find(&merchants).Error
-
-	if err != nil {
+	if err := query.Order("distance_km ASC").Find(&merchants).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch nearby merchants"})
 		return
 	}
@@ -211,14 +243,28 @@ func (h *Handler) SearchMerchants(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
 }
 
-// PopularMerchants returns top-rated open merchants for the "Popular" home/search section
+// PopularMerchants returns top-rated food merchants for the "Rating
+// Tertinggi" home section. Optionally filtered to merchants that carry at
+// least one product tagged with food_category_id.
 func (h *Handler) PopularMerchants(c *gin.Context) {
+	foodCategoryID := c.Query("food_category_id")
+
+	query := h.db.Where("is_active = ? AND is_verified = ? AND type = ?", true, true, model.MerchantTypeFood)
+	if foodCategoryID != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM products WHERE products.merchant_id = merchants.id AND products.food_category_id = ?)", foodCategoryID)
+	}
+
 	var merchants []model.Merchant
-	h.db.Where("is_active = ? AND is_verified = ?", true, true).
-		Order("rating DESC, total_reviews DESC").
-		Limit(6).
-		Find(&merchants)
+	query.Order("rating DESC, total_reviews DESC").Limit(6).Find(&merchants)
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
+}
+
+// PublicFoodCategories returns the active global food-category taxonomy,
+// ordered for display as Home screen filter chips.
+func (h *Handler) PublicFoodCategories(c *gin.Context) {
+	var categories []model.FoodCategory
+	h.db.Where("is_active = ?", true).Order("sort_order ASC, name ASC").Find(&categories)
+	c.JSON(http.StatusOK, gin.H{"food_categories": categories})
 }
 
 // GetMerchant returns a single merchant
@@ -562,19 +608,28 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateDiscountPrice(req.DiscountPrice, req.Price); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	categoryUUID, _ := uuid.Parse(catID)
 	product := model.Product{
-		CategoryID:    categoryUUID,
-		Name:          req.Name,
-		Description:   req.Description,
-		Price:         req.Price,
-		ImageURL:      req.ImageURL,
-		IsAvailable:   true,
-		SortOrder:     req.SortOrder,
-		TrackStock:    req.TrackStock,
-		StockQuantity: req.StockQuantity,
-		SKU:           req.SKU,
+		CategoryID:         categoryUUID,
+		FoodCategoryID:     req.FoodCategoryID,
+		Name:               req.Name,
+		Description:        req.Description,
+		Price:              req.Price,
+		ImageURL:           req.ImageURL,
+		IsAvailable:        true,
+		SortOrder:          req.SortOrder,
+		TrackStock:         req.TrackStock,
+		StockQuantity:      req.StockQuantity,
+		SKU:                req.SKU,
+		DiscountPrice:      req.DiscountPrice,
+		PackagingFee:       req.PackagingFee,
+		VisibleFromMinute:  req.VisibleFromMinute,
+		VisibleUntilMinute: req.VisibleUntilMinute,
 	}
 
 	if err := h.db.Create(&product).Error; err != nil {
@@ -593,11 +648,20 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateDiscountPrice(req.DiscountPrice, req.Price); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	updates := map[string]interface{}{
 		"name": req.Name, "description": req.Description,
 		"price": req.Price, "image_url": req.ImageURL, "sort_order": req.SortOrder,
 		"track_stock": req.TrackStock, "stock_quantity": req.StockQuantity, "sku": req.SKU,
+		"food_category_id":     req.FoodCategoryID,
+		"discount_price":       req.DiscountPrice,
+		"packaging_fee":        req.PackagingFee,
+		"visible_from_minute":  req.VisibleFromMinute,
+		"visible_until_minute": req.VisibleUntilMinute,
 	}
 
 	h.db.Model(&model.Product{}).Where("id = ?", productID).Updates(updates)
@@ -670,13 +734,25 @@ func (h *Handler) CreateVariant(c *gin.Context) {
 		return
 	}
 
+	// MaxSelect defaults to 1 (single-select) when unset, matching the
+	// original required/optional toggle's behavior. MinSelect derives
+	// IsRequired for older clients that only read that field.
+	if req.MaxSelect <= 0 {
+		req.MaxSelect = 1
+	}
+	if req.IsRequired && req.MinSelect == 0 {
+		req.MinSelect = 1
+	}
+
 	productUUID, _ := uuid.Parse(productID)
 	variant := model.ProductVariant{
 		ProductID:  productUUID,
 		GroupName:  req.GroupName,
 		Name:       req.Name,
 		Price:      req.Price,
-		IsRequired: req.IsRequired,
+		IsRequired: req.MinSelect > 0,
+		MinSelect:  req.MinSelect,
+		MaxSelect:  req.MaxSelect,
 	}
 
 	if err := h.db.Create(&variant).Error; err != nil {

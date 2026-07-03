@@ -54,6 +54,7 @@ func main() {
 		&model.Address{},
 		&model.Merchant{},
 		&model.ProductCategory{},
+		&model.FoodCategory{},
 		&model.Product{},
 		&model.ProductVariant{},
 		&model.Driver{},
@@ -127,6 +128,12 @@ func main() {
 		// Public merchant browsing (no auth)
 		// merchH.RegisterRoutes(v1, protected) // Will call below after protected group is created
 
+		// Admin handler instantiated here (before the admin-only group)
+		// so its public-facing methods (e.g. active promotions for the
+		// customer app's Home promo carousel) can be registered on v1.
+		adminH := adminHandler.NewHandler(db)
+		v1.GET("/promotions/active", adminH.PublicActivePromotions)
+
 		// Protected routes (auth required)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
@@ -138,7 +145,6 @@ func main() {
 			adminRoutes := protected.Group("/admin")
 			adminRoutes.Use(middleware.RoleMiddleware("admin"))
 			{
-				adminH := adminHandler.NewHandler(db)
 				adminH.RegisterRoutes(adminRoutes)
 				supportH.RegisterAdminRoutes(adminRoutes)
 			}

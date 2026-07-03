@@ -70,4 +70,14 @@ class MenuCubit extends Cubit<MenuState> {
     await _api.toggleProductAvailability(productId, available);
     await load();
   }
+
+  Future<void> createVariant(String productId, Map<String, dynamic> data) async {
+    await _api.createVariant(productId, data);
+    await load();
+  }
+
+  Future<void> deleteVariant(String variantId) async {
+    await _api.deleteVariant(variantId);
+    await load();
+  }
 }

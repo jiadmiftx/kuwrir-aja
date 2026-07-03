@@ -86,6 +86,12 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	// Zone assignment
 	r.PATCH("/drivers/:id/zone", h.AssignDriverZone)
 	r.PATCH("/merchants/:id/zone", h.AssignMerchantZone)
+
+	// Food categories (global taxonomy for customer app browsing)
+	r.GET("/food-categories", h.GetFoodCategories)
+	r.POST("/food-categories", h.CreateFoodCategory)
+	r.PUT("/food-categories/:id", h.UpdateFoodCategory)
+	r.DELETE("/food-categories/:id", h.DeleteFoodCategory)
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -588,6 +594,73 @@ func (h *Handler) UpdatePromotion(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Promotion updated"})
+}
+
+// GetFoodCategories returns all food categories (admin view — includes inactive).
+func (h *Handler) GetFoodCategories(c *gin.Context) {
+	var categories []model.FoodCategory
+	h.db.Order("sort_order ASC, name ASC").Find(&categories)
+	c.JSON(http.StatusOK, gin.H{"food_categories": categories})
+}
+
+type FoodCategoryRequest struct {
+	Name      string `json:"name" binding:"required"`
+	Icon      string `json:"icon"`
+	SortOrder int    `json:"sort_order"`
+	IsActive  bool   `json:"is_active"`
+}
+
+func (h *Handler) CreateFoodCategory(c *gin.Context) {
+	var req FoodCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	category := model.FoodCategory{
+		Name:      req.Name,
+		Icon:      req.Icon,
+		SortOrder: req.SortOrder,
+		IsActive:  true,
+	}
+	if err := h.db.Create(&category).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create food category"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"food_category": category})
+}
+
+func (h *Handler) UpdateFoodCategory(c *gin.Context) {
+	id := c.Param("id")
+	var req FoodCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	result := h.db.Model(&model.FoodCategory{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"name": req.Name, "icon": req.Icon, "sort_order": req.SortOrder, "is_active": req.IsActive,
+	})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Food category not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Food category updated"})
+}
+
+func (h *Handler) DeleteFoodCategory(c *gin.Context) {
+	id := c.Param("id")
+	h.db.Where("id = ?", id).Delete(&model.FoodCategory{})
+	c.JSON(http.StatusOK, gin.H{"message": "Food category deleted"})
+}
+
+// PublicActivePromotions returns currently-active, non-expired promotions
+// for the customer app's Home promo carousel — no auth required.
+func (h *Handler) PublicActivePromotions(c *gin.Context) {
+	now := time.Now()
+	var promos []model.Promotion
+	h.db.Where("is_active = ? AND starts_at <= ? AND expires_at >= ?", true, now, now).
+		Order("starts_at DESC").
+		Find(&promos)
+	c.JSON(http.StatusOK, gin.H{"promotions": promos})
 }
 
 func (h *Handler) DeletePromotion(c *gin.Context) {

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   MessageSquare,
   Map,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/driver-applications', icon: ClipboardList, label: 'Driver Applications' },
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/promos', icon: Tag, label: 'Promotions' },
+  { to: '/food-categories', icon: UtensilsCrossed, label: 'Food Categories' },
   { to: '/settlements', icon: Banknote, label: 'Settlements' },
   { to: '/revenue', icon: TrendingUp, label: 'Revenue' },
   { to: '/support', icon: MessageSquare, label: 'Support Chat' },

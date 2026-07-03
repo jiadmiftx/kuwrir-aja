@@ -139,9 +139,17 @@ class _CartScreenState extends State<CartScreen> {
                                                 Text(item.product.name,
                                                     style: const TextStyle(
                                                         fontWeight: FontWeight.w600, fontSize: 14)),
+                                                if (item.selectedVariants.isNotEmpty) ...[
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    item.selectedVariants.map((v) => v.name).join(', '),
+                                                    style: TextStyle(
+                                                        fontSize: 12, color: KuwrirColors.textSecondary),
+                                                  ),
+                                                ],
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  'IDR ${_fmt(item.product.price)}',
+                                                  'IDR ${_fmt(item.unitPrice)}',
                                                   style: const TextStyle(
                                                       color: KuwrirColors.primary,
                                                       fontSize: 13,
@@ -154,9 +162,9 @@ class _CartScreenState extends State<CartScreen> {
                                             children: [
                                               _QtyBtn(
                                                 icon: Icons.remove,
-                                                onTap: () => context
-                                                    .read<CartCubit>()
-                                                    .decrementItem(item.product.id),
+                                                onTap: () => context.read<CartCubit>().decrementItem(
+                                                    item.product.id,
+                                                    variantKey: item.variantKey),
                                               ),
                                               Padding(
                                                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -166,11 +174,12 @@ class _CartScreenState extends State<CartScreen> {
                                               ),
                                               _QtyBtn(
                                                 icon: Icons.add,
-                                                onTap: () => context
-                                                    .read<CartCubit>()
-                                                    .addItem(item.product,
-                                                        merchantId: cart.merchantId,
-                                                        merchantName: cart.merchantName),
+                                                onTap: () => context.read<CartCubit>().addItem(
+                                                      item.product,
+                                                      merchantId: cart.merchantId,
+                                                      merchantName: cart.merchantName,
+                                                      selectedVariants: item.selectedVariants,
+                                                    ),
                                               ),
                                             ],
                                           ),
@@ -311,7 +320,15 @@ class _CartScreenState extends State<CartScreen> {
                             ),
                             child: Column(
                               children: [
-                                _PriceRow(label: 'Subtotal menu', amount: cart.subtotal),
+                                _PriceRow(
+                                    label: 'Subtotal menu',
+                                    amount: cart.subtotal - cart.packagingFeeTotal),
+                                if (cart.packagingFeeTotal > 0) ...[
+                                  const SizedBox(height: 4),
+                                  _PriceRow(
+                                      label: 'Biaya kemasan (dari merchant)',
+                                      amount: cart.packagingFeeTotal),
+                                ],
                                 const SizedBox(height: 4),
                                 _PriceRow(label: 'Ongkir (estimasi)', amount: 15000),
                                 const Divider(height: 12),

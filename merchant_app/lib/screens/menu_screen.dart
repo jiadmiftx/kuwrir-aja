@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/menu_cubit.dart';
+import 'variant_manager_sheet.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -189,9 +190,16 @@ class _CategorySection extends StatelessWidget {
     final descCtrl = TextEditingController();
     final skuCtrl = TextEditingController();
     final stockCtrl = TextEditingController();
+    final discountCtrl = TextEditingController();
+    final packagingFeeCtrl = TextEditingController();
     File? imageFile;
     bool trackStock = false;
+    String? foodCategoryId;
+    bool alwaysVisible = true;
+    TimeOfDay? visibleFrom;
+    TimeOfDay? visibleUntil;
     final cubit = context.read<MenuCubit>();
+    final foodCategoriesFuture = ApiClient().getFoodCategories();
 
     showDialog(
       context: context,
@@ -235,6 +243,39 @@ class _CategorySection extends StatelessWidget {
                     labelText: 'SKU (opsional)',
                   ),
                 ),
+                const SizedBox(height: 8),
+                _FoodCategoryDropdown(
+                  future: foodCategoriesFuture,
+                  value: foodCategoryId,
+                  onChanged: (v) => setState(() => foodCategoryId = v),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: discountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Harga Diskon (opsional)',
+                    hintText: 'Kosongkan jika tidak ada diskon',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: packagingFeeCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Biaya Kemasan per Item (opsional)',
+                    hintText: '0',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _VisibilityWindowField(
+                  alwaysVisible: alwaysVisible,
+                  from: visibleFrom,
+                  until: visibleUntil,
+                  onAlwaysVisibleChanged: (v) => setState(() => alwaysVisible = v),
+                  onFromChanged: (v) => setState(() => visibleFrom = v),
+                  onUntilChanged: (v) => setState(() => visibleUntil = v),
+                ),
                 const SizedBox(height: 4),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -257,6 +298,12 @@ class _CategorySection extends StatelessWidget {
               onPressed: () {
                 final name = nameCtrl.text.trim();
                 final price = double.tryParse(priceCtrl.text) ?? 0;
+                final discount = double.tryParse(discountCtrl.text);
+                if (discount != null && (discount <= 0 || discount >= price)) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                      content: Text('Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar')));
+                  return;
+                }
                 if (name.isNotEmpty && price > 0) {
                   cubit.createProduct(catId, {
                     'name': name,
@@ -266,6 +313,11 @@ class _CategorySection extends StatelessWidget {
                     'sku': skuCtrl.text.trim(),
                     'track_stock': trackStock,
                     'stock_quantity': int.tryParse(stockCtrl.text) ?? 0,
+                    'food_category_id': foodCategoryId,
+                    'discount_price': discount,
+                    'packaging_fee': double.tryParse(packagingFeeCtrl.text) ?? 0,
+                    'visible_from_minute': alwaysVisible ? null : _toMinute(visibleFrom),
+                    'visible_until_minute': alwaysVisible ? null : _toMinute(visibleUntil),
                   }, image: imageFile);
                   Navigator.pop(ctx);
                 }
@@ -275,6 +327,50 @@ class _CategorySection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+int? _toMinute(TimeOfDay? t) => t == null ? null : t.hour * 60 + t.minute;
+
+/// Optional platform-wide food category picker, shared by add/edit product
+/// dialogs. Untagged products (no selection) simply won't surface under any
+/// category filter on the customer app's Home screen.
+class _FoodCategoryDropdown extends StatelessWidget {
+  final Future<List<FoodCategory>> future;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  const _FoodCategoryDropdown({
+    required this.future,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<FoodCategory>>(
+      future: future,
+      builder: (context, snapshot) {
+        final categories = snapshot.data ?? const [];
+        if (snapshot.connectionState != ConnectionState.done || categories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return DropdownButtonFormField<String?>(
+          initialValue: value,
+          decoration: const InputDecoration(labelText: 'Kategori Makanan (opsional)'),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('Tanpa kategori')),
+            ...categories.map(
+              (c) => DropdownMenuItem<String?>(
+                value: c.id,
+                child: Text('${c.icon ?? ''} ${c.name}'.trim()),
+              ),
+            ),
+          ],
+          onChanged: onChanged,
+        );
+      },
     );
   }
 }
@@ -412,6 +508,7 @@ class _ProductTile extends StatelessWidget {
               onSelected: (action) => _handleAction(context, action),
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(value: 'variants', child: Text('Kelola Varian')),
                 const PopupMenuItem(value: 'delete', child: Text('Hapus')),
               ],
             ),
@@ -424,6 +521,12 @@ class _ProductTile extends StatelessWidget {
   void _handleAction(BuildContext context, String action) {
     if (action == 'edit') {
       _showEditDialog(context);
+    } else if (action == 'variants') {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => VariantManagerSheet(product: product),
+      );
     } else if (action == 'delete') {
       _showDeleteConfirm(context);
     }
@@ -435,9 +538,18 @@ class _ProductTile extends StatelessWidget {
     final descCtrl = TextEditingController(text: product.description ?? '');
     final skuCtrl = TextEditingController(text: product.sku ?? '');
     final stockCtrl = TextEditingController(text: product.stockQuantity.toString());
+    final discountCtrl =
+        TextEditingController(text: product.discountPrice?.toStringAsFixed(0) ?? '');
+    final packagingFeeCtrl = TextEditingController(
+        text: product.packagingFee > 0 ? product.packagingFee.toStringAsFixed(0) : '');
     File? imageFile;
     bool trackStock = product.trackStock;
+    String? foodCategoryId = product.foodCategoryId;
+    bool alwaysVisible = product.visibleFromMinute == null && product.visibleUntilMinute == null;
+    TimeOfDay? visibleFrom = _fromMinute(product.visibleFromMinute);
+    TimeOfDay? visibleUntil = _fromMinute(product.visibleUntilMinute);
     final cubit = context.read<MenuCubit>();
+    final foodCategoriesFuture = ApiClient().getFoodCategories();
 
     showDialog(
       context: context,
@@ -465,6 +577,39 @@ class _ProductTile extends StatelessWidget {
                 TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Deskripsi')),
                 const SizedBox(height: 8),
                 TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU (opsional)')),
+                const SizedBox(height: 8),
+                _FoodCategoryDropdown(
+                  future: foodCategoriesFuture,
+                  value: foodCategoryId,
+                  onChanged: (v) => setState(() => foodCategoryId = v),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: discountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Harga Diskon (opsional)',
+                    hintText: 'Kosongkan jika tidak ada diskon',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: packagingFeeCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Biaya Kemasan per Item (opsional)',
+                    hintText: '0',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _VisibilityWindowField(
+                  alwaysVisible: alwaysVisible,
+                  from: visibleFrom,
+                  until: visibleUntil,
+                  onAlwaysVisibleChanged: (v) => setState(() => alwaysVisible = v),
+                  onFromChanged: (v) => setState(() => visibleFrom = v),
+                  onUntilChanged: (v) => setState(() => visibleUntil = v),
+                ),
                 const SizedBox(height: 4),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -485,13 +630,25 @@ class _ProductTile extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
             ElevatedButton(
               onPressed: () {
+                final price = double.tryParse(priceCtrl.text) ?? product.price;
+                final discount = double.tryParse(discountCtrl.text);
+                if (discount != null && (discount <= 0 || discount >= price)) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                      content: Text('Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar')));
+                  return;
+                }
                 cubit.updateProduct(product.id, {
                   'name': nameCtrl.text.trim(),
-                  'price': double.tryParse(priceCtrl.text) ?? product.price,
+                  'price': price,
                   'description': descCtrl.text.trim(),
                   'sku': skuCtrl.text.trim(),
                   'track_stock': trackStock,
                   'stock_quantity': int.tryParse(stockCtrl.text) ?? 0,
+                  'food_category_id': foodCategoryId,
+                  'discount_price': discount,
+                  'packaging_fee': double.tryParse(packagingFeeCtrl.text) ?? 0,
+                  'visible_from_minute': alwaysVisible ? null : _toMinute(visibleFrom),
+                  'visible_until_minute': alwaysVisible ? null : _toMinute(visibleUntil),
                 }, image: imageFile);
                 Navigator.pop(ctx);
               },
@@ -526,4 +683,66 @@ class _ProductTile extends StatelessWidget {
 
   String _fmt(double v) => v.toStringAsFixed(0)
       .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+}
+
+TimeOfDay? _fromMinute(int? minute) =>
+    minute == null ? null : TimeOfDay(hour: minute ~/ 60, minute: minute % 60);
+
+/// Toggle + two time pickers controlling when a product shows up for
+/// customers. Off (always visible) by default — matches every product
+/// created before this feature existed.
+class _VisibilityWindowField extends StatelessWidget {
+  final bool alwaysVisible;
+  final TimeOfDay? from;
+  final TimeOfDay? until;
+  final ValueChanged<bool> onAlwaysVisibleChanged;
+  final ValueChanged<TimeOfDay?> onFromChanged;
+  final ValueChanged<TimeOfDay?> onUntilChanged;
+
+  const _VisibilityWindowField({
+    required this.alwaysVisible,
+    required this.from,
+    required this.until,
+    required this.onAlwaysVisibleChanged,
+    required this.onFromChanged,
+    required this.onUntilChanged,
+  });
+
+  Future<void> _pick(BuildContext context, TimeOfDay? initial, ValueChanged<TimeOfDay?> onChanged) async {
+    final picked = await showTimePicker(context: context, initialTime: initial ?? TimeOfDay.now());
+    if (picked != null) onChanged(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Selalu Tampil', style: TextStyle(fontSize: 14)),
+          value: alwaysVisible,
+          onChanged: onAlwaysVisibleChanged,
+        ),
+        if (!alwaysVisible)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pick(context, from, onFromChanged),
+                  child: Text(from == null ? 'Mulai' : from!.format(context)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pick(context, until, onUntilChanged),
+                  child: Text(until == null ? 'Selesai' : until!.format(context)),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
 }

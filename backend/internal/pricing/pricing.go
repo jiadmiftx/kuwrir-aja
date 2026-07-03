@@ -59,16 +59,34 @@ func ApplyMarkup(price float64, s Settings) float64 {
 	return math.Ceil(marked/500) * 500
 }
 
+// EffectivePrice returns the price a customer actually pays before markup:
+// the product's DiscountPrice when set, otherwise its regular Price. This is
+// the single place discount logic lives — both catalog display and
+// PlaceOrder feed this into ApplyMarkup so the two never drift apart.
+func EffectivePrice(p model.Product) float64 {
+	if p.DiscountPrice != nil && *p.DiscountPrice > 0 {
+		return *p.DiscountPrice
+	}
+	return p.Price
+}
+
 // ApplyMarkupToCategories overwrites product/variant prices in-memory with
 // the markup-inclusive customer price. It never writes back to the DB — the
-// merchant's raw price stays untouched in storage.
+// merchant's raw price stays untouched in storage. Price and DiscountPrice
+// (when set) are marked up independently, so the customer app can still show
+// the original price struck through next to the marked-up discount price.
 func ApplyMarkupToCategories(db *gorm.DB, categories []model.ProductCategory) {
 	ps := LoadSettings(db)
 	for i := range categories {
 		for j := range categories[i].Products {
-			categories[i].Products[j].Price = ApplyMarkup(categories[i].Products[j].Price, ps)
-			for k := range categories[i].Products[j].Variants {
-				categories[i].Products[j].Variants[k].Price = ApplyMarkup(categories[i].Products[j].Variants[k].Price, ps)
+			product := &categories[i].Products[j]
+			product.Price = ApplyMarkup(product.Price, ps)
+			if product.DiscountPrice != nil && *product.DiscountPrice > 0 {
+				marked := ApplyMarkup(*product.DiscountPrice, ps)
+				product.DiscountPrice = &marked
+			}
+			for k := range product.Variants {
+				product.Variants[k].Price = ApplyMarkup(product.Variants[k].Price, ps)
 			}
 		}
 	}

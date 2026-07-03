@@ -126,6 +126,11 @@ type Merchant struct {
 	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
 	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
 
+	// DistanceKm is populated only by distance-aware queries (e.g.
+	// NearbyMerchants) via a computed SELECT expression — read-only,
+	// excluded from migration and from create/update.
+	DistanceKm *float64 `gorm:"->;-:migration" json:"distance_km,omitempty"`
+
 	// Verification documents (placeholder: local URLs, later: R2)
 	OwnerKtpURL        string `json:"owner_ktp_url,omitempty"`
 	BusinessLicenseURL string `json:"business_license_url,omitempty"` // SIUP / IUMK
@@ -146,7 +151,8 @@ type Merchant struct {
 	Categories []ProductCategory `gorm:"foreignKey:MerchantID" json:"categories,omitempty"`
 }
 
-// ProductCategory groups products
+// ProductCategory groups products within a single merchant's own menu
+// (e.g. "Menu Utama", "Minuman") — not shared across merchants.
 type ProductCategory struct {
 	Base
 	MerchantID uuid.UUID `gorm:"type:uuid;not null;index" json:"merchant_id"`
@@ -155,10 +161,23 @@ type ProductCategory struct {
 	Products   []Product `gorm:"foreignKey:CategoryID" json:"products,omitempty"`
 }
 
+// FoodCategory is a platform-wide taxonomy (e.g. "Nasi", "Minuman", "Snack")
+// that merchants can tag their products with, independent of each
+// merchant's own ProductCategory menu grouping. Powers the customer app's
+// Home category filter across all merchants.
+type FoodCategory struct {
+	Base
+	Name      string `gorm:"not null" json:"name"`
+	Icon      string `json:"icon,omitempty"` // emoji, e.g. "🍚"
+	SortOrder int    `gorm:"default:0" json:"sort_order"`
+	IsActive  bool   `gorm:"default:true" json:"is_active"`
+}
+
 // Product is an item sold by the merchant
 type Product struct {
 	Base
-	CategoryID    uuid.UUID        `gorm:"type:uuid;not null;index" json:"category_id"`
+	CategoryID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"category_id"`
+	FoodCategoryID *uuid.UUID `gorm:"type:uuid;index" json:"food_category_id,omitempty"`
 	Name          string           `gorm:"not null" json:"name"`
 	Description   string           `json:"description,omitempty"`
 	Price            float64 `gorm:"not null" json:"price"`            // Base price (merchant's price / harga jual)
@@ -173,9 +192,29 @@ type Product struct {
 	SKU           string           `json:"sku,omitempty"`
 	SortOrder     int              `gorm:"default:0" json:"sort_order"`
 	Variants      []ProductVariant `gorm:"foreignKey:ProductID" json:"variants,omitempty"`
+
+	// DiscountPrice, when set, is the customer-facing base price instead of
+	// Price (must be > 0 and < Price — enforced in the merchant handler).
+	// Markup is applied to whichever is effective, via pricing.EffectivePrice.
+	DiscountPrice *float64 `json:"discount_price,omitempty"`
+
+	// PackagingFee is a flat per-unit pass-through cost (not marked up),
+	// added to the order total as product.PackagingFee * quantity.
+	PackagingFee float64 `gorm:"default:0" json:"packaging_fee"`
+
+	// VisibleFromMinute/VisibleUntilMinute restrict when the product shows
+	// up for customers (minutes since midnight, 0-1439, single timezone —
+	// WITA). Both nil means always visible. VisibleFromMinute >
+	// VisibleUntilMinute means the window crosses midnight.
+	VisibleFromMinute  *int `json:"visible_from_minute,omitempty"`
+	VisibleUntilMinute *int `json:"visible_until_minute,omitempty"`
 }
 
-// ProductVariant represents options/modifiers for a product
+// ProductVariant represents options/modifiers for a product, grouped by
+// GroupName (e.g. "Ukuran", "Topping"). MinSelect/MaxSelect describe the
+// group's selection rule and are expected to be identical across every
+// option sharing the same GroupName for a product — enforced by the
+// merchant app UI, not the database.
 type ProductVariant struct {
 	Base
 	ProductID  uuid.UUID `gorm:"type:uuid;not null;index" json:"product_id"`
@@ -183,6 +222,8 @@ type ProductVariant struct {
 	Name       string    `gorm:"not null" json:"name"`       // e.g., "Large", "Red"
 	Price      float64   `gorm:"default:0" json:"price"`
 	IsRequired bool      `gorm:"default:false" json:"is_required"`
+	MinSelect  int       `gorm:"default:0" json:"min_select"` // 0 = optional group
+	MaxSelect  int       `gorm:"default:1" json:"max_select"` // 1 = single-select (radio)
 }
 
 // Driver represents a delivery driver
@@ -254,6 +295,7 @@ type Order struct {
 	// Tax & fees (added to total beyond markup + delivery)
 	TaxAmount     float64 `gorm:"default:0" json:"tax_amount"`      // PPN applied on subtotal_with_markup
 	AppServiceFee float64 `gorm:"default:0" json:"app_service_fee"` // platform service fee on delivery
+	PackagingFee  float64 `gorm:"default:0" json:"packaging_fee"`   // sum of product.packaging_fee * quantity across items, not marked up
 
 	// Payout tracking (what each party actually receives)
 	MerchantPayout          float64 `gorm:"default:0" json:"merchant_payout"`           // = Subtotal - PlatformMarkup (merchant's base price)
@@ -292,11 +334,12 @@ type OrderItem struct {
 	ProductID    *uuid.UUID `gorm:"type:uuid" json:"product_id,omitempty"` // Nullable for custom items
 	ItemName     string     `gorm:"not null" json:"item_name"`             // Snapshot
 	Quantity     int        `gorm:"not null" json:"quantity"`
-	BasePrice    float64    `gorm:"not null" json:"base_price"`   // Merchant's original price
-	UnitPrice    float64    `gorm:"not null" json:"unit_price"`   // Price with markup
-	TotalPrice   float64    `gorm:"not null" json:"total_price"`  // UnitPrice * Quantity + variants
-	VariantsJSON *string    `gorm:"type:jsonb" json:"variants_json,omitempty"`
-	Notes        string     `json:"notes,omitempty"`
+	BasePrice     float64    `gorm:"not null" json:"base_price"`   // Price actually charged (discounted if applicable), before markup
+	OriginalPrice *float64   `json:"original_price,omitempty"`     // Pre-discount merchant price, snapshotted only when a discount was applied
+	UnitPrice     float64    `gorm:"not null" json:"unit_price"`   // BasePrice with markup, plus marked-up variant prices
+	TotalPrice    float64    `gorm:"not null" json:"total_price"`  // UnitPrice * Quantity + packaging fee
+	VariantsJSON  *string    `gorm:"type:jsonb" json:"variants_json,omitempty"`
+	Notes         string     `json:"notes,omitempty"`
 }
 
 // Review from customer

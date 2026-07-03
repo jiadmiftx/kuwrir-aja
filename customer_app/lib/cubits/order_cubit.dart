@@ -42,6 +42,7 @@ class OrderCubit extends Cubit<OrderState> {
                   'product_id': i.product.id,
                   'quantity': i.quantity,
                   'notes': i.notes ?? '',
+                  'variant_ids': i.selectedVariants.map((v) => v.id).toList(),
                 })
             .toList(),
         'dropoff_address': dropoffAddress,

@@ -1,6 +1,7 @@
 package customer
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -41,9 +42,19 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 // --- Request DTOs ---
 
 type OrderItemRequest struct {
-	ProductID string `json:"product_id" binding:"required"`
-	Quantity  int    `json:"quantity" binding:"required,gte=1"`
-	Notes     string `json:"notes"`
+	ProductID  string   `json:"product_id" binding:"required"`
+	Quantity   int      `json:"quantity" binding:"required,gte=1"`
+	Notes      string   `json:"notes"`
+	VariantIDs []string `json:"variant_ids"`
+}
+
+// selectedVariantSnapshot is what gets stored as OrderItem.VariantsJSON —
+// enough to render a receipt without re-joining ProductVariant later.
+type selectedVariantSnapshot struct {
+	ID        string  `json:"id"`
+	GroupName string  `json:"group_name"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`
 }
 
 type PlaceOrderRequest struct {
@@ -111,6 +122,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	var subtotalWithMarkup float64
 	var totalBasePrice float64
 	var totalPlatformMarkup float64
+	var totalPackagingFee float64
 
 	for _, reqItem := range req.Items {
 		var product model.Product
@@ -124,33 +136,105 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 			return
 		}
 
+		if !pricing.IsVisibleNow(product.VisibleFromMinute, product.VisibleUntilMinute) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s is not available at this time", product.Name)})
+			return
+		}
+
 		if product.TrackStock && product.StockQuantity < reqItem.Quantity {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Insufficient stock for %s", product.Name)})
 			return
 		}
 
+		// Load this product's variant options and validate the customer's
+		// selection against each group's min/max rule (derived from any
+		// option in that group — every option in a group is expected to
+		// carry the same rule, enforced by the merchant app UI).
+		var allVariants []model.ProductVariant
+		h.db.Where("product_id = ?", product.ID).Find(&allVariants)
+
+		selectedIDs := make(map[string]bool, len(reqItem.VariantIDs))
+		for _, id := range reqItem.VariantIDs {
+			selectedIDs[id] = true
+		}
+
+		type groupRule struct{ min, max int }
+		groupRules := map[string]groupRule{}
+		groupCounts := map[string]int{}
+		var selectedVariants []model.ProductVariant
+		for _, v := range allVariants {
+			if _, ok := groupRules[v.GroupName]; !ok {
+				groupRules[v.GroupName] = groupRule{v.MinSelect, v.MaxSelect}
+			}
+			if selectedIDs[v.ID.String()] {
+				groupCounts[v.GroupName]++
+				selectedVariants = append(selectedVariants, v)
+			}
+		}
+		for group, rule := range groupRules {
+			count := groupCounts[group]
+			if count < rule.min {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s: pilih minimal %d untuk %s", product.Name, rule.min, group)})
+				return
+			}
+			if rule.max > 0 && count > rule.max {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s: pilih maksimal %d untuk %s", product.Name, rule.max, group)})
+				return
+			}
+		}
+
 		// Apply platform markup — same formula/rounding as the catalog price the
 		// customer saw, so the charged total never drifts from what was displayed.
-		priceWithMarkup := pricing.ApplyMarkup(product.Price, pricingSettings)
-		markupAmount := priceWithMarkup - product.Price
-		itemTotal := priceWithMarkup * float64(reqItem.Quantity)
+		// Discounted price (when set) is the markup basis, not the regular price.
+		effectivePrice := pricing.EffectivePrice(product)
+		priceWithMarkup := pricing.ApplyMarkup(effectivePrice, pricingSettings)
+
+		var rawVariantSum, variantsMarkupSum float64
+		var variantSnapshots []selectedVariantSnapshot
+		for _, v := range selectedVariants {
+			vMarked := pricing.ApplyMarkup(v.Price, pricingSettings)
+			rawVariantSum += v.Price
+			variantsMarkupSum += vMarked
+			variantSnapshots = append(variantSnapshots, selectedVariantSnapshot{
+				ID: v.ID.String(), GroupName: v.GroupName, Name: v.Name, Price: vMarked,
+			})
+		}
+		if variantSnapshots == nil {
+			variantSnapshots = []selectedVariantSnapshot{}
+		}
+		variantsJSONBytes, _ := json.Marshal(variantSnapshots)
+		variantsJSONStr := string(variantsJSONBytes)
+
+		unitPriceWithVariants := priceWithMarkup + variantsMarkupSum
+		rawUnitWithVariants := effectivePrice + rawVariantSum
+		itemMarkupAmount := unitPriceWithVariants - rawUnitWithVariants
+		packagingFeeTotal := product.PackagingFee * float64(reqItem.Quantity)
+		itemTotal := unitPriceWithVariants*float64(reqItem.Quantity) + packagingFeeTotal
+
+		var originalPrice *float64
+		if product.DiscountPrice != nil && *product.DiscountPrice > 0 {
+			orig := product.Price
+			originalPrice = &orig
+		}
 
 		productID, _ := uuid.Parse(reqItem.ProductID)
 		orderItems = append(orderItems, model.OrderItem{
-			ProductID:    &productID,
-			ItemName:     product.Name,
-			Quantity:     reqItem.Quantity,
-			BasePrice:    product.Price,
-			UnitPrice:    priceWithMarkup,
-			TotalPrice:   itemTotal,
-			Notes:        reqItem.Notes,
-			VariantsJSON: func() *string { s := "[]"; return &s }(),
+			ProductID:     &productID,
+			ItemName:      product.Name,
+			Quantity:      reqItem.Quantity,
+			BasePrice:     effectivePrice,
+			OriginalPrice: originalPrice,
+			UnitPrice:     unitPriceWithVariants,
+			TotalPrice:    itemTotal,
+			Notes:         reqItem.Notes,
+			VariantsJSON:  &variantsJSONStr,
 		})
 
-		baseItemTotal := product.Price * float64(reqItem.Quantity)
-		subtotalWithMarkup += itemTotal
+		baseItemTotal := rawUnitWithVariants * float64(reqItem.Quantity)
+		subtotalWithMarkup += unitPriceWithVariants * float64(reqItem.Quantity)
 		totalBasePrice += baseItemTotal
-		totalPlatformMarkup += markupAmount * float64(reqItem.Quantity)
+		totalPlatformMarkup += itemMarkupAmount * float64(reqItem.Quantity)
+		totalPackagingFee += packagingFeeTotal
 
 		// Deduct stock if tracking
 		if product.TrackStock {
@@ -201,8 +285,9 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	}
 	taxAmount := subtotalWithMarkup * (effectiveTaxRate / 100.0)
 
-	// 7. Grand total customer pays (app service fee is an explicit charge to customer)
-	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee + appServiceFee
+	// 7. Grand total customer pays (app service fee is an explicit charge to
+	// customer; packaging fee is a pass-through merchant cost, not taxed/marked up)
+	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee + appServiceFee + totalPackagingFee
 
 	// Enforce min order amount
 	if settings.MinOrderAmount > 0 && subtotalWithMarkup < settings.MinOrderAmount {
@@ -241,6 +326,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		PlatformMarkup:     totalPlatformMarkup,
 		TaxAmount:          taxAmount,
 		AppServiceFee:      appServiceFee,
+		PackagingFee:            totalPackagingFee,
 		DeliveryFee:             deliveryFee,
 		DeliveryCommission:      deliveryCommission,
 		DriverEarning:           driverEarning,
