@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Cocourir</title>
+  <meta name="description" content="Cocourir Privacy Policy: how we collect, use, and protect user data across the Customer App, Merchant App, and Driver App.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --g950: oklch(0.20 0.07 150);
+      --g900: oklch(0.26 0.10 149);
+      --g800: oklch(0.32 0.13 148);
+      --g700: oklch(0.40 0.16 148);
+      --g600: oklch(0.48 0.18 148);
+      --g500: oklch(0.56 0.18 147);
+      --g400: oklch(0.65 0.16 146);
+      --g200: oklch(0.83 0.09 146);
+      --g100: oklch(0.92 0.04 146);
+      --g50:  oklch(0.97 0.015 148);
+      --g10:  oklch(0.99 0.005 148);
+      --amber: oklch(0.76 0.15 74);
+      --amber-d: oklch(0.60 0.16 68);
+      --ink: oklch(0.17 0.025 148);
+      --ink-mid: oklch(0.42 0.05 148);
+      --ink-soft: oklch(0.62 0.035 148);
+      --ff: 'Figtree', system-ui, sans-serif;
+      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-lg: 24px;
+      --shadow-card: 0 2px 8px oklch(0.20 0.07 150 / 0.10), 0 8px 32px oklch(0.20 0.07 150 / 0.07);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--ff);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+      background: var(--g10);
+    }
+    a { color: var(--g700); text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: var(--g600); }
+    .container { width: min(820px, 100% - 2rem); margin-inline: auto; }
+
+    .nav {
+      background: var(--g950);
+      padding: 0 1rem;
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+      width: min(1200px, 100% - 2rem);
+      margin-inline: auto;
+    }
+    .logo { display: flex; align-items: center; gap: 0.5rem; }
+    .logo-icon { height: 36px; display: flex; align-items: center; }
+    .logo-icon img { height: 36px; width: auto; object-fit: contain; }
+    .back-link {
+      color: oklch(1 0 0 / 0.80);
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .back-link:hover { color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 1.25rem; }
+    .lang-switch {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: oklch(1 0 0 / 0.08);
+      border-radius: 100px;
+      padding: 3px;
+    }
+    .lang-switch a {
+      padding: 0.3rem 0.75rem;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: oklch(1 0 0 / 0.60);
+    }
+    .lang-switch a.active { background: var(--amber); color: var(--g950); }
+    .lang-switch a:not(.active):hover { color: #fff; }
+
+    .hero {
+      background: var(--g950);
+      color: #fff;
+      padding: 2.5rem 1rem 3.5rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+    }
+    .hero p { color: oklch(1 0 0 / 0.70); font-size: 0.95rem; }
+
+    .content { padding: clamp(3rem, 6vw, 4.5rem) 1rem 6rem; }
+    .content .card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      padding: clamp(1.75rem, 4vw, 3rem);
+    }
+    .content h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-top: 2.25rem;
+      margin-bottom: 0.9rem;
+      color: var(--g800);
+    }
+    .content h2:first-child { margin-top: 0; }
+    .content h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .content p { margin-bottom: 1rem; color: var(--ink-mid); }
+    .content ul { margin: 0 0 1rem 1.25rem; color: var(--ink-mid); list-style: disc; }
+    .content li { margin-bottom: 0.45rem; }
+    .content strong { color: var(--ink); }
+    .meta {
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--g100);
+    }
+    .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--g100); vertical-align: top; }
+    th { background: var(--g50); font-weight: 700; color: var(--ink); }
+    td { color: var(--ink-mid); }
+    .toc {
+      background: var(--g50);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc p { font-weight: 700; color: var(--ink); margin-bottom: 0.6rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .toc ol { margin-left: 1.1rem; color: var(--g700); }
+    .toc li { margin-bottom: 0.3rem; font-size: 0.93rem; }
+    .contact-box {
+      background: var(--g950);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      margin-top: 1.5rem;
+    }
+    .contact-box p { color: oklch(1 0 0 / 0.75); margin-bottom: 0.5rem; }
+    .contact-box a { color: var(--amber); }
+
+    .footer {
+      background: oklch(0.14 0.04 148);
+      color: oklch(1 0 0 / 0.55);
+      padding: 2.5rem 1rem;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+    .footer a { color: oklch(1 0 0 / 0.75); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo" aria-label="Cocourir - Home">
+      <div class="logo-icon"><img src="logo_cocourir.svg" alt="Cocourir"></div>
+    </a>
+    <div class="nav-right">
+      <div class="lang-switch" role="group" aria-label="Choose language">
+        <a href="privacy.html">ID</a>
+        <a href="privacy-en.html" class="active">EN</a>
+      </div>
+      <a href="/" class="back-link">← Back to Home</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p>Applies to the Cocourir Customer App, Merchant App, and Driver App</p>
+  </div>
+</section>
+
+<section class="content">
+  <div class="container">
+    <div class="card">
+      <p class="meta">Last updated: July 3, 2026</p>
+
+      <p>Cocourir ("we", "the platform") values the privacy of users of our Customer, Merchant, and Driver apps ("you", "user"). This Privacy Policy explains what data we collect, how we use it, who it may be shared with, and the rights you have over your personal data.</p>
+      <p>By downloading, accessing, or using any Cocourir app, you agree to the collection and use of data as described in this policy.</p>
+
+      <div class="toc">
+        <p>Table of Contents</p>
+        <ol>
+          <li>Data We Collect</li>
+          <li>How We Use Data</li>
+          <li>Device Permissions (Android)</li>
+          <li>Sharing Data with Third Parties</li>
+          <li>Data Storage &amp; Security</li>
+          <li>Your Rights Over Personal Data</li>
+          <li>Data Retention &amp; Deletion</li>
+          <li>Children's Privacy</li>
+          <li>Changes to This Policy</li>
+          <li>Contact Us</li>
+        </ol>
+      </div>
+
+      <h2 id="data">1. Data We Collect</h2>
+      <p>The data we collect varies depending on which app you use (Customer, Merchant, or Driver):</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Data Category</th><th>Examples</th><th>App(s)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Account data</td><td>Name, phone number, email, password (encrypted), profile photo</td><td>All</td></tr>
+            <tr><td>Location</td><td>Precise GPS coordinates for order delivery, real-time driver tracking, and delivery-fee zone calculation</td><td>All</td></tr>
+            <tr><td>Order data</td><td>Order history, delivery address, purchased items, order notes, payment method</td><td>Customer, Merchant, Driver</td></tr>
+            <tr><td>Payment data</td><td>Wallet balance, transaction history, bank account for payouts (account number, account holder name)</td><td>Merchant, Driver</td></tr>
+            <tr><td>Verification documents</td><td>Photos of national ID (KTP), driving licence (SIM), vehicle registration (STNK), vehicle photo, business documents (for merchant/driver onboarding)</td><td>Merchant, Driver</td></tr>
+            <tr><td>Photos &amp; media</td><td>Product/menu photos, proof-of-delivery photos, profile photo — captured via camera or gallery</td><td>Merchant, Driver</td></tr>
+            <tr><td>Device data</td><td>Device model, operating system, push-notification token, app identifiers</td><td>All</td></tr>
+            <tr><td>Usage data</td><td>In-app activity logs (e.g. login times, features accessed) for support and service-improvement purposes</td><td>All</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="use">2. How We Use Data</h2>
+      <ul>
+        <li><strong>Processing orders</strong> — connecting customers, merchants, and drivers, calculating delivery fees based on zone/distance, and processing payments.</li>
+        <li><strong>Real-time delivery tracking</strong> — showing the driver's location to the customer and merchant while a delivery is in progress.</li>
+        <li><strong>Identity verification</strong> — confirming that merchants and drivers registering on the platform are legitimate individuals/businesses, to keep the platform safe.</li>
+        <li><strong>Notifications</strong> — sending order status updates, promotions, and important account information.</li>
+        <li><strong>Customer support</strong> — resolving complaints, questions, or disputes related to orders.</li>
+        <li><strong>Payouts</strong> — processing wallet withdrawals for merchants and drivers to their registered bank accounts.</li>
+        <li><strong>Analytics &amp; service improvement</strong> — understanding usage patterns to improve app features and performance.</li>
+        <li><strong>Security</strong> — detecting and preventing fraud, account misuse, or violations of our terms of service.</li>
+      </ul>
+      <p>We do <strong>not</strong> sell your personal data to third parties for advertising purposes.</p>
+
+      <h2 id="permissions">3. Device Permissions (Android)</h2>
+      <p>The Cocourir apps request the following permissions, each used strictly for its stated purpose:</p>
+      <ul>
+        <li><strong>Location (Fine/Coarse Location)</strong> — to determine the delivery address (Customer), store location (Merchant), and real-time tracking during delivery (Driver). The Driver App requires active location while "online" so orders can be routed accurately.</li>
+        <li><strong>Camera &amp; Gallery</strong> — to upload product/menu photos (Merchant) and proof-of-delivery or vehicle-document photos (Driver).</li>
+        <li><strong>Notifications</strong> — to send order-status and account-related alerts.</li>
+        <li><strong>Internet</strong> — required for the app to connect to Cocourir's servers.</li>
+      </ul>
+      <p>You may disable these permissions at any time through your device settings, though some features (such as delivery tracking) may not work properly without location access.</p>
+
+      <h2 id="sharing">4. Sharing Data with Third Parties</h2>
+      <p>We share data only to the extent necessary for platform operations:</p>
+      <ul>
+        <li><strong>Between platform users</strong> — a customer's name and location are shared with the driver assigned to their order (for delivery purposes); a merchant's store name and location are shared with the relevant customer and driver.</li>
+        <li><strong>Third-party service providers</strong> — server hosting providers, push-notification services, and mapping/geolocation services (e.g. OpenStreetMap, official government mapping services) that support app operations.</li>
+        <li><strong>Legal obligations</strong> — when required by applicable law or a lawful request from a government authority.</li>
+      </ul>
+      <p>We require every third party that processes data on our behalf to maintain reasonable standards of confidentiality and security.</p>
+
+      <h2 id="security">5. Data Storage &amp; Security</h2>
+      <p>Your data is stored on servers we manage, protected by reasonable security measures including encrypted passwords and encrypted connections (HTTPS) between the app and our servers. Access to user data is limited to personnel who need it to operate the service.</p>
+      <p>That said, no system is entirely risk-free — we continue to improve platform security as the service grows.</p>
+
+      <h2 id="rights">6. Your Rights Over Personal Data</h2>
+      <p>You have the right to:</p>
+      <ul>
+        <li>Access and update your profile data directly within the app.</li>
+        <li>Request a copy of the personal data we hold about you.</li>
+        <li>Request deletion of your account and associated data (see Section 7).</li>
+        <li>Withdraw consent for location use by disabling location permission on your device (may limit app functionality).</li>
+      </ul>
+      <p>To exercise any of these rights, contact us using the details in Section 10.</p>
+
+      <h2 id="retention">7. Data Retention &amp; Deletion</h2>
+      <p>We retain account data for as long as your account is active and as needed to fulfil the purposes described in this policy, including financial record-keeping obligations required by applicable regulations. If you request account deletion, we will delete or anonymize your personal data within a reasonable time, except for data we are legally required to retain (such as financial transaction records).</p>
+
+      <h2 id="children">8. Children's Privacy</h2>
+      <p>Cocourir's services are intended for users aged 17 and above. We do not knowingly collect data from children under this age. If you become aware that a child's data has been collected without parental/guardian consent, please contact us so it can be promptly removed.</p>
+
+      <h2 id="changes">9. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. Significant changes will be communicated through the app or this page. The "Last updated" date above reflects the most recent revision.</p>
+
+      <h2 id="contact">10. Contact Us</h2>
+      <p>If you have questions, complaints, or requests regarding your personal data, please reach out to us:</p>
+      <div class="contact-box">
+        <p>✉ Email: <a href="mailto:halo@cocourir.id">halo@cocourir.id</a></p>
+        <p>📸 Instagram: <a href="https://instagram.com/cocourir" target="_blank" rel="noopener noreferrer">@cocourir</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>© 2026 Cocourir. <a href="/">Back to Home</a></p>
+</footer>
+
+</body>
+</html>
