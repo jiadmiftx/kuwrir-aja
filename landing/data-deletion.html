@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minta Hapus Data — Cocourir</title>
+  <meta name="description" content="Cara meminta penghapusan data pribadi tertentu di Cocourir tanpa harus menghapus akun Anda.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --g950: oklch(0.20 0.07 150);
+      --g900: oklch(0.26 0.10 149);
+      --g800: oklch(0.32 0.13 148);
+      --g700: oklch(0.40 0.16 148);
+      --g600: oklch(0.48 0.18 148);
+      --g500: oklch(0.56 0.18 147);
+      --g400: oklch(0.65 0.16 146);
+      --g200: oklch(0.83 0.09 146);
+      --g100: oklch(0.92 0.04 146);
+      --g50:  oklch(0.97 0.015 148);
+      --g10:  oklch(0.99 0.005 148);
+      --amber: oklch(0.76 0.15 74);
+      --amber-d: oklch(0.60 0.16 68);
+      --ink: oklch(0.17 0.025 148);
+      --ink-mid: oklch(0.42 0.05 148);
+      --ink-soft: oklch(0.62 0.035 148);
+      --ff: 'Figtree', system-ui, sans-serif;
+      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-lg: 24px;
+      --shadow-card: 0 2px 8px oklch(0.20 0.07 150 / 0.10), 0 8px 32px oklch(0.20 0.07 150 / 0.07);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--ff);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+      background: var(--g10);
+    }
+    a { color: var(--g700); text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: var(--g600); }
+    .container { width: min(820px, 100% - 2rem); margin-inline: auto; }
+
+    .nav { background: var(--g950); padding: 0 1rem; }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 68px; width: min(1200px, 100% - 2rem); margin-inline: auto;
+    }
+    .logo { display: flex; align-items: center; gap: 0.5rem; }
+    .logo-icon { height: 36px; display: flex; align-items: center; }
+    .logo-icon img { height: 36px; width: auto; object-fit: contain; }
+    .back-link { color: oklch(1 0 0 / 0.80); font-size: 0.9rem; font-weight: 600; text-decoration: none; }
+    .back-link:hover { color: #fff; }
+    .nav-right { display: flex; align-items: center; gap: 1.25rem; }
+    .lang-switch {
+      display: flex; align-items: center; gap: 2px;
+      background: oklch(1 0 0 / 0.08); border-radius: 100px; padding: 3px;
+    }
+    .lang-switch a {
+      padding: 0.3rem 0.75rem; border-radius: 100px; font-size: 0.8rem;
+      font-weight: 700; text-decoration: none; color: oklch(1 0 0 / 0.60);
+    }
+    .lang-switch a.active { background: var(--amber); color: var(--g950); }
+    .lang-switch a:not(.active):hover { color: #fff; }
+
+    .hero { background: var(--g950); color: #fff; padding: 2.5rem 1rem 3.5rem; text-align: center; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 2.75rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
+    .hero p { color: oklch(1 0 0 / 0.70); font-size: 0.95rem; }
+
+    .content { padding: clamp(3rem, 6vw, 4.5rem) 1rem 6rem; }
+    .content .card { background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: clamp(1.75rem, 4vw, 3rem); }
+    .content h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 2.25rem; margin-bottom: 0.9rem; color: var(--g800); }
+    .content h2:first-child { margin-top: 0; }
+    .content p { margin-bottom: 1rem; color: var(--ink-mid); }
+    .content ul, .content ol { margin: 0 0 1rem 1.25rem; color: var(--ink-mid); }
+    .content ul { list-style: disc; }
+    .content li { margin-bottom: 0.45rem; }
+    .content strong { color: var(--ink); }
+    .meta { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--g100); }
+    .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--g100); vertical-align: top; }
+    th { background: var(--g50); font-weight: 700; color: var(--ink); }
+    td { color: var(--ink-mid); }
+    .icon-check { color: var(--g600); font-weight: 800; }
+    .icon-x { color: oklch(0.58 0.22 28); font-weight: 800; }
+    .steps-box {
+      background: var(--g50); border-radius: var(--radius); padding: 1.5rem 1.75rem; margin-bottom: 1.5rem;
+    }
+    .steps-box ol { margin-left: 1.25rem; color: var(--g700); }
+    .steps-box li { margin-bottom: 0.6rem; font-weight: 600; }
+    .steps-box li span { display: block; font-weight: 400; color: var(--ink-mid); margin-top: 0.15rem; }
+    .email-template {
+      background: var(--g950); color: #fff; border-radius: var(--radius);
+      padding: 1.5rem 1.75rem; font-family: ui-monospace, monospace; font-size: 0.85rem;
+      line-height: 1.8; margin: 1rem 0 1.5rem; white-space: pre-wrap;
+    }
+    .email-template strong { color: var(--amber); }
+    .contact-box { background: var(--g950); color: #fff; border-radius: var(--radius); padding: 1.75rem; margin-top: 1.5rem; }
+    .contact-box p { color: oklch(1 0 0 / 0.75); margin-bottom: 0.5rem; }
+    .contact-box a { color: var(--amber); }
+    .sla-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem; background: var(--g100);
+      color: var(--g700); font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 100px;
+      margin-bottom: 1rem;
+    }
+
+    .footer { background: oklch(0.14 0.04 148); color: oklch(1 0 0 / 0.55); padding: 2.5rem 1rem; text-align: center; font-size: 0.85rem; }
+    .footer a { color: oklch(1 0 0 / 0.75); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo" aria-label="Cocourir - Halaman Utama">
+      <div class="logo-icon"><img src="logo_cocourir.svg" alt="Cocourir"></div>
+    </a>
+    <div class="nav-right">
+      <div class="lang-switch" role="group" aria-label="Pilih bahasa">
+        <a href="data-deletion.html" class="active">ID</a>
+        <a href="data-deletion-en.html">EN</a>
+      </div>
+      <a href="/" class="back-link">← Kembali ke Beranda</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>Minta Hapus Data</h1>
+    <p>Hapus sebagian data pribadi Anda tanpa harus menghapus akun Cocourir</p>
+  </div>
+</section>
+
+<section class="content">
+  <div class="container">
+    <div class="card">
+      <p class="meta">Terakhir diperbarui: 3 Juli 2026 — bagian ini melengkapi <a href="privacy.html">Kebijakan Privasi</a> Cocourir, Bagian 6 &amp; 7.</p>
+
+      <h2>Apa ini?</h2>
+      <p>Anda tidak harus menghapus seluruh akun Cocourir hanya untuk menghapus data tertentu. Halaman ini menjelaskan data apa saja yang bisa dihapus secara terpisah, dan bagaimana cara mengajukan permintaannya.</p>
+
+      <h2>Data yang bisa dihapus tanpa hapus akun</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Bisa dihapus terpisah?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Foto profil</td><td><span class="icon-check">✓ Ya</span></td></tr>
+            <tr><td>Dokumen verifikasi lama (KTP/SIM/STNK versi sebelumnya, setelah diganti dengan yang baru)</td><td><span class="icon-check">✓ Ya</span></td></tr>
+            <tr><td>Riwayat percakapan support</td><td><span class="icon-check">✓ Ya</span></td></tr>
+            <tr><td>Catatan/preferensi pesanan tersimpan (bukan riwayat transaksi)</td><td><span class="icon-check">✓ Ya</span></td></tr>
+            <tr><td>Riwayat transaksi &amp; data keuangan (order selesai, pencairan dana)</td><td><span class="icon-x">✗ Tidak, selama akun aktif</span></td></tr>
+            <tr><td>Data akun inti (nama, nomor telepon, email)</td><td><span class="icon-x">✗ Tidak, selama akun aktif</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Data transaksi dan akun inti wajib kami simpan selama akun aktif untuk kepatuhan pencatatan keuangan dan agar layanan (pesanan, pencairan dana, dukungan) tetap berfungsi. Jika Anda ingin data ini turut dihapus, ajukan penghapusan akun sepenuhnya melalui jalur yang sama di bawah.</p>
+
+      <h2>Cara mengajukan permintaan</h2>
+      <div class="sla-badge">⏱ Diproses dalam 7 hari kerja</div>
+      <div class="steps-box">
+        <ol>
+          <li>Kirim email ke <strong>halo@cocourir.id</strong> dari alamat email yang terdaftar di akun Anda (atau sertakan nomor telepon terdaftar).
+            <span>Ini untuk memverifikasi bahwa permintaan benar berasal dari pemilik akun.</span>
+          </li>
+          <li>Gunakan subjek <strong>"Permintaan Hapus Data"</strong> dan sebutkan data mana saja yang ingin dihapus.
+            <span>Lihat contoh format email di bawah.</span>
+          </li>
+          <li>Tim kami akan memverifikasi identitas Anda dan memproses permintaan dalam 7 hari kerja.
+            <span>Anda akan menerima konfirmasi email setelah data dihapus.</span>
+          </li>
+        </ol>
+      </div>
+
+      <p><strong>Contoh format email:</strong></p>
+      <div class="email-template">Kepada: halo@cocourir.id
+Subjek: Permintaan Hapus Data
+
+Nama: [Nama Anda]
+Nomor telepon terdaftar: [08xx-xxxx-xxxx]
+Aplikasi: [Customer App / Merchant App / Driver App]
+
+Saya ingin meminta penghapusan data berikut dari akun saya:
+- [ ] Foto profil
+- [ ] Dokumen verifikasi lama
+- [ ] Riwayat percakapan support
+- [ ] Lainnya: [sebutkan]
+
+Akun saya tetap ingin digunakan seperti biasa.</div>
+
+      <h2>Butuh hapus seluruh akun?</h2>
+      <p>Gunakan jalur email yang sama di atas, cukup ganti subjek menjadi <strong>"Permintaan Hapus Akun"</strong>. Perlu diketahui bahwa data transaksi tertentu mungkin tetap kami simpan sesuai kewajiban hukum meski akun telah dihapus/dinonaktifkan — lihat <a href="privacy.html#retensi">Kebijakan Privasi Bagian 7</a> untuk detail.</p>
+
+      <div class="contact-box">
+        <p>✉ Email: <a href="mailto:halo@cocourir.id?subject=Permintaan%20Hapus%20Data">halo@cocourir.id</a></p>
+        <p>📸 Instagram: <a href="https://instagram.com/cocourir" target="_blank" rel="noopener noreferrer">@cocourir</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>© 2026 Cocourir. <a href="/">Kembali ke Beranda</a> · <a href="privacy.html">Kebijakan Privasi</a></p>
+</footer>
+
+</body>
+</html>
