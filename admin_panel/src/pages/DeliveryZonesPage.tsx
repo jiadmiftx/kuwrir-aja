@@ -855,19 +855,22 @@ export default function DeliveryZonesPage() {
                           )
                         }
                       }
-                      if (!isChild) {
-                        return (
-                          <Circle
-                            key={z.id}
-                            center={[z.latitude, z.longitude]}
-                            radius={z.radius_km * 1000}
-                            pathOptions={{ color: col, fillColor: col, fillOpacity: 0.08, weight: 2 }}
-                          >
-                            {popup}
-                          </Circle>
-                        )
-                      }
-                      return null
+                      return (
+                        <Circle
+                          key={z.id}
+                          center={[z.latitude, z.longitude]}
+                          radius={z.radius_km * 1000}
+                          pathOptions={{
+                            color: col,
+                            fillColor: col,
+                            fillOpacity: isChild ? 0.1 : 0.08,
+                            weight: isChild ? 1 : 2,
+                            dashArray: isChild ? '4 4' : undefined,
+                          }}
+                        >
+                          {popup}
+                        </Circle>
+                      )
                     }
                     return (
                       <>
