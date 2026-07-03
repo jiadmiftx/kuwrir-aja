@@ -214,8 +214,11 @@ func seedSettings(db *gorm.DB) {
 	defaults := []model.SystemSetting{
 		// Platform service fee on products (Wakalah/Ujrah — disclosed to merchant, visible in breakdown)
 		{Key: "platform_markup_percentage", Value: "15", Label: "Platform Service Fee / Ujrah on Products (%)"},
+		// How the product markup is applied to the customer-facing catalog price.
+		{Key: "product_markup_mode", Value: "percentage", Label: "Product Markup Mode (percentage|fixed)"},
+		{Key: "product_markup_fixed_amount", Value: "1000", Label: "Fixed Markup Amount per Product (IDR, used when mode=fixed)"},
 		// Delivery split
-		{Key: "delivery_commission_percentage", Value: "25", Label: "Platform Commission on Delivery Fee (%)"},
+		{Key: "delivery_commission_percentage", Value: "20", Label: "Platform Commission on Delivery Fee (%)"},
 		{Key: "app_service_fee_percentage", Value: "5", Label: "App Tech Fee on Delivery (%)"},
 		// Self-deliver: merchant keeps delivery fee minus this commission
 		{Key: "self_deliver_commission_percentage", Value: "10", Label: "Self-Deliver Commission for Platform (%)"},

@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/pricing"
 	"github.com/kuwrir-platform/backend/internal/service"
 )
 
@@ -127,6 +128,7 @@ func (h *Handler) GetMerchantServices(c *gin.Context) {
 		Preload("Products.Variants").
 		Order("sort_order ASC").
 		Find(&categories)
+	pricing.ApplyMarkupToCategories(h.db, categories)
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
