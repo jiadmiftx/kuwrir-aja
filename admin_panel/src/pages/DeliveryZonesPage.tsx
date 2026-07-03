@@ -22,6 +22,12 @@ L.Icon.Default.mergeOptions({
 
 const ZONE_COLORS = ['#16a34a', '#2563eb', '#9333ea', '#ea580c', '#0891b2']
 
+// Deterministic, evenly-spaced hue per kecamatan within a kota, so every
+// child polygon gets a visually distinct color regardless of how many
+// kecamatan the zone has. Golden-angle spacing avoids adjacent kecamatan
+// landing on similar hues even as the count grows.
+const childColor = (index: number) => `hsl(${(index * 137.508) % 360}, 72%, 42%)`
+
 interface Zone {
   id: string
   city_name: string
@@ -355,6 +361,22 @@ export default function DeliveryZonesPage() {
     toast.success('Zona dihapus')
   }
 
+  // Throws with the backend's error message (if any) when a response isn't
+  // ok — api() itself never throws on non-2xx, so callers must check this or
+  // failures get silently swallowed (e.g. a save that "succeeds" in the UI
+  // but never persisted, which is what happened before this fix).
+  const assertOk = async (res: Response, fallback: string) => {
+    if (res.ok) return
+    let message = fallback
+    try {
+      const body = await res.json()
+      if (body?.error) message = body.error
+    } catch {
+      /* non-JSON error body, keep fallback */
+    }
+    throw new Error(message)
+  }
+
   const handleSave = async () => {
     if (!form.city_name?.trim()) {
       toast.error('Nama kota/kabupaten wajib diisi')
@@ -364,15 +386,17 @@ export default function DeliveryZonesPage() {
     try {
       let zoneId = editingZone?.id
       if (editingZone) {
-        await api(`/api/v1/admin/delivery-zones/${editingZone.id}`, {
+        const res = await api(`/api/v1/admin/delivery-zones/${editingZone.id}`, {
           method: 'PUT',
           body: JSON.stringify(form),
         })
+        await assertOk(res, 'Gagal memperbarui zona')
       } else {
         const res = await api('/api/v1/admin/delivery-zones', {
           method: 'POST',
           body: JSON.stringify(form),
         })
+        await assertOk(res, 'Gagal membuat zona')
         const data = await res.json()
         zoneId = data.zone?.id ?? data.id
       }
@@ -385,7 +409,7 @@ export default function DeliveryZonesPage() {
         if (existingByOsmId.has(id)) continue
         const cand = allCandidates.find((c) => c.id === id)
         if (!cand) continue
-        await api('/api/v1/admin/delivery-zones', {
+        const res = await api('/api/v1/admin/delivery-zones', {
           method: 'POST',
           body: JSON.stringify({
             city_name: cand.name,
@@ -397,20 +421,22 @@ export default function DeliveryZonesPage() {
             is_active: true,
           }),
         })
+        await assertOk(res, `Gagal menambahkan kecamatan ${cand.name}`)
       }
 
       // Remove unchecked kecamatan that were previously saved
       for (const [id, child] of existingByOsmId) {
         if (!selectedKecamatan.has(id)) {
-          await api(`/api/v1/admin/delivery-zones/${child.id}`, { method: 'DELETE' })
+          const res = await api(`/api/v1/admin/delivery-zones/${child.id}`, { method: 'DELETE' })
+          await assertOk(res, `Gagal menghapus kecamatan ${child.city_name}`)
         }
       }
 
       toast.success(editingZone ? 'Zona diperbarui' : 'Zona ditambahkan')
       closePanel()
       fetchZones()
-    } catch {
-      toast.error('Gagal menyimpan zona')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan zona')
     } finally {
       setSaving(false)
     }
@@ -499,7 +525,10 @@ export default function DeliveryZonesPage() {
                   <Input
                     type="number"
                     value={form.base_fee ?? 15000}
-                    onChange={(e) => setForm((f) => ({ ...f, base_fee: parseFloat(e.target.value) }))}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value)
+                      setForm((f) => ({ ...f, base_fee: Number.isNaN(val) ? 0 : val }))
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -507,7 +536,10 @@ export default function DeliveryZonesPage() {
                   <Input
                     type="number"
                     value={form.per_km_fee ?? 10000}
-                    onChange={(e) => setForm((f) => ({ ...f, per_km_fee: parseFloat(e.target.value) }))}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value)
+                      setForm((f) => ({ ...f, per_km_fee: Number.isNaN(val) ? 0 : val }))
+                    }}
                   />
                 </div>
               </div>
@@ -786,9 +818,8 @@ export default function DeliveryZonesPage() {
                               style={() => ({
                                 color: col,
                                 fillColor: col,
-                                fillOpacity: isChild ? 0.06 : 0.1,
-                                weight: isChild ? 1 : 2,
-                                dashArray: isChild ? '4 4' : undefined,
+                                fillOpacity: isChild ? 0.25 : 0.1,
+                                weight: isChild ? 1.5 : 2,
                               })}
                             >
                               {popup}
@@ -816,7 +847,9 @@ export default function DeliveryZonesPage() {
                     return (
                       <>
                         {renderZoneLayer(zone, color)}
-                        {zone.children?.filter((c) => c.is_active).map((child) => renderZoneLayer(child, color, true))}
+                        {zone.children
+                          ?.filter((c) => c.is_active)
+                          .map((child, ci) => renderZoneLayer(child, childColor(ci), true))}
                       </>
                     )
                   })}
