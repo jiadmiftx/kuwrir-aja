@@ -93,21 +93,18 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		req.DropoffLat, req.DropoffLng,
 	)
 
-	selectedZone, zoneBasisFee, zonePerKmFee := h.loadDeliveryZoneWithID(merchant.Latitude, merchant.Longitude, settings)
+	selectedZone, zoneBasisFee, zonePerKmFee := h.loadHomeKota(merchant.Latitude, merchant.Longitude, settings)
 
-	var boundaryGeoJSON *string
-	var zoneRadiusKm float64 = 5.0
+	var deliveryFee float64
 	if selectedZone != nil {
-		boundaryGeoJSON = selectedZone.BoundaryGeoJSON
-		zoneRadiusKm = selectedZone.RadiusKm
+		shapes := h.flatZoneShapes(selectedZone)
+		deliveryFee = priceDropoff(shapes, req.DropoffLat, req.DropoffLng, zoneBasisFee, zonePerKmFee)
+	} else {
+		// No zones configured at all — fall back to a flat 5km radius
+		// around the merchant using the system default fees.
+		shapes := []pricing.ZoneShape{{Lat: merchant.Latitude, Lng: merchant.Longitude, RadiusKm: 5.0}}
+		deliveryFee = priceDropoff(shapes, req.DropoffLat, req.DropoffLng, zoneBasisFee, zonePerKmFee)
 	}
-	deliveryFee := pricing.DeliveryFeeForDropoff(
-		req.DropoffLat, req.DropoffLng,
-		pricing.Settings{}, // not used in this call
-		zoneBasisFee, zonePerKmFee, zoneRadiusKm,
-		boundaryGeoJSON,
-		merchant.Latitude, merchant.Longitude,
-	)
 
 	// 4. Build order items with markup calculation
 	var orderItems []model.OrderItem
@@ -966,11 +963,18 @@ func (h *Handler) loadSettings() settingsData {
 	return s
 }
 
-// loadDeliveryZoneWithID finds the best matching active DeliveryZone for the given merchant lat/lng.
-// Priority: (1) child zone (kecamatan) polygon → return its parent zone's fees,
-//           (2) parent zone polygon, (3) nearest parent zone, (4) default zone.
-func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData) (zone *model.DeliveryZone, baseFee, perKmFee float64) {
-	// Priority 1: check kecamatan (child zones) by polygon
+// loadHomeKota finds the merchant's kota (parent zone), which decides which
+// BaseFee/PerKmFee schedule applies and is stored as the order's ZoneID. It
+// does not by itself decide the flat-fee delivery area — see flatZoneShapes
+// for that; a kota with kecamatan configured prices deliveries against just
+// those kecamatan, not the kota's own boundary.
+// Priority: (1) an active kecamatan polygon containing the point backstops a
+// parent with no polygon of its own, (2) parent's own shape (polygon, else a
+// radius circle around the parent's own reference point), (3) nearest
+// parent within 50km, (4) default zone, (5) nearest parent regardless of
+// distance.
+func (h *Handler) loadHomeKota(lat, lng float64, fallback settingsData) (zone *model.DeliveryZone, baseFee, perKmFee float64) {
+	// Priority 1: kecamatan polygon backstop
 	var children []model.DeliveryZone
 	h.db.Where("parent_zone_id IS NOT NULL AND is_active = true AND boundary_geojson IS NOT NULL").Find(&children)
 	for i := range children {
@@ -990,9 +994,13 @@ func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData
 		return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
 	}
 
-	// Priority 2: parent zone with polygon that contains the merchant
+	// Priority 2: parent's own shape contains the merchant
 	for i := range parents {
-		if parents[i].BoundaryGeoJSON != nil && pricing.PointInPolygon(lat, lng, *parents[i].BoundaryGeoJSON) {
+		shape := pricing.ZoneShape{
+			Lat: parents[i].Latitude, Lng: parents[i].Longitude,
+			RadiusKm: parents[i].RadiusKm, BoundaryGeoJSON: parents[i].BoundaryGeoJSON,
+		}
+		if pricing.IsInsideShape(lat, lng, shape) {
 			return &parents[i], parents[i].BaseFee, parents[i].PerKmFee
 		}
 	}
@@ -1022,6 +1030,46 @@ func (h *Handler) loadDeliveryZoneWithID(lat, lng float64, fallback settingsData
 		return nearest, nearest.BaseFee, nearest.PerKmFee
 	}
 	return nil, fallback.InsideZoneFee, fallback.FeePerKmOutside
+}
+
+// flatZoneShapes returns the flat-fee area(s) for a resolved kota: the union
+// of its active kecamatan if any are configured, otherwise the kota's own
+// shape. Configuring kecamatan under a kota narrows the flat area down to
+// just those kecamatan — the kota's own boundary no longer counts once it
+// has children.
+func (h *Handler) flatZoneShapes(parent *model.DeliveryZone) []pricing.ZoneShape {
+	var children []model.DeliveryZone
+	h.db.Where("parent_zone_id = ? AND is_active = true", parent.ID).Find(&children)
+	if len(children) == 0 {
+		return []pricing.ZoneShape{{
+			Lat: parent.Latitude, Lng: parent.Longitude,
+			RadiusKm: parent.RadiusKm, BoundaryGeoJSON: parent.BoundaryGeoJSON,
+		}}
+	}
+	shapes := make([]pricing.ZoneShape, len(children))
+	for i, c := range children {
+		shapes[i] = pricing.ZoneShape{Lat: c.Latitude, Lng: c.Longitude, RadiusKm: c.RadiusKm, BoundaryGeoJSON: c.BoundaryGeoJSON}
+	}
+	return shapes
+}
+
+// priceDropoff bills baseFee if the dropoff falls inside any of the given
+// shapes, else baseFee plus perKmFee times the distance to the nearest
+// shape's boundary.
+func priceDropoff(shapes []pricing.ZoneShape, dropLat, dropLng, baseFee, perKmFee float64) float64 {
+	minExcess := math.MaxFloat64
+	for _, s := range shapes {
+		if pricing.IsInsideShape(dropLat, dropLng, s) {
+			return baseFee
+		}
+		if d := pricing.DistanceToShapeBoundaryKm(dropLat, dropLng, s); d < minExcess {
+			minExcess = d
+		}
+	}
+	if minExcess == math.MaxFloat64 {
+		return baseFee
+	}
+	return baseFee + minExcess*perKmFee
 }
 
 // haversineDistance calculates distance between two GPS coordinates in km
