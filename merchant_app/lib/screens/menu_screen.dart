@@ -36,7 +36,9 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
           body: _buildBody(context, state),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: state is MenuLoading ? null : () => _showAddCategoryDialog(context),
+            onPressed: state is MenuLoading
+                ? null
+                : () => _showAddCategoryDialog(context),
             backgroundColor: KuwrirColors.primary,
             foregroundColor: Colors.white,
             icon: const Icon(Icons.add),
@@ -77,12 +79,21 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+            const Icon(
+              Icons.inventory_2_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
             const SizedBox(height: 16),
-            const Text('Belum ada menu', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            const Text(
+              'Belum ada menu',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
             const SizedBox(height: 8),
-            const Text('Tambah kategori dan produk pertama Anda',
-                style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Text(
+              'Tambah kategori dan produk pertama Anda',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -124,7 +135,10 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             onPressed: () {
               if (ctrl.text.trim().isNotEmpty) {
@@ -165,7 +179,8 @@ class _CategorySection extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.add_circle_outline, size: 20),
                 color: KuwrirColors.primary,
-                onPressed: () => _showAddProductDialog(context, category.id, category.name),
+                onPressed: () =>
+                    _showAddProductDialog(context, category.id, category.name),
               ),
             ],
           ),
@@ -173,8 +188,10 @@ class _CategorySection extends StatelessWidget {
         if (category.products.isEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Text('Belum ada produk',
-                style: TextStyle(color: KuwrirColors.textHint, fontSize: 13)),
+            child: Text(
+              'Belum ada produk',
+              style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+            ),
           )
         else
           for (final product in category.products)
@@ -184,7 +201,11 @@ class _CategorySection extends StatelessWidget {
     );
   }
 
-  void _showAddProductDialog(BuildContext context, String catId, String catName) {
+  void _showAddProductDialog(
+    BuildContext context,
+    String catId,
+    String catName,
+  ) {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     final descCtrl = TextEditingController();
@@ -206,102 +227,119 @@ class _CategorySection extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           title: Text('Tambah ke $catName'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ProductImagePicker(
-                  imageFile: imageFile,
-                  onPick: (file) => setState(() => imageFile = file),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Nama Produk'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Harga Dasar (IDR)',
-                    hintText: '50000',
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ProductImagePicker(
+                    imageFile: imageFile,
+                    onPick: (file) => setState(() => imageFile = file),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Deskripsi (opsional)',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: skuCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'SKU (opsional)',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _FoodCategoryDropdown(
-                  future: foodCategoriesFuture,
-                  value: foodCategoryId,
-                  onChanged: (v) => setState(() => foodCategoryId = v),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: discountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Harga Diskon (opsional)',
-                    hintText: 'Kosongkan jika tidak ada diskon',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: packagingFeeCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Biaya Kemasan per Item (opsional)',
-                    hintText: '0',
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _VisibilityWindowField(
-                  alwaysVisible: alwaysVisible,
-                  from: visibleFrom,
-                  until: visibleUntil,
-                  onAlwaysVisibleChanged: (v) => setState(() => alwaysVisible = v),
-                  onFromChanged: (v) => setState(() => visibleFrom = v),
-                  onUntilChanged: (v) => setState(() => visibleUntil = v),
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Lacak Stok', style: TextStyle(fontSize: 14)),
-                  value: trackStock,
-                  onChanged: (v) => setState(() => trackStock = v),
-                ),
-                if (trackStock)
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: stockCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Jumlah Stok'),
+                    controller: nameCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Nama Produk'),
                   ),
-              ],
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Harga Dasar (IDR)',
+                      hintText: '50000',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Deskripsi (opsional)',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: skuCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'SKU (opsional)',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _FoodCategoryDropdown(
+                    future: foodCategoriesFuture,
+                    value: foodCategoryId,
+                    onChanged: (v) => setState(() => foodCategoryId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: discountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Harga Diskon (opsional)',
+                      hintText: 'Kosongkan jika tidak ada diskon',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: packagingFeeCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Biaya Kemasan per Item (opsional)',
+                      hintText: '0',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _VisibilityWindowField(
+                    alwaysVisible: alwaysVisible,
+                    from: visibleFrom,
+                    until: visibleUntil,
+                    onAlwaysVisibleChanged: (v) =>
+                        setState(() => alwaysVisible = v),
+                    onFromChanged: (v) => setState(() => visibleFrom = v),
+                    onUntilChanged: (v) => setState(() => visibleUntil = v),
+                  ),
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Lacak Stok',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    value: trackStock,
+                    onChanged: (v) => setState(() => trackStock = v),
+                  ),
+                  if (trackStock)
+                    TextField(
+                      controller: stockCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Jumlah Stok',
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal'),
+            ),
             ElevatedButton(
               onPressed: () {
                 final name = nameCtrl.text.trim();
                 final price = double.tryParse(priceCtrl.text) ?? 0;
                 final discount = double.tryParse(discountCtrl.text);
                 if (discount != null && (discount <= 0 || discount >= price)) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                      content: Text('Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar')));
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar',
+                      ),
+                    ),
+                  );
                   return;
                 }
                 if (name.isNotEmpty && price > 0) {
@@ -315,9 +353,14 @@ class _CategorySection extends StatelessWidget {
                     'stock_quantity': int.tryParse(stockCtrl.text) ?? 0,
                     'food_category_id': foodCategoryId,
                     'discount_price': discount,
-                    'packaging_fee': double.tryParse(packagingFeeCtrl.text) ?? 0,
-                    'visible_from_minute': alwaysVisible ? null : _toMinute(visibleFrom),
-                    'visible_until_minute': alwaysVisible ? null : _toMinute(visibleUntil),
+                    'packaging_fee':
+                        double.tryParse(packagingFeeCtrl.text) ?? 0,
+                    'visible_from_minute': alwaysVisible
+                        ? null
+                        : _toMinute(visibleFrom),
+                    'visible_until_minute': alwaysVisible
+                        ? null
+                        : _toMinute(visibleUntil),
                   }, image: imageFile);
                   Navigator.pop(ctx);
                 }
@@ -353,14 +396,20 @@ class _FoodCategoryDropdown extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         final categories = snapshot.data ?? const [];
-        if (snapshot.connectionState != ConnectionState.done || categories.isEmpty) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            categories.isEmpty) {
           return const SizedBox.shrink();
         }
         return DropdownButtonFormField<String?>(
           initialValue: value,
-          decoration: const InputDecoration(labelText: 'Kategori Makanan (opsional)'),
+          decoration: const InputDecoration(
+            labelText: 'Kategori Makanan (opsional)',
+          ),
           items: [
-            const DropdownMenuItem<String?>(value: null, child: Text('Tanpa kategori')),
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Tanpa kategori'),
+            ),
             ...categories.map(
               (c) => DropdownMenuItem<String?>(
                 value: c.id,
@@ -391,20 +440,29 @@ class _ProductImagePicker extends StatelessWidget {
     final src = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (_) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Foto'),
-              onTap: () => Navigator.pop(context, ImageSource.camera)),
-          ListTile(
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Galeri'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery)),
-        ]),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
       ),
     );
     if (src == null) return;
-    final xfile = await ImagePicker().pickImage(source: src, imageQuality: 80, maxWidth: 1200);
+    final xfile = await ImagePicker().pickImage(
+      source: src,
+      imageQuality: 80,
+      maxWidth: 1200,
+    );
     if (xfile == null) return;
     onPick(File(xfile.path));
   }
@@ -420,20 +478,30 @@ class _ProductImagePicker extends StatelessWidget {
         decoration: BoxDecoration(
           color: KuwrirColors.primary.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: KuwrirColors.primary.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: KuwrirColors.primary.withValues(alpha: 0.2),
+          ),
         ),
         child: imageFile != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.file(imageFile!, fit: BoxFit.cover, width: double.infinity),
+                child: Image.file(
+                  imageFile!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
               )
             : (existingUrl != null && existingUrl!.isNotEmpty)
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(existingUrl!, fit: BoxFit.cover, width: double.infinity,
-                        errorBuilder: (_, __, ___) => _placeholder()),
-                  )
-                : _placeholder(),
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  existingUrl!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => _placeholder(),
+                ),
+              )
+            : _placeholder(),
       ),
     );
   }
@@ -445,8 +513,10 @@ class _ProductImagePicker extends StatelessWidget {
         children: [
           Icon(Icons.add_a_photo_outlined, color: KuwrirColors.primary),
           const SizedBox(height: 4),
-          Text('Upload Foto Produk',
-              style: TextStyle(fontSize: 12, color: KuwrirColors.primary)),
+          Text(
+            'Upload Foto Produk',
+            style: TextStyle(fontSize: 12, color: KuwrirColors.primary),
+          ),
         ],
       ),
     );
@@ -472,8 +542,12 @@ class _ProductTile extends StatelessWidget {
           child: product.imageUrl != null
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(product.imageUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(Icons.fastfood, color: KuwrirColors.primary)),
+                  child: Image.network(
+                    product.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Icon(Icons.fastfood, color: KuwrirColors.primary),
+                  ),
                 )
               : Icon(Icons.fastfood, color: KuwrirColors.primary, size: 22),
         ),
@@ -490,7 +564,9 @@ class _ProductTile extends StatelessWidget {
           'IDR ${_fmt(product.price)}',
           style: TextStyle(
             fontSize: 13,
-            color: product.isAvailable ? KuwrirColors.primary : KuwrirColors.textHint,
+            color: product.isAvailable
+                ? KuwrirColors.primary
+                : KuwrirColors.textHint,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -508,7 +584,10 @@ class _ProductTile extends StatelessWidget {
               onSelected: (action) => _handleAction(context, action),
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(value: 'variants', child: Text('Kelola Varian')),
+                const PopupMenuItem(
+                  value: 'variants',
+                  child: Text('Kelola Varian'),
+                ),
                 const PopupMenuItem(value: 'delete', child: Text('Hapus')),
               ],
             ),
@@ -534,18 +613,27 @@ class _ProductTile extends StatelessWidget {
 
   void _showEditDialog(BuildContext context) {
     final nameCtrl = TextEditingController(text: product.name);
-    final priceCtrl = TextEditingController(text: product.price.toStringAsFixed(0));
+    final priceCtrl = TextEditingController(
+      text: product.price.toStringAsFixed(0),
+    );
     final descCtrl = TextEditingController(text: product.description ?? '');
     final skuCtrl = TextEditingController(text: product.sku ?? '');
-    final stockCtrl = TextEditingController(text: product.stockQuantity.toString());
-    final discountCtrl =
-        TextEditingController(text: product.discountPrice?.toStringAsFixed(0) ?? '');
+    final stockCtrl = TextEditingController(
+      text: product.stockQuantity.toString(),
+    );
+    final discountCtrl = TextEditingController(
+      text: product.discountPrice?.toStringAsFixed(0) ?? '',
+    );
     final packagingFeeCtrl = TextEditingController(
-        text: product.packagingFee > 0 ? product.packagingFee.toStringAsFixed(0) : '');
+      text: product.packagingFee > 0
+          ? product.packagingFee.toStringAsFixed(0)
+          : '',
+    );
     File? imageFile;
     bool trackStock = product.trackStock;
     String? foodCategoryId = product.foodCategoryId;
-    bool alwaysVisible = product.visibleFromMinute == null && product.visibleUntilMinute == null;
+    bool alwaysVisible =
+        product.visibleFromMinute == null && product.visibleUntilMinute == null;
     TimeOfDay? visibleFrom = _fromMinute(product.visibleFromMinute);
     TimeOfDay? visibleUntil = _fromMinute(product.visibleUntilMinute);
     final cubit = context.read<MenuCubit>();
@@ -556,85 +644,113 @@ class _ProductTile extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           title: const Text('Edit Produk'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ProductImagePicker(
-                  imageFile: imageFile,
-                  existingUrl: product.imageUrl,
-                  onPick: (file) => setState(() => imageFile = file),
-                ),
-                const SizedBox(height: 12),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nama')),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Harga (IDR)'),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Deskripsi')),
-                const SizedBox(height: 8),
-                TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU (opsional)')),
-                const SizedBox(height: 8),
-                _FoodCategoryDropdown(
-                  future: foodCategoriesFuture,
-                  value: foodCategoryId,
-                  onChanged: (v) => setState(() => foodCategoryId = v),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: discountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Harga Diskon (opsional)',
-                    hintText: 'Kosongkan jika tidak ada diskon',
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ProductImagePicker(
+                    imageFile: imageFile,
+                    existingUrl: product.imageUrl,
+                    onPick: (file) => setState(() => imageFile = file),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: packagingFeeCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Biaya Kemasan per Item (opsional)',
-                    hintText: '0',
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _VisibilityWindowField(
-                  alwaysVisible: alwaysVisible,
-                  from: visibleFrom,
-                  until: visibleUntil,
-                  onAlwaysVisibleChanged: (v) => setState(() => alwaysVisible = v),
-                  onFromChanged: (v) => setState(() => visibleFrom = v),
-                  onUntilChanged: (v) => setState(() => visibleUntil = v),
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Lacak Stok', style: TextStyle(fontSize: 14)),
-                  value: trackStock,
-                  onChanged: (v) => setState(() => trackStock = v),
-                ),
-                if (trackStock)
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: stockCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Jumlah Stok'),
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nama'),
                   ),
-              ],
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Harga (IDR)'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(labelText: 'Deskripsi'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: skuCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'SKU (opsional)',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _FoodCategoryDropdown(
+                    future: foodCategoriesFuture,
+                    value: foodCategoryId,
+                    onChanged: (v) => setState(() => foodCategoryId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: discountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Harga Diskon (opsional)',
+                      hintText: 'Kosongkan jika tidak ada diskon',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: packagingFeeCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Biaya Kemasan per Item (opsional)',
+                      hintText: '0',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _VisibilityWindowField(
+                    alwaysVisible: alwaysVisible,
+                    from: visibleFrom,
+                    until: visibleUntil,
+                    onAlwaysVisibleChanged: (v) =>
+                        setState(() => alwaysVisible = v),
+                    onFromChanged: (v) => setState(() => visibleFrom = v),
+                    onUntilChanged: (v) => setState(() => visibleUntil = v),
+                  ),
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Lacak Stok',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    value: trackStock,
+                    onChanged: (v) => setState(() => trackStock = v),
+                  ),
+                  if (trackStock)
+                    TextField(
+                      controller: stockCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Jumlah Stok',
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal'),
+            ),
             ElevatedButton(
               onPressed: () {
                 final price = double.tryParse(priceCtrl.text) ?? product.price;
                 final discount = double.tryParse(discountCtrl.text);
                 if (discount != null && (discount <= 0 || discount >= price)) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                      content: Text('Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar')));
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Harga diskon harus lebih besar dari 0 dan lebih kecil dari harga dasar',
+                      ),
+                    ),
+                  );
                   return;
                 }
                 cubit.updateProduct(product.id, {
@@ -647,8 +763,12 @@ class _ProductTile extends StatelessWidget {
                   'food_category_id': foodCategoryId,
                   'discount_price': discount,
                   'packaging_fee': double.tryParse(packagingFeeCtrl.text) ?? 0,
-                  'visible_from_minute': alwaysVisible ? null : _toMinute(visibleFrom),
-                  'visible_until_minute': alwaysVisible ? null : _toMinute(visibleUntil),
+                  'visible_from_minute': alwaysVisible
+                      ? null
+                      : _toMinute(visibleFrom),
+                  'visible_until_minute': alwaysVisible
+                      ? null
+                      : _toMinute(visibleUntil),
                 }, image: imageFile);
                 Navigator.pop(ctx);
               },
@@ -667,7 +787,10 @@ class _ProductTile extends StatelessWidget {
         title: const Text('Hapus Produk?'),
         content: Text('${product.name} akan dihapus permanen.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
@@ -681,8 +804,12 @@ class _ProductTile extends StatelessWidget {
     );
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
 }
 
 TimeOfDay? _fromMinute(int? minute) =>
@@ -708,8 +835,15 @@ class _VisibilityWindowField extends StatelessWidget {
     required this.onUntilChanged,
   });
 
-  Future<void> _pick(BuildContext context, TimeOfDay? initial, ValueChanged<TimeOfDay?> onChanged) async {
-    final picked = await showTimePicker(context: context, initialTime: initial ?? TimeOfDay.now());
+  Future<void> _pick(
+    BuildContext context,
+    TimeOfDay? initial,
+    ValueChanged<TimeOfDay?> onChanged,
+  ) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial ?? TimeOfDay.now(),
+    );
     if (picked != null) onChanged(picked);
   }
 
@@ -737,7 +871,9 @@ class _VisibilityWindowField extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => _pick(context, until, onUntilChanged),
-                  child: Text(until == null ? 'Selesai' : until!.format(context)),
+                  child: Text(
+                    until == null ? 'Selesai' : until!.format(context),
+                  ),
                 ),
               ),
             ],
