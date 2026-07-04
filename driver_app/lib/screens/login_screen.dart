@@ -18,6 +18,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  Future<void> _handleOtpVerify(String phone, String code) async {
+    final client = ApiClient();
+    final res = await client.verifyOtp(phone, code);
+    if (!mounted) return;
+    if (res['token'] == null) {
+      throw res['error'] ?? 'Verifikasi gagal';
+    }
+    final role = res['user']?['role'];
+    if (role != 'driver') {
+      throw 'Akun ini bukan akun driver';
+    }
+    await client.saveToken(res['token'], res['refresh_token'] ?? '');
+    await NotificationService.uploadToken(client);
+    if (!mounted) return;
+    await maybePromptBiometricOptIn(context);
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/job_board');
+  }
+
   Future<void> _handleLogin() async {
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -39,6 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success && authProvider.user?.role == 'driver') {
         await NotificationService.uploadToken(ApiClient());
+        if (!mounted) return;
+        await maybePromptBiometricOptIn(context);
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/job_board');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,6 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         await client.saveToken(res['token'], res['refresh_token'] ?? '');
         await NotificationService.uploadToken(client);
+        if (!mounted) return;
+        await maybePromptBiometricOptIn(context);
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/job_board');
       }
     } on GoogleSignInException catch (e) {
@@ -127,7 +152,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
+              OtpFlow(
+                onVerify: _handleOtpVerify,
+                headerTitle: 'Masuk dengan nomor HP driver',
+                headerSubtitle: 'Kode OTP dikirim lewat WhatsApp',
+                verifyButtonLabel: 'Masuk',
+              ),
+              const SizedBox(height: 16),
+              const Row(children: [
+                Expanded(child: Divider()),
+                Padding(padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('atau pakai password', style: TextStyle(color: Colors.grey))),
+                Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: 16),
               TextField(
                 controller: _phoneController,
                 decoration: InputDecoration(

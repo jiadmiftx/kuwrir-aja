@@ -13,6 +13,7 @@ import FoodCategoriesPage from '@/pages/FoodCategoriesPage'
 import BannersPage from '@/pages/BannersPage'
 import WhatsAppPage from '@/pages/WhatsAppPage'
 import SettlementsPage from '@/pages/SettlementsPage'
+import WithdrawalsPage from '@/pages/WithdrawalsPage'
 import RevenuePage from '@/pages/RevenuePage'
 import SupportChatsPage from '@/pages/SupportChatsPage'
 import DeliveryZonesPage from '@/pages/DeliveryZonesPage'
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="/banners" element={<BannersPage />} />
                 <Route path="/whatsapp" element={<WhatsAppPage />} />
                 <Route path="/settlements" element={<SettlementsPage />} />
+                <Route path="/withdrawals" element={<WithdrawalsPage />} />
                 <Route path="/revenue" element={<RevenuePage />} />
                 <Route path="/support" element={<SupportChatsPage />} />
                 <Route path="/delivery-zones" element={<DeliveryZonesPage />} />

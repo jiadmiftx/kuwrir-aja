@@ -73,6 +73,9 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		merchants.GET("/:id/products", h.GetProducts)
 	}
 
+	// Cross-merchant product search (customer app Search screen filters).
+	public.GET("/products/search", h.SearchProducts)
+
 	// Global food-category taxonomy — read-only for customer app (Home
 	// filter chips) and merchant app (product tagging picker).
 	public.GET("/food-categories", h.PublicFoodCategories)
@@ -112,6 +115,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 
 		// Dashboard summary
 		owner.GET("/today-summary", h.TodaySummary)
+		owner.GET("/dashboard-summary", h.GetDashboardSummary)
 	}
 }
 
@@ -127,16 +131,17 @@ type CreateMerchantRequest struct {
 }
 
 type UpdateMerchantRequest struct {
-	Name        *string  `json:"name"`
-	Description *string  `json:"description"`
-	Phone       *string  `json:"phone"`
-	Address     *string  `json:"address"`
-	Latitude    *float64 `json:"latitude"`
-	Longitude   *float64 `json:"longitude"`
-	LogoURL     *string  `json:"logo_url"`
-	BannerURL   *string  `json:"banner_url"`
-	TaxEnabled  *bool    `json:"tax_enabled"`
-	TaxRate     *float64 `json:"tax_rate"` // null = inherit platform default
+	Name           *string  `json:"name"`
+	Description    *string  `json:"description"`
+	Phone          *string  `json:"phone"`
+	Address        *string  `json:"address"`
+	Latitude       *float64 `json:"latitude"`
+	Longitude      *float64 `json:"longitude"`
+	LogoURL        *string  `json:"logo_url"`
+	BannerURL      *string  `json:"banner_url"`
+	TaxEnabled     *bool    `json:"tax_enabled"`
+	TaxRate        *float64 `json:"tax_rate"` // null = inherit platform default
+	IsFreeDelivery *bool    `json:"is_free_delivery"`
 }
 
 type CreateCategoryRequest struct {
@@ -241,6 +246,65 @@ func (h *Handler) SearchMerchants(c *gin.Context) {
 		Find(&merchants)
 
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
+}
+
+// ProductSearchItem is a Product joined with just enough of its owning
+// merchant for the customer app's Search screen to render a result card and
+// navigate to that merchant on tap.
+type ProductSearchItem struct {
+	model.Product
+	MerchantID      uuid.UUID `json:"merchant_id"`
+	MerchantName    string    `json:"merchant_name"`
+	MerchantLogoURL string    `json:"merchant_logo_url,omitempty"`
+	MerchantIsOpen  bool      `json:"merchant_is_open"`
+}
+
+// SearchProducts finds products across all merchants matching a keyword
+// and/or filters (food category, has-discount, merchant free-delivery).
+// Powers the customer app's Search screen filter chips and the banner ->
+// pre-filtered-search flow.
+func (h *Handler) SearchProducts(c *gin.Context) {
+	q := c.Query("q")
+	foodCategoryID := c.Query("food_category_id")
+	discountOnly := c.Query("discount") == "true"
+	freeDeliveryOnly := c.Query("free_delivery") == "true"
+
+	query := h.db.Table("products").
+		Select("products.*, merchants.id AS merchant_id, merchants.name AS merchant_name, merchants.logo_url AS merchant_logo_url, merchants.is_open AS merchant_is_open").
+		Joins("JOIN product_categories ON product_categories.id = products.category_id").
+		Joins("JOIN merchants ON merchants.id = product_categories.merchant_id").
+		Where("products.is_available = ? AND merchants.is_active = ? AND merchants.is_verified = ?", true, true, true)
+
+	if q != "" {
+		term := "%" + strings.ToLower(q) + "%"
+		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ?", term, term)
+	}
+	if foodCategoryID != "" {
+		query = query.Where("products.food_category_id = ?", foodCategoryID)
+	}
+	if discountOnly {
+		query = query.Where("products.discount_price IS NOT NULL")
+	}
+	if freeDeliveryOnly {
+		query = query.Where("merchants.is_free_delivery = ?", true)
+	}
+
+	var items []ProductSearchItem
+	if err := query.Order("products.sort_order ASC").Limit(100).Scan(&items).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search products"})
+		return
+	}
+
+	ps := pricing.LoadSettings(h.db)
+	for i := range items {
+		items[i].Price = pricing.ApplyMarkup(items[i].Price, ps)
+		if items[i].DiscountPrice != nil && *items[i].DiscountPrice > 0 {
+			marked := pricing.ApplyMarkup(*items[i].DiscountPrice, ps)
+			items[i].DiscountPrice = &marked
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"products": items})
 }
 
 // PopularMerchants returns top-rated food merchants for the "Rating
@@ -422,11 +486,11 @@ func (h *Handler) GetMerchantStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"status":              merchant.VerificationStatus,
-		"is_active":           merchant.IsActive,
-		"is_verified":         merchant.IsVerified,
-		"verification_note":   merchant.VerificationNote,
-		"name":                merchant.Name,
+		"status":            merchant.VerificationStatus,
+		"is_active":         merchant.IsActive,
+		"is_verified":       merchant.IsVerified,
+		"verification_note": merchant.VerificationNote,
+		"name":              merchant.Name,
 	})
 }
 
@@ -491,6 +555,9 @@ func (h *Handler) UpdateMyMerchant(c *gin.Context) {
 	}
 	if req.TaxRate != nil {
 		updates["tax_rate"] = *req.TaxRate
+	}
+	if req.IsFreeDelivery != nil {
+		updates["is_free_delivery"] = *req.IsFreeDelivery
 	}
 
 	if err := h.db.Model(&model.Merchant{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
@@ -930,5 +997,49 @@ func (h *Handler) TodaySummary(c *gin.Context) {
 		"order_count":   orderCount,
 		"total_revenue": totalRevenue,
 		"date":          today.Format("2006-01-02"),
+	})
+}
+
+// GetDashboardSummary returns today's order counts broken down by the merchant
+// dashboard's four buckets (Baru / Diproses / Kurir dalam perjalanan /
+// Selesai), today's revenue, and the merchant's rating — everything the
+// Dashboard tab needs in one call.
+func (h *Handler) GetDashboardSummary(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	today := time.Now().Truncate(24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	countByStatus := func(statuses ...string) int64 {
+		var count int64
+		h.db.Model(&model.Order{}).
+			Where("merchant_id = ? AND created_at >= ? AND created_at < ? AND status IN (?)",
+				merchant.ID, today, tomorrow, statuses).
+			Count(&count)
+		return count
+	}
+
+	var totalRevenue float64
+	h.db.Model(&model.Order{}).
+		Select("COALESCE(SUM(subtotal), 0)").
+		Where("merchant_id = ? AND created_at >= ? AND created_at < ? AND status = ?",
+			merchant.ID, today, tomorrow, "delivered").
+		Scan(&totalRevenue)
+
+	c.JSON(http.StatusOK, gin.H{
+		"date":              today.Format("2006-01-02"),
+		"new_orders":        countByStatus("pending"),
+		"processing_orders": countByStatus("confirmed", "preparing"),
+		"courier_en_route":  countByStatus("ready", "picked_up"),
+		"completed_orders":  countByStatus("delivered"),
+		"cancelled_orders":  countByStatus("cancelled"),
+		"today_revenue":     totalRevenue,
+		"rating":            merchant.Rating,
+		"total_reviews":     merchant.TotalReviews,
 	})
 }

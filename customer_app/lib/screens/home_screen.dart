@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/location_cubit.dart';
+import '../cubits/session_cubit.dart';
 import 'location_picker_screen.dart';
+import 'banner_detail_screen.dart';
+import 'phone_verification_gate.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +23,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     final loc = context.read<LocationCubit>().state;
     context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPhoneVerified());
+  }
+
+  void _checkPhoneVerified() {
+    final user = context.read<SessionCubit>().state.user;
+    if (user != null && !user.isPhoneVerified) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PhoneVerificationGate(), fullscreenDialog: true),
+      );
+    }
   }
 
   Future<void> _openLocationPicker(LocationState loc) async {
@@ -88,7 +102,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (loaded.banners.isNotEmpty)
                         _BannerCarousel(
                           banners: loaded.banners,
-                          onTapBanner: (b) => context.read<HomeCubit>().selectCategory(b.foodCategoryId),
+                          onTapBanner: (b) => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => BannerDetailScreen(banner: b)),
+                          ),
                         ),
                       if (loaded.categories.isNotEmpty)
                         _CategorySection(
@@ -227,12 +244,35 @@ class _BannerCarousel extends StatefulWidget {
   State<_BannerCarousel> createState() => _BannerCarouselState();
 }
 
+// Large multiple of any banner count so the user can swipe backward
+// indefinitely too, not just forward — true index is `virtualPage % length`.
+const _kInfiniteMultiplier = 10000;
+
 class _BannerCarouselState extends State<_BannerCarousel> {
-  final _controller = PageController(viewportFraction: 0.92);
-  int _page = 0;
+  late final PageController _controller;
+  late int _page;
+  Timer? _autoPlayTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = _kInfiniteMultiplier * widget.banners.length ~/ 2;
+    _controller = PageController(viewportFraction: 0.92, initialPage: _page);
+    _startAutoPlay();
+  }
+
+  void _startAutoPlay() {
+    _autoPlayTimer?.cancel();
+    if (widget.banners.length < 2) return;
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_controller.hasClients) return;
+      _controller.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+    });
+  }
 
   @override
   void dispose() {
+    _autoPlayTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -245,12 +285,15 @@ class _BannerCarouselState extends State<_BannerCarousel> {
           height: 172,
           child: PageView.builder(
             controller: _controller,
-            itemCount: widget.banners.length,
-            onPageChanged: (i) => setState(() => _page = i),
+            itemCount: widget.banners.isEmpty ? 0 : _kInfiniteMultiplier * widget.banners.length,
+            onPageChanged: (i) {
+              setState(() => _page = i);
+              _startAutoPlay(); // restart the countdown so a manual swipe doesn't get cut short
+            },
             itemBuilder: (context, i) {
-              final banner = widget.banners[i];
+              final banner = widget.banners[i % widget.banners.length];
               return GestureDetector(
-                onTap: banner.foodCategoryId != null ? () => widget.onTapBanner(banner) : null,
+                onTap: () => widget.onTapBanner(banner),
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(20, 8, 8, 0),
                   clipBehavior: Clip.antiAlias,
@@ -342,10 +385,10 @@ class _BannerCarouselState extends State<_BannerCarousel> {
               widget.banners.length,
               (i) => Container(
                 margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: i == _page ? 18 : 6,
+                width: i == _page % widget.banners.length ? 18 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _page ? KuwrirColors.primary : KuwrirColors.border,
+                  color: i == _page % widget.banners.length ? KuwrirColors.primary : KuwrirColors.border,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),

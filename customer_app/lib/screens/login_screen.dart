@@ -3,7 +3,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
-import 'otp_login_screen.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -13,43 +12,24 @@ class CustomerLoginScreen extends StatefulWidget {
 }
 
 class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
-  final _phoneCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _loading = false;
-  bool _obscure = true;
+  bool _googleLoading = false;
 
-  Future<void> _login() async {
-    if (_phoneCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      final client = ApiClient();
-      final res = await client.post('/auth/login', {
-        'phone': _phoneCtrl.text.trim(),
-        'password': _passwordCtrl.text,
-      });
-      if (!mounted) return;
-
-      if (res['token'] != null) {
-        final role = res['user']?['role'];
-        if (role != 'customer') {
-          _showError('Akun ini bukan akun customer');
-          return;
-        }
-        await client.saveToken(res['token'], res['refresh_token'] ?? '');
-        await NotificationService.uploadToken(client);
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        _showError(res['error'] ?? 'Login gagal');
-      }
-    } catch (e) {
-      _showError('Koneksi gagal: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+  Future<void> _handleOtpVerify(String phone, String code) async {
+    final client = ApiClient();
+    final res = await client.verifyOtp(phone, code);
+    if (!mounted) return;
+    if (res['token'] == null) {
+      throw res['error'] ?? 'Verifikasi gagal';
     }
+    await client.saveToken(res['token'], res['refresh_token'] ?? '');
+    await NotificationService.uploadToken(client);
+    if (!mounted) return;
+    await maybePromptBiometricOptIn(context);
+    if (mounted) Navigator.pushReplacementNamed(context, '/home');
   }
 
   Future<void> _loginWithGoogle() async {
-    setState(() => _loading = true);
+    setState(() => _googleLoading = true);
     try {
       await GoogleSignIn.instance.initialize(serverClientId: '55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com');
       final account = await GoogleSignIn.instance.authenticate();
@@ -66,7 +46,9 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       if (res['token'] != null) {
         await client.saveToken(res['token'], res['refresh_token'] ?? '');
         await NotificationService.uploadToken(client);
-        Navigator.pushReplacementNamed(context, '/home');
+        if (!mounted) return;
+        await maybePromptBiometricOptIn(context);
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
       } else {
         _showError(res['error'] ?? 'Google login gagal');
       }
@@ -77,19 +59,12 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     } catch (e) {
       _showError('Google login gagal: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
   void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.red));
-
-  @override
-  void dispose() {
-    _phoneCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,50 +75,20 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
               Center(
                 child: SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               const Text('Pesan makanan, terima di depan pintu',
                   style: TextStyle(color: Colors.grey),
                   textAlign: TextAlign.center),
-              const SizedBox(height: 48),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Nomor HP',
-                  prefixIcon: const Icon(Icons.phone),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-                onSubmitted: (_) => _login(),
-              ),
               const SizedBox(height: 24),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  onPressed: _loading ? null : _login,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Masuk', style: TextStyle(fontSize: 16)),
-                ),
+              OtpFlow(
+                onVerify: _handleOtpVerify,
+                headerTitle: 'Masuk atau daftar dengan nomor HP',
+                headerSubtitle: 'Kode OTP dikirim lewat WhatsApp — nomor baru otomatis terdaftar',
+                verifyButtonLabel: 'Masuk',
               ),
               const SizedBox(height: 12),
               const Row(children: [
@@ -156,35 +101,16 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               ]),
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: _loading ? null : _loginWithGoogle,
+                onPressed: _googleLoading ? null : _loginWithGoogle,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                icon: const Icon(Icons.g_mobiledata, size: 28),
+                icon: _googleLoading
+                    ? const SizedBox(
+                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.g_mobiledata, size: 28),
                 label: const Text('Masuk dengan Google'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _loading
-                    ? null
-                    : () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const OtpLoginScreen())),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.sms_outlined, size: 22),
-                label: const Text('Masuk dengan OTP WhatsApp'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.pushNamed(context, '/register'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Daftar Akun Baru'),
               ),
             ],
           ),

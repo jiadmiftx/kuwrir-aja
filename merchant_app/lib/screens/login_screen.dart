@@ -17,6 +17,26 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
   bool _loading = false;
   bool _obscure = true;
 
+  Future<void> _handleOtpVerify(String phone, String code) async {
+    final client = ApiClient();
+    final res = await client.verifyOtp(phone, code);
+    if (!mounted) return;
+    if (res['token'] == null) {
+      throw res['error'] ?? 'Verifikasi gagal';
+    }
+    final role = res['user']?['role'];
+    if (role != 'merchant') {
+      throw 'Akun ini bukan akun merchant';
+    }
+    final isActive = res['user']?['is_active'] ?? false;
+    await client.saveToken(res['token'], res['refresh_token'] ?? '');
+    await NotificationService.uploadToken(client);
+    if (!mounted) return;
+    await maybePromptBiometricOptIn(context);
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
+  }
+
   Future<void> _login() async {
     if (_phoneCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) return;
     setState(() => _loading = true);
@@ -38,6 +58,9 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
         }
         await client.saveToken(res['token'], res['refresh_token']);
         await NotificationService.uploadToken(client);
+        if (!mounted) return;
+        await maybePromptBiometricOptIn(context);
+        if (!mounted) return;
         if (!isActive) {
           Navigator.pushReplacementNamed(context, '/pending');
           return;
@@ -72,6 +95,9 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
         }
         await client.saveToken(res['token'], res['refresh_token'] ?? '');
         await NotificationService.uploadToken(client);
+        if (!mounted) return;
+        await maybePromptBiometricOptIn(context);
+        if (!mounted) return;
         final hasMerchantProfile = res['has_merchant_profile'] ?? false;
         if (!hasMerchantProfile) {
           Navigator.pushReplacement(
@@ -133,7 +159,21 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
               const Text('KUWRIR Merchant', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 8),
               const Text('Kelola toko dan terima order', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
+              OtpFlow(
+                onVerify: _handleOtpVerify,
+                headerTitle: 'Masuk dengan nomor HP toko',
+                headerSubtitle: 'Kode OTP dikirim lewat WhatsApp',
+                verifyButtonLabel: 'Masuk',
+              ),
+              const SizedBox(height: 16),
+              const Row(children: [
+                Expanded(child: Divider()),
+                Padding(padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('atau pakai password', style: TextStyle(color: Colors.grey))),
+                Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: 16),
               TextField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,

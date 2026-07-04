@@ -704,6 +704,7 @@ type BannerRequest struct {
 	Subtitle       string  `json:"subtitle"`
 	CTAText        string  `json:"cta_text"`
 	FoodCategoryID *string `json:"food_category_id"`
+	PromoType      string  `json:"promo_type"` // "" | "discount" | "free_delivery"
 	SortOrder      int     `json:"sort_order"`
 	IsActive       bool    `json:"is_active"`
 }
@@ -735,6 +736,7 @@ func (h *Handler) CreateBanner(c *gin.Context) {
 		Subtitle:       req.Subtitle,
 		CTAText:        ctaText,
 		FoodCategoryID: foodCategoryUUID,
+		PromoType:      req.PromoType,
 		SortOrder:      req.SortOrder,
 		IsActive:       true,
 	}
@@ -765,7 +767,8 @@ func (h *Handler) UpdateBanner(c *gin.Context) {
 
 	result := h.db.Model(&model.Banner{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"title": req.Title, "subtitle": req.Subtitle, "cta_text": req.CTAText,
-		"food_category_id": foodCategoryUUID, "sort_order": req.SortOrder, "is_active": req.IsActive,
+		"food_category_id": foodCategoryUUID, "promo_type": req.PromoType,
+		"sort_order": req.SortOrder, "is_active": req.IsActive,
 	})
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Banner not found"})
@@ -946,7 +949,7 @@ func (h *Handler) UploadPromotionImage(c *gin.Context) {
 func (h *Handler) GetWithdrawals(c *gin.Context) {
 	status := c.DefaultQuery("status", "")
 	var requests []model.WithdrawalRequest
-	q := h.db.Preload("Wallet")
+	q := h.db.Preload("Wallet.User")
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}

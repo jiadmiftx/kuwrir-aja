@@ -98,7 +98,7 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret:             getEnv("JWT_SECRET", "kuwrir-super-secret-key-change-me"),
 			ExpiryHours:        getEnvInt("JWT_EXPIRY_HOURS", 24),
-			RefreshExpiryHours: getEnvInt("JWT_REFRESH_EXPIRY_HOURS", 168), // 7 days
+			RefreshExpiryHours: getEnvInt("JWT_REFRESH_EXPIRY_HOURS", 720), // 30 days
 		},
 		R2: R2Config{
 			AccountID:       getEnv("R2_ACCOUNT_ID", ""),

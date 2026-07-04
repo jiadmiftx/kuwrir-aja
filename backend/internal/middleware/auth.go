@@ -8,11 +8,33 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims represents the JWT token payload
+// Claims represents the JWT token payload. TokenType distinguishes access
+// ("access") from refresh ("refresh") tokens so a refresh token can't be
+// used to call ordinary authed endpoints and vice versa. Tokens issued
+// before this field existed decode with TokenType == "" and are treated as
+// access tokens (unchanged behavior) — they're short-lived anyway.
 type Claims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	TokenType string `json:"token_type,omitempty"`
 	jwt.RegisteredClaims
+}
+
+// ParseToken validates a JWT's signature and expiry and returns its claims.
+// Shared by AuthMiddleware and the /auth/refresh handler so both enforce
+// identical validation.
+func ParseToken(secret, tokenString string) (*Claims, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		if err == nil {
+			err = jwt.ErrTokenInvalidClaims
+		}
+		return nil, err
+	}
+	return claims, nil
 }
 
 // AuthMiddleware validates JWT tokens and injects user claims into context
@@ -30,12 +52,8 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return []byte(secret), nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := ParseToken(secret, tokenString)
+		if err != nil || claims.TokenType == "refresh" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}

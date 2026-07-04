@@ -1,19 +1,40 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:kuwrir_shared/kuwrir_shared.dart';
-import '../services/notification_service.dart';
+import '../api/api_client.dart';
+import '../theme/kuwrir_colors.dart';
 
 enum _OtpStep { phone, code }
 
-class OtpLoginScreen extends StatefulWidget {
-  const OtpLoginScreen({super.key});
+/// Reusable phone-entry -> code-entry -> resend-cooldown flow, shared by
+/// every app's login screen (verify == log in) and customer_app's
+/// mandatory phone-verification gate (verify == attach+verify a phone on an
+/// already-authenticated account). Only [onVerify] and the header copy
+/// differ between call sites; requesting the OTP itself is identical
+/// everywhere.
+class OtpFlow extends StatefulWidget {
+  /// Called with the entered phone + code. Throw to show an error (the
+  /// exception's message, or a plain string, is shown via SnackBar) —
+  /// returning normally means success, and the caller is responsible for
+  /// whatever happens next (navigate, pop, reload session, etc).
+  final Future<void> Function(String phone, String code) onVerify;
+  final String headerTitle;
+  final String headerSubtitle;
+  final String verifyButtonLabel;
+
+  const OtpFlow({
+    super.key,
+    required this.onVerify,
+    this.headerTitle = 'Masukkan nomor HP kamu',
+    this.headerSubtitle = 'Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
+    this.verifyButtonLabel = 'Verifikasi',
+  });
 
   @override
-  State<OtpLoginScreen> createState() => _OtpLoginScreenState();
+  State<OtpFlow> createState() => _OtpFlowState();
 }
 
-class _OtpLoginScreenState extends State<OtpLoginScreen> {
+class _OtpFlowState extends State<OtpFlow> {
   final _phoneCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _client = ApiClient();
@@ -78,22 +99,14 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
     }
   }
 
-  Future<void> _verifyOtp() async {
+  Future<void> _verify() async {
     final code = _codeCtrl.text.trim();
     if (code.isEmpty) return;
     setState(() => _loading = true);
     try {
-      final res = await _client.verifyOtp(_phoneCtrl.text.trim(), code);
-      if (!mounted) return;
-      if (res['token'] != null) {
-        await _client.saveToken(res['token'], res['refresh_token'] ?? '');
-        await NotificationService.uploadToken(_client);
-        if (mounted) Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        _showError(res['error'] ?? 'Verifikasi gagal');
-      }
+      await widget.onVerify(_phoneCtrl.text.trim(), code);
     } catch (e) {
-      if (mounted) _showError('Verifikasi gagal: $e');
+      if (mounted) _showError(e is ApiException ? e.message : '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -101,17 +114,9 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Masuk dengan OTP WhatsApp')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _step == _OtpStep.phone ? _buildPhoneStep() : _buildCodeStep(),
-          ),
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: _step == _OtpStep.phone ? _buildPhoneStep() : _buildCodeStep(),
     );
   }
 
@@ -120,11 +125,11 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
       const SizedBox(height: 24),
       const Icon(Icons.sms_outlined, size: 56, color: KuwrirColors.primary),
       const SizedBox(height: 16),
-      const Text('Masukkan nomor HP kamu',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      Text(widget.headerTitle,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center),
       const SizedBox(height: 8),
-      Text('Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
+      Text(widget.headerSubtitle,
           style: TextStyle(color: KuwrirColors.textSecondary),
           textAlign: TextAlign.center),
       const SizedBox(height: 32),
@@ -178,18 +183,18 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
           hintText: '000000',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        onSubmitted: (_) => _verifyOtp(),
+        onSubmitted: (_) => _verify(),
       ),
       const SizedBox(height: 16),
       SizedBox(
         height: 50,
         child: FilledButton(
-          onPressed: _loading ? null : _verifyOtp,
+          onPressed: _loading ? null : _verify,
           child: _loading
               ? const SizedBox(
                   width: 20, height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Verifikasi', style: TextStyle(fontSize: 16)),
+              : Text(widget.verifyButtonLabel, style: const TextStyle(fontSize: 16)),
         ),
       ),
       const SizedBox(height: 12),

@@ -42,6 +42,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		auth.POST("/google", h.GoogleLogin)
 		auth.POST("/otp/request", h.RequestOTP)
 		auth.POST("/otp/verify", h.VerifyOTP)
+		auth.POST("/refresh", h.RefreshToken)
 	}
 
 	// Authenticated routes
@@ -50,6 +51,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		authed.GET("/me", h.GetMe)
 		authed.PUT("/device-token", h.SaveDeviceToken)
+		authed.POST("/verify-phone", h.VerifyPhone)
 	}
 }
 
@@ -347,9 +349,35 @@ func (h *Handler) RequestOTP(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// validateAndConsumeOTP checks phone's latest unconsumed, unexpired code
+// against code, bumping the attempt counter on mismatch and marking it
+// consumed on success. Shared by VerifyOTP (login) and VerifyPhone (attach
+// a verified phone to an already-authenticated account) so both enforce
+// identical expiry/attempt-limit rules. status == 0 means success.
+func (h *Handler) validateAndConsumeOTP(phone, code string) (status int, errMsg string) {
+	var otp model.OtpCode
+	if err := h.db.Where("phone = ? AND consumed_at IS NULL AND expires_at > ?", phone, time.Now()).
+		Order("created_at DESC").First(&otp).Error; err != nil {
+		return http.StatusBadRequest, "Code expired or not found, request a new one"
+	}
+
+	if otp.Attempts >= otpMaxVerifyTries {
+		return http.StatusTooManyRequests, "Too many attempts, request a new code"
+	}
+
+	if hashOTP(code) != otp.CodeHash {
+		h.db.Model(&otp).Update("attempts", otp.Attempts+1)
+		return http.StatusUnauthorized, "Invalid code"
+	}
+
+	h.db.Model(&otp).Update("consumed_at", time.Now())
+	return 0, ""
+}
+
 // VerifyOTP checks the code and logs the user in, auto-creating a customer
 // account on first successful verify for an unknown phone number (same
-// auto-register shape as GoogleLogin above).
+// auto-register shape as GoogleLogin above). Marks the phone verified either
+// way — a successful OTP check is real proof of ownership.
 // POST /auth/otp/verify   Body: {"phone": "...", "code": "..."}
 func (h *Handler) VerifyOTP(c *gin.Context) {
 	var req VerifyOTPRequest
@@ -358,26 +386,12 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	var otp model.OtpCode
-	if err := h.db.Where("phone = ? AND consumed_at IS NULL AND expires_at > ?", req.Phone, time.Now()).
-		Order("created_at DESC").First(&otp).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Code expired or not found, request a new one"})
-		return
-	}
-
-	if otp.Attempts >= otpMaxVerifyTries {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts, request a new code"})
-		return
-	}
-
-	if hashOTP(req.Code) != otp.CodeHash {
-		h.db.Model(&otp).Update("attempts", otp.Attempts+1)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid code"})
+	if status, msg := h.validateAndConsumeOTP(req.Phone, req.Code); status != 0 {
+		c.JSON(status, gin.H{"error": msg})
 		return
 	}
 
 	now := time.Now()
-	h.db.Model(&otp).Update("consumed_at", now)
 
 	var user model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
@@ -386,10 +400,11 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		// no real password.
 		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
 		user = model.User{
-			Phone:    req.Phone,
-			Password: string(fakePassword),
-			Role:     model.RoleCustomer,
-			IsActive: true,
+			Phone:           req.Phone,
+			Password:        string(fakePassword),
+			Role:            model.RoleCustomer,
+			IsActive:        true,
+			PhoneVerifiedAt: &now,
 		}
 		if err := h.db.Create(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create account"})
@@ -398,6 +413,9 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 	} else if !user.IsActive {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Account is deactivated"})
 		return
+	} else if user.PhoneVerifiedAt == nil {
+		h.db.Model(&user).Update("phone_verified_at", now)
+		user.PhoneVerifiedAt = &now
 	}
 
 	token, refreshToken, err := h.generateTokens(user)
@@ -411,6 +429,47 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		RefreshToken: refreshToken,
 		User:         user,
 	})
+}
+
+// VerifyPhone attaches and verifies a real phone number on the currently
+// authenticated account — used by customer_app's mandatory phone-verify
+// gate for accounts whose Phone is still GoogleLogin's placeholder
+// ("G-..."). Reuses the same OTP validation as VerifyOTP but updates the
+// logged-in user's row instead of looking up/creating one by phone.
+// POST /auth/verify-phone   Body: {"phone": "...", "code": "..."}   (auth required)
+func (h *Handler) VerifyPhone(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if status, msg := h.validateAndConsumeOTP(req.Phone, req.Code); status != 0 {
+		c.JSON(status, gin.H{"error": msg})
+		return
+	}
+
+	var conflicting model.User
+	if err := h.db.Where("phone = ? AND id != ?", req.Phone, userID).First(&conflicting).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Nomor ini sudah terdaftar di akun lain"})
+		return
+	}
+
+	now := time.Now()
+	if err := h.db.Model(&model.User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{"phone": req.Phone, "phone_verified_at": now}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update phone"})
+		return
+	}
+
+	var user model.User
+	if err := h.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load account"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // SaveDeviceToken stores the FCM device token for push notifications.
@@ -472,11 +531,56 @@ func verifyGoogleToken(idToken string) (*googleTokenInfo, error) {
 	return &info, nil
 }
 
+// RefreshToken exchanges a still-valid refresh token for a new access +
+// refresh token pair (sliding expiration) — as long as a user opens any app
+// at least once within JWT_REFRESH_EXPIRY_HOURS, they never have to
+// fully re-authenticate via OTP/Google/password. Rejects access tokens
+// presented here (TokenType must be "refresh") and deactivated accounts.
+// POST /auth/refresh   Body: {"refresh_token": "..."}
+func (h *Handler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	claims, err := middleware.ParseToken(h.cfg.JWT.Secret, req.RefreshToken)
+	if err != nil || claims.TokenType != "refresh" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
+		return
+	}
+
+	var user model.User
+	if err := h.db.Where("id = ?", claims.UserID).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Account not found"})
+		return
+	}
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Account is deactivated"})
+		return
+	}
+
+	token, refreshToken, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         user,
+	})
+}
+
 func (h *Handler) generateTokens(user model.User) (string, string, error) {
 	// Access token
 	claims := &middleware.Claims{
-		UserID: user.ID.String(),
-		Role:   string(user.Role),
+		UserID:    user.ID.String(),
+		Role:      string(user.Role),
+		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.ExpiryHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -492,8 +596,9 @@ func (h *Handler) generateTokens(user model.User) (string, string, error) {
 
 	// Refresh token
 	refreshClaims := &middleware.Claims{
-		UserID: user.ID.String(),
-		Role:   string(user.Role),
+		UserID:    user.ID.String(),
+		Role:      string(user.Role),
+		TokenType: "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.RefreshExpiryHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

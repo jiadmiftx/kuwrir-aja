@@ -5,7 +5,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../cubits/location_cubit.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialCategoryId;
+  final bool initialDiscount;
+  final bool initialFreeDelivery;
+
+  const SearchScreen({
+    super.key,
+    this.initialCategoryId,
+    this.initialDiscount = false,
+    this.initialFreeDelivery = false,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -20,6 +29,13 @@ class _SearchScreenState extends State<SearchScreen>
   late final TabController _tabController;
 
   List<String> _recentSearches = [];
+
+  late String? _categoryId = widget.initialCategoryId;
+  late bool _discountOnly = widget.initialDiscount;
+  late bool _freeDeliveryOnly = widget.initialFreeDelivery;
+
+  bool get _hasActiveFilter =>
+      _categoryId != null || _discountOnly || _freeDeliveryOnly;
 
   @override
   void initState() {
@@ -64,6 +80,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   Widget build(BuildContext context) {
+    final showResults = _hasQuery || _hasActiveFilter;
     return Scaffold(
       backgroundColor: KuwrirColors.background,
       appBar: AppBar(
@@ -80,7 +97,9 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           child: TextField(
             controller: _controller,
-            autofocus: true,
+            autofocus: widget.initialCategoryId == null &&
+                !widget.initialDiscount &&
+                !widget.initialFreeDelivery,
             decoration: InputDecoration(
               hintText: 'Cari makanan atau warung...',
               border: InputBorder.none,
@@ -112,21 +131,188 @@ class _SearchScreenState extends State<SearchScreen>
           // Delivery address widget
           _DeliveryAddressBar(),
 
+          _FilterBar(
+            categoryId: _categoryId,
+            discountOnly: _discountOnly,
+            freeDeliveryOnly: _freeDeliveryOnly,
+            onChanged: (categoryId, discount, freeDelivery) => setState(() {
+              _categoryId = categoryId;
+              _discountOnly = discount;
+              _freeDeliveryOnly = freeDelivery;
+            }),
+          ),
+
           // Content
           Expanded(
-            child: _hasQuery ? _SearchResults(tabController: _tabController) : _EmptyState(
-              recentSearches: _recentSearches,
-              onTap: (s) {
-                _controller.text = s;
-                _controller.selection = TextSelection.fromPosition(
-                  TextPosition(offset: s.length),
-                );
-                _saveSearch(s);
-              },
-              onClearRecent: _clearRecentSearches,
-            ),
+            child: showResults
+                ? _SearchResults(
+                    tabController: _tabController,
+                    query: _controller.text.trim(),
+                    categoryId: _categoryId,
+                    discountOnly: _discountOnly,
+                    freeDeliveryOnly: _freeDeliveryOnly,
+                  )
+                : _EmptyState(
+                    recentSearches: _recentSearches,
+                    onTap: (s) {
+                      _controller.text = s;
+                      _controller.selection = TextSelection.fromPosition(
+                        TextPosition(offset: s.length),
+                      );
+                      _saveSearch(s);
+                    },
+                    onClearRecent: _clearRecentSearches,
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Filter Bar ──────────────────────────────────────────────────────────────
+// "Diskon"/"Gratis Ongkir" toggle chips plus a horizontal category picker —
+// selecting any of these alone (with an empty search box) is enough to show
+// filtered results, so a banner CTA can land here pre-filtered.
+
+class _FilterBar extends StatefulWidget {
+  final String? categoryId;
+  final bool discountOnly;
+  final bool freeDeliveryOnly;
+  final void Function(String? categoryId, bool discount, bool freeDelivery) onChanged;
+
+  const _FilterBar({
+    required this.categoryId,
+    required this.discountOnly,
+    required this.freeDeliveryOnly,
+    required this.onChanged,
+  });
+
+  @override
+  State<_FilterBar> createState() => _FilterBarState();
+}
+
+class _FilterBarState extends State<_FilterBar> {
+  List<FoodCategory> _categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final api = context.read<ApiClient>();
+      final cats = await api.getFoodCategories();
+      if (mounted) setState(() => _categories = cats);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: KuwrirColors.surface,
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'Diskon',
+                  icon: Icons.local_offer_outlined,
+                  selected: widget.discountOnly,
+                  onTap: () => widget.onChanged(
+                      widget.categoryId, !widget.discountOnly, widget.freeDeliveryOnly),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Gratis Ongkir',
+                  icon: Icons.delivery_dining_outlined,
+                  selected: widget.freeDeliveryOnly,
+                  onTap: () => widget.onChanged(
+                      widget.categoryId, widget.discountOnly, !widget.freeDeliveryOnly),
+                ),
+              ],
+            ),
+          ),
+          if (_categories.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: _categories.map((c) {
+                  final selected = c.id == widget.categoryId;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _FilterChip(
+                      label: '${c.icon ?? ''} ${c.name}'.trim(),
+                      selected: selected,
+                      onTap: () => widget.onChanged(
+                          selected ? null : c.id, widget.discountOnly, widget.freeDeliveryOnly),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Divider(height: 1, color: KuwrirColors.border),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? KuwrirColors.primary : KuwrirColors.background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? KuwrirColors.primary : KuwrirColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: selected ? Colors.white : KuwrirColors.textSecondary),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : KuwrirColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -405,8 +591,18 @@ class _PopularMerchantTile extends StatelessWidget {
 
 class _SearchResults extends StatelessWidget {
   final TabController tabController;
+  final String query;
+  final String? categoryId;
+  final bool discountOnly;
+  final bool freeDeliveryOnly;
 
-  const _SearchResults({required this.tabController});
+  const _SearchResults({
+    required this.tabController,
+    required this.query,
+    required this.categoryId,
+    required this.discountOnly,
+    required this.freeDeliveryOnly,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -435,8 +631,13 @@ class _SearchResults extends StatelessWidget {
           child: TabBarView(
             controller: tabController,
             children: [
-              _RestaurantResultList(),
-              _MenuItemResultList(),
+              _RestaurantResultList(query: query, freeDeliveryOnly: freeDeliveryOnly),
+              _MenuItemResultList(
+                query: query,
+                categoryId: categoryId,
+                discountOnly: discountOnly,
+                freeDeliveryOnly: freeDeliveryOnly,
+              ),
             ],
           ),
         ),
@@ -447,106 +648,81 @@ class _SearchResults extends StatelessWidget {
 
 // ─── Restaurant Result List ───────────────────────────────────────────────────
 
-class _RestaurantResultList extends StatelessWidget {
+class _RestaurantResultList extends StatefulWidget {
+  final String query;
+  final bool freeDeliveryOnly;
+  const _RestaurantResultList({required this.query, required this.freeDeliveryOnly});
+
+  @override
+  State<_RestaurantResultList> createState() => _RestaurantResultListState();
+}
+
+class _RestaurantResultListState extends State<_RestaurantResultList> {
+  List<Merchant> _results = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RestaurantResultList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query || oldWidget.freeDeliveryOnly != widget.freeDeliveryOnly) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = context.read<ApiClient>();
+      final merchants = widget.query.isEmpty
+          ? await api.getPopularMerchants()
+          : await api.searchMerchants(widget.query);
+      _results = widget.freeDeliveryOnly
+          ? merchants.where((m) => m.isFreeDelivery).toList()
+          : merchants;
+    } catch (e) {
+      _error = 'Gagal memuat warung';
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Sample data — replace with API
-    final restaurants = [
-      _RestaurantData(
-        name: 'Warung Nasi Campur Bu Eka',
-        category: 'Masakan Indonesia',
-        tags: ['Nasi', 'Lauk Pauk'],
-        rating: 4.8,
-        reviews: 124,
-        distance: '0.8 km',
-        deliveryTime: '15–20 mnt',
-        priceRange: '8–25rb',
-        emoji: '🍛',
-        color: Color(0xFFFF6B35),
-        isOpen: true,
-        hasPromo: true,
-      ),
-      _RestaurantData(
-        name: 'Ayam Taliwang Irama',
-        category: 'Khas Lombok',
-        tags: ['Ayam', 'Pedas'],
-        rating: 4.5,
-        reviews: 89,
-        distance: '1.2 km',
-        deliveryTime: '20–25 mnt',
-        priceRange: '15–40rb',
-        emoji: '🍗',
-        color: Color(0xFFF59E0B),
-        isOpen: true,
-        hasPromo: false,
-      ),
-      _RestaurantData(
-        name: 'Sate Rembiga Pak Haji',
-        category: 'Sate & Bakar',
-        tags: ['Sate', 'Bakar'],
-        rating: 4.9,
-        reviews: 210,
-        distance: '1.5 km',
-        deliveryTime: '25–30 mnt',
-        priceRange: '20–50rb',
-        emoji: '🥘',
-        color: Color(0xFF22C55E),
-        isOpen: false,
-        hasPromo: false,
-      ),
-      _RestaurantData(
-        name: 'Es Campur Madu Lombok',
-        category: 'Minuman & Dessert',
-        tags: ['Es', 'Minuman'],
-        rating: 4.3,
-        reviews: 56,
-        distance: '0.5 km',
-        deliveryTime: '10–15 mnt',
-        priceRange: '5–15rb',
-        emoji: '🥤',
-        color: Color(0xFF3B82F6),
-        isOpen: true,
-        hasPromo: true,
-      ),
-    ];
-
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: TextStyle(color: KuwrirColors.textSecondary)),
+      );
+    }
+    if (_results.isEmpty) {
+      return Center(
+        child: Text('Tidak ada warung yang cocok',
+            style: TextStyle(color: KuwrirColors.textSecondary)),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      itemCount: restaurants.length,
-      itemBuilder: (context, i) =>
-          _RestaurantResultCard(data: restaurants[i]),
+      itemCount: _results.length,
+      itemBuilder: (context, i) => _RestaurantResultCard(merchant: _results[i]),
     );
   }
 }
 
-class _RestaurantData {
-  final String name, category, distance, deliveryTime, priceRange, emoji;
-  final List<String> tags;
-  final double rating;
-  final int reviews;
-  final Color color;
-  final bool isOpen, hasPromo;
-
-  const _RestaurantData({
-    required this.name,
-    required this.category,
-    required this.tags,
-    required this.rating,
-    required this.reviews,
-    required this.distance,
-    required this.deliveryTime,
-    required this.priceRange,
-    required this.emoji,
-    required this.color,
-    required this.isOpen,
-    required this.hasPromo,
-  });
-}
-
 class _RestaurantResultCard extends StatelessWidget {
-  final _RestaurantData data;
+  final Merchant merchant;
 
-  const _RestaurantResultCard({required this.data});
+  const _RestaurantResultCard({required this.merchant});
 
   @override
   Widget build(BuildContext context) {
@@ -558,7 +734,7 @@ class _RestaurantResultCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => Navigator.pushNamed(context, '/merchant',
-              arguments: {'id': '1', 'name': data.name}),
+              arguments: {'id': merchant.id, 'name': merchant.name}),
           child: Column(
             children: [
               // Image area
@@ -568,22 +744,25 @@ class _RestaurantResultCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Container(
-                      color: data.color.withValues(alpha: 0.12),
-                      child: Center(
-                        child: Text(
-                          data.emoji,
-                          style: const TextStyle(fontSize: 52),
-                        ),
-                      ),
-                    ),
-                    // Top badges
+                    merchant.logoUrl != null
+                        ? Image.network(
+                            merchant.logoUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: KuwrirColors.primary.withValues(alpha: 0.12),
+                              child: Icon(Icons.storefront, size: 48, color: KuwrirColors.primary),
+                            ),
+                          )
+                        : Container(
+                            color: KuwrirColors.primary.withValues(alpha: 0.12),
+                            child: Icon(Icons.storefront, size: 48, color: KuwrirColors.primary),
+                          ),
                     Positioned(
                       top: 10,
                       left: 10,
-                      child: _OpenBadge(isOpen: data.isOpen),
+                      child: _OpenBadge(isOpen: merchant.isOpen),
                     ),
-                    if (data.hasPromo)
+                    if (merchant.isFreeDelivery)
                       Positioned(
                         top: 10,
                         right: 10,
@@ -595,12 +774,12 @@ class _RestaurantResultCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
-                            'PROMO',
+                            'GRATIS ONGKIR',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 9,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
@@ -623,7 +802,7 @@ class _RestaurantResultCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                data.name,
+                                merchant.name,
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
@@ -634,11 +813,13 @@ class _RestaurantResultCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                data.category,
+                                merchant.address,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: KuwrirColors.textSecondary,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -658,7 +839,7 @@ class _RestaurantResultCard extends StatelessWidget {
                                   size: 13, color: Color(0xFFF59E0B)),
                               const SizedBox(width: 2),
                               Text(
-                                data.rating.toString(),
+                                merchant.rating.toStringAsFixed(1),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -670,53 +851,16 @@ class _RestaurantResultCard extends StatelessWidget {
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 8),
-
-                    // Tags
-                    Wrap(
-                      spacing: 5,
-                      children: data.tags.map((tag) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: data.color.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: data.color.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
                     const SizedBox(height: 8),
                     const Divider(height: 1),
                     const SizedBox(height: 8),
-
-                    // Meta row
                     Row(
                       children: [
-                        _MetaChip(
-                          icon: Icons.access_time_rounded,
-                          label: data.deliveryTime,
-                        ),
-                        const SizedBox(width: 12),
-                        _MetaChip(
-                          icon: Icons.location_on_outlined,
-                          label: data.distance,
-                        ),
-                        const SizedBox(width: 12),
-                        _MetaChip(
-                          icon: Icons.payments_outlined,
-                          label: data.priceRange,
-                        ),
+                        if (merchant.distanceKm != null)
+                          _MetaChip(
+                            icon: Icons.location_on_outlined,
+                            label: '${merchant.distanceKm!.toStringAsFixed(1)} km',
+                          ),
                         const Spacer(),
                         Row(
                           children: [
@@ -725,7 +869,7 @@ class _RestaurantResultCard extends StatelessWidget {
                                 color: KuwrirColors.textSecondary),
                             const SizedBox(width: 3),
                             Text(
-                              '${data.reviews} ulasan',
+                              '${merchant.totalReviews} ulasan',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: KuwrirColors.textSecondary,
@@ -815,106 +959,104 @@ class _MetaChip extends StatelessWidget {
 
 // ─── Menu Item Result List ────────────────────────────────────────────────────
 
-class _MenuItemResultList extends StatelessWidget {
+class _MenuItemResultList extends StatefulWidget {
+  final String query;
+  final String? categoryId;
+  final bool discountOnly;
+  final bool freeDeliveryOnly;
+
+  const _MenuItemResultList({
+    required this.query,
+    required this.categoryId,
+    required this.discountOnly,
+    required this.freeDeliveryOnly,
+  });
+
+  @override
+  State<_MenuItemResultList> createState() => _MenuItemResultListState();
+}
+
+class _MenuItemResultListState extends State<_MenuItemResultList> {
+  List<ProductSearchResult> _results = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MenuItemResultList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query ||
+        oldWidget.categoryId != widget.categoryId ||
+        oldWidget.discountOnly != widget.discountOnly ||
+        oldWidget.freeDeliveryOnly != widget.freeDeliveryOnly) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = context.read<ApiClient>();
+      _results = await api.searchProducts(
+        q: widget.query,
+        foodCategoryId: widget.categoryId,
+        discount: widget.discountOnly,
+        freeDelivery: widget.freeDeliveryOnly,
+      );
+    } catch (e) {
+      _error = 'Gagal memuat menu';
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = [
-      _MenuItemData(
-        name: 'Ayam Taliwang Pedas',
-        restaurantName: 'Ayam Taliwang Irama',
-        description: 'Ayam kampung bakar bumbu Taliwang khas Lombok, pedas gurih',
-        price: 35000,
-        originalPrice: 42000,
-        rating: 4.7,
-        emoji: '🍗',
-        color: Color(0xFFF59E0B),
-        tag: 'Terlaris',
-      ),
-      _MenuItemData(
-        name: 'Nasi Campur Spesial',
-        restaurantName: 'Warung Nasi Campur Bu Eka',
-        description: 'Nasi putih dengan lauk pauk lengkap pilihan',
-        price: 18000,
-        rating: 4.8,
-        emoji: '🍛',
-        color: Color(0xFFFF6B35),
-        tag: 'Favorit',
-      ),
-      _MenuItemData(
-        name: 'Sate Rembiga 10 Tusuk',
-        restaurantName: 'Sate Rembiga Pak Haji',
-        description: 'Daging sapi pilihan bumbu merah khas Rembiga',
-        price: 28000,
-        rating: 4.9,
-        emoji: '🥘',
-        color: Color(0xFF22C55E),
-        tag: null,
-      ),
-      _MenuItemData(
-        name: 'Es Kelapa Muda',
-        restaurantName: 'Es Campur Madu Lombok',
-        description: 'Kelapa muda segar langsung dari petani Lombok',
-        price: 12000,
-        rating: 4.5,
-        emoji: '🥥',
-        color: Color(0xFF3B82F6),
-        tag: 'Baru',
-      ),
-      _MenuItemData(
-        name: 'Plecing Kangkung',
-        restaurantName: 'Warung Nasi Campur Bu Eka',
-        description: 'Kangkung segar dengan sambal tomat pedas khas Lombok',
-        price: 10000,
-        rating: 4.6,
-        emoji: '🌿',
-        color: Color(0xFF22C55E),
-        tag: null,
-      ),
-    ];
-
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: TextStyle(color: KuwrirColors.textSecondary)),
+      );
+    }
+    if (_results.isEmpty) {
+      return Center(
+        child: Text('Tidak ada menu yang cocok',
+            style: TextStyle(color: KuwrirColors.textSecondary)),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      itemCount: items.length,
-      itemBuilder: (context, i) => _MenuItemCard(data: items[i]),
+      itemCount: _results.length,
+      itemBuilder: (context, i) => _MenuItemCard(result: _results[i]),
     );
   }
 }
 
-class _MenuItemData {
-  final String name, restaurantName, description, emoji;
-  final double rating;
-  final int price;
-  final int? originalPrice;
-  final Color color;
-  final String? tag;
-
-  const _MenuItemData({
-    required this.name,
-    required this.restaurantName,
-    required this.description,
-    required this.price,
-    this.originalPrice,
-    required this.rating,
-    required this.emoji,
-    required this.color,
-    this.tag,
-  });
-}
-
 class _MenuItemCard extends StatelessWidget {
-  final _MenuItemData data;
+  final ProductSearchResult result;
 
-  const _MenuItemCard({required this.data});
+  const _MenuItemCard({required this.result});
 
-  String _formatPrice(int price) {
+  String _formatPrice(double price) {
     if (price >= 1000) {
       return 'Rp ${(price / 1000).toStringAsFixed(0)}rb';
     }
-    return 'Rp $price';
+    return 'Rp ${price.toStringAsFixed(0)}';
   }
 
   @override
   Widget build(BuildContext context) {
+    final product = result.product;
+    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -922,7 +1064,8 @@ class _MenuItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () {},
+          onTap: () => Navigator.pushNamed(context, '/merchant',
+              arguments: {'id': result.merchantId, 'name': result.merchantName}),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -936,17 +1079,20 @@ class _MenuItemCard extends StatelessWidget {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: data.color.withValues(alpha: 0.1),
+                        color: KuwrirColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Center(
-                        child: Text(
-                          data.emoji,
-                          style: const TextStyle(fontSize: 36),
-                        ),
-                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: product.imageUrl != null
+                          ? Image.network(
+                              product.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  Icon(Icons.restaurant, color: KuwrirColors.primary),
+                            )
+                          : Icon(Icons.restaurant, color: KuwrirColors.primary),
                     ),
-                    if (data.tag != null)
+                    if (hasDiscount)
                       Positioned(
                         top: -4,
                         left: -4,
@@ -954,16 +1100,12 @@ class _MenuItemCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: data.tag == 'Terlaris'
-                                ? KuwrirColors.primary
-                                : data.tag == 'Baru'
-                                    ? KuwrirColors.info
-                                    : KuwrirColors.warning,
+                            color: KuwrirColors.primary,
                             borderRadius: BorderRadius.circular(5),
                           ),
-                          child: Text(
-                            data.tag!,
-                            style: const TextStyle(
+                          child: const Text(
+                            'DISKON',
+                            style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -981,7 +1123,7 @@ class _MenuItemCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        data.name,
+                        product.name,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -999,7 +1141,7 @@ class _MenuItemCard extends StatelessWidget {
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
-                              data.restaurantName,
+                              result.merchantName,
                               style: TextStyle(
                                 fontSize: 11,
                                 color: KuwrirColors.textSecondary,
@@ -1010,52 +1152,34 @@ class _MenuItemCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        data.description,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: KuwrirColors.textSecondary,
-                          height: 1.4,
+                      if (product.description?.isNotEmpty == true) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          product.description!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: KuwrirColors.textSecondary,
+                            height: 1.4,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          // Rating
-                          Row(
-                            children: [
-                              Icon(Icons.star_rounded,
-                                  size: 13,
-                                  color: KuwrirColors.warning),
-                              const SizedBox(width: 2),
-                              Text(
-                                data.rating.toString(),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF92400E),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 10),
-                          // Price
-                          if (data.originalPrice != null)
+                          if (hasDiscount)
                             Text(
-                              _formatPrice(data.originalPrice!),
+                              _formatPrice(product.price),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: KuwrirColors.textHint,
                                 decoration: TextDecoration.lineThrough,
                               ),
                             ),
-                          if (data.originalPrice != null)
-                            const SizedBox(width: 4),
+                          if (hasDiscount) const SizedBox(width: 4),
                           Text(
-                            _formatPrice(data.price),
+                            _formatPrice(hasDiscount ? product.discountPrice! : product.price),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
@@ -1063,25 +1187,16 @@ class _MenuItemCard extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
-                          // Add button
-                          GestureDetector(
-                            onTap: () {
-                              // TODO: add to cart
-                            },
-                            child: Container(
-                              width: 30,
-                              height: 30,
+                          if (!result.merchantIsOpen)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: KuwrirColors.primary,
-                                shape: BoxShape.circle,
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(100),
                               ),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 18,
-                              ),
+                              child: const Text('Tutup',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey)),
                             ),
-                          ),
                         ],
                       ),
                     ],

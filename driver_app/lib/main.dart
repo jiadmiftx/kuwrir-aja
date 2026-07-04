@@ -64,7 +64,7 @@ class KuwrirDriverApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const DriverRegisterScreen(),
         '/pending': (context) => const DriverPendingScreen(),
-        '/job_board': (context) => const JobBoardScreen(),
+        '/job_board': (context) => const AppLockGate(child: JobBoardScreen()),
         '/active_delivery': (context) => const ActiveDeliveryScreen(),
         '/wallet': (context) => const WalletScreen(),
       },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_cubit.dart';
+import 'kasir_hub_screen.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -142,6 +143,18 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Kasir / POS entry point
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.point_of_sale_outlined, color: KuwrirColors.primary),
+                  title: const Text('Kasir / POS'),
+                  subtitle: const Text('Transaksi walk-in, laporan, piutang & hutang'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KasirHub())),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Store info
               _InfoTile(icon: Icons.store, label: 'Nama Toko', value: merchant.name),
               if (merchant.phone != null)
@@ -269,6 +282,41 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
               ],
 
+              const SizedBox(height: 12),
+
+              // Free-delivery toggle (store-wide — powers the customer app's
+              // "Gratis Ongkir" search filter)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Gratis Ongkir',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Semua produk tokomu muncul di filter Gratis Ongkir pelanggan',
+                              style: TextStyle(
+                                  fontSize: 12, color: KuwrirColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: merchant.isFreeDelivery,
+                        onChanged: (v) => _toggleFreeDelivery(context, v),
+                        activeColor: KuwrirColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 16),
 
               // ── Tax / PKP Settings ──
@@ -385,6 +433,19 @@ class _StoreScreenState extends State<StoreScreen> {
             .showSnackBar(const SnackBar(content: Text('Rate pajak tersimpan')));
         context.read<StoreCubit>().load();
       }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    }
+  }
+
+  Future<void> _toggleFreeDelivery(BuildContext context, bool v) async {
+    try {
+      final api = context.read<ApiClient>();
+      await api.toggleFreeDelivery(v);
+      if (context.mounted) context.read<StoreCubit>().load();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)

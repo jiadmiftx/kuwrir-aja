@@ -7,6 +7,11 @@ class User {
   final String role;
   final String? avatarUrl;
   final bool isActive;
+  final DateTime? phoneVerifiedAt;
+
+  /// False for GoogleLogin's placeholder phone ("G-...") and any account
+  /// that has never completed a real OTP check.
+  bool get isPhoneVerified => phoneVerifiedAt != null;
 
   User({
     required this.id,
@@ -16,6 +21,7 @@ class User {
     required this.role,
     this.avatarUrl,
     this.isActive = true,
+    this.phoneVerifiedAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -27,6 +33,9 @@ class User {
       role: json['role'] as String,
       avatarUrl: json['avatar_url'] as String?,
       isActive: json['is_active'] as bool? ?? true,
+      phoneVerifiedAt: json['phone_verified_at'] != null
+          ? DateTime.tryParse(json['phone_verified_at'] as String)
+          : null,
     );
   }
 
@@ -39,6 +48,7 @@ class User {
       'role': role,
       'avatar_url': avatarUrl,
       'is_active': isActive,
+      'phone_verified_at': phoneVerifiedAt?.toIso8601String(),
     };
   }
 }

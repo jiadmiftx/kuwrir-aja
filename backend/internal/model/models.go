@@ -80,6 +80,7 @@ type User struct {
 	// explicitly sets false for pending driver/merchant accounts.
 	IsActive        bool       `json:"is_active"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
+	PhoneVerifiedAt *time.Time `json:"phone_verified_at,omitempty"` // set by VerifyOTP / verify-phone; nil for GoogleLogin's placeholder phone
 	FCMToken        string     `gorm:"type:text" json:"-"`
 	GoogleID        *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
 
@@ -135,6 +136,7 @@ type Merchant struct {
 	SelfDeliveryFee float64 `gorm:"default:0" json:"self_delivery_fee"`
 	TaxEnabled      bool     `gorm:"default:false" json:"tax_enabled"`
 	TaxRate         *float64 `json:"tax_rate,omitempty"` // nil = inherit platform default
+	IsFreeDelivery  bool     `gorm:"default:false" json:"is_free_delivery"` // merchant absorbs delivery fee on all its products
 
 	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
 	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
@@ -197,8 +199,12 @@ type Banner struct {
 	Subtitle       string     `json:"subtitle,omitempty"`
 	CTAText        string     `gorm:"default:'Lihat Menu'" json:"cta_text"`
 	FoodCategoryID *uuid.UUID `gorm:"type:uuid" json:"food_category_id,omitempty"`
-	SortOrder      int        `gorm:"default:0" json:"sort_order"`
-	IsActive       bool       `gorm:"default:true" json:"is_active"`
+	// PromoType routes the CTA to a pre-filtered search instead of a plain
+	// category select: "" (default, uses FoodCategoryID only), "discount",
+	// or "free_delivery". Mirrors Promotion.Type.
+	PromoType string `gorm:"default:''" json:"promo_type,omitempty"`
+	SortOrder int    `gorm:"default:0" json:"sort_order"`
+	IsActive  bool   `gorm:"default:true" json:"is_active"`
 }
 
 // Product is an item sold by the merchant

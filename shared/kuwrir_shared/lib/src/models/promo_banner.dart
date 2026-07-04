@@ -8,6 +8,9 @@ class PromoBanner {
   final String? subtitle;
   final String ctaText;
   final String? foodCategoryId;
+  // "" (default) | "discount" | "free_delivery" — routes the CTA to a
+  // pre-filtered Search instead of a plain category select.
+  final String promoType;
 
   const PromoBanner({
     required this.id,
@@ -16,6 +19,7 @@ class PromoBanner {
     this.subtitle,
     this.ctaText = 'Lihat Menu',
     this.foodCategoryId,
+    this.promoType = '',
   });
 
   factory PromoBanner.fromJson(Map<String, dynamic> json) => PromoBanner(
@@ -25,5 +29,6 @@ class PromoBanner {
         subtitle: json['subtitle'] as String?,
         ctaText: json['cta_text'] as String? ?? 'Lihat Menu',
         foodCategoryId: json['food_category_id'] as String?,
+        promoType: json['promo_type'] as String? ?? '',
       );
 }

@@ -26,12 +26,13 @@ interface Banner {
   subtitle: string
   cta_text: string
   food_category_id: string | null
+  promo_type: string
   sort_order: number
   is_active: boolean
 }
 
 const emptyForm = {
-  title: '', subtitle: '', cta_text: 'Lihat Menu', food_category_id: '', sort_order: '0', is_active: true,
+  title: '', subtitle: '', cta_text: 'Lihat Menu', food_category_id: '', promo_type: '', sort_order: '0', is_active: true,
 }
 
 export default function BannersPage() {
@@ -89,6 +90,7 @@ export default function BannersPage() {
       subtitle: b.subtitle ?? '',
       cta_text: b.cta_text ?? '',
       food_category_id: b.food_category_id ?? '',
+      promo_type: b.promo_type ?? '',
       sort_order: String(b.sort_order),
       is_active: b.is_active,
     })
@@ -117,6 +119,7 @@ export default function BannersPage() {
         subtitle: form.subtitle.trim(),
         cta_text: form.cta_text.trim() || 'Lihat Menu',
         food_category_id: form.food_category_id || null,
+        promo_type: form.promo_type,
         sort_order: parseInt(form.sort_order) || 0,
         is_active: form.is_active,
       }
@@ -295,6 +298,24 @@ export default function BannersPage() {
               </div>
             </div>
             <div className="space-y-1">
+              <Label>Jenis Promo (opsional)</Label>
+              <Select
+                value={form.promo_type || 'none'}
+                onValueChange={v => setForm(f => ({ ...f, promo_type: !v || v === 'none' ? '' : v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Tanpa jenis khusus" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tanpa jenis khusus (pakai kategori di bawah)</SelectItem>
+                  <SelectItem value="discount">Diskon</SelectItem>
+                  <SelectItem value="free_delivery">Gratis Ongkir</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Tap banner di customer app akan membuka halaman detail lalu tombol "Lihat" akan
+                membuka Pencarian terfilter sesuai jenis ini.
+              </p>
+            </div>
+            <div className="space-y-1">
               <Label>Tautan Kategori (opsional)</Label>
               <Select
                 value={form.food_category_id || 'none'}
@@ -309,7 +330,7 @@ export default function BannersPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Tap banner di customer app akan memfilter beranda ke kategori ini.
+                Dipakai kalau Jenis Promo di atas kosong — memfilter pencarian ke kategori ini.
               </p>
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer pt-1">

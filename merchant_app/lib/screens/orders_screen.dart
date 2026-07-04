@@ -4,7 +4,12 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_orders_cubit.dart';
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  /// When set, only orders whose status is in this set are shown (used by
+  /// Dashboard's stat-card deep links) — otherwise the default "everything
+  /// except delivered/cancelled" view.
+  final Set<String>? initialStatusFilter;
+
+  const OrdersScreen({super.key, this.initialStatusFilter});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -58,8 +63,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
 
     if (state is StoreOrdersLoaded) {
+      final filter = widget.initialStatusFilter;
       final active = state.orders
-          .where((o) => !['delivered', 'cancelled'].contains(o['status']))
+          .where((o) => filter != null
+              ? filter.contains(o['status'])
+              : !['delivered', 'cancelled'].contains(o['status']))
           .toList();
 
       if (active.isEmpty) {
