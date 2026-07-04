@@ -14,6 +14,7 @@ type Config struct {
 	R2       R2Config
 	Valhalla ValhallaConfig
 	Duitku   DuitkuConfig
+	WhatsApp WhatsAppConfig
 }
 
 type ServerConfig struct {
@@ -63,6 +64,16 @@ type DuitkuConfig struct {
 	ReturnURL    string
 }
 
+// WhatsAppConfig holds credentials for whichever WhatsApp OTP/notification
+// gateway ends up implementing service.WhatsAppSender — unused by the
+// default LogWhatsAppSender, present so a real gateway (Baileys-based now,
+// official Cloud API later) has somewhere to read credentials from without
+// another config-plumbing pass.
+type WhatsAppConfig struct {
+	GatewayURL string
+	APIKey     string
+}
+
 // Load reads configuration from environment variables with sensible defaults
 func Load() *Config {
 	return &Config{
@@ -105,6 +116,10 @@ func Load() *Config {
 			BaseURL:      getEnv("DUITKU_BASE_URL", "https://api-sandbox.duitku.com"),
 			CallbackURL:  getEnv("DUITKU_CALLBACK_URL", ""),
 			ReturnURL:    getEnv("DUITKU_RETURN_URL", ""),
+		},
+		WhatsApp: WhatsAppConfig{
+			GatewayURL: getEnv("WHATSAPP_GATEWAY_URL", ""),
+			APIKey:     getEnv("WHATSAPP_API_KEY", ""),
 		},
 	}
 }

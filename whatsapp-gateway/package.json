@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-gateway",
+  "version": "1.0.0",
+  "description": "Self-hosted WhatsApp OTP sender for Cocourir, backed by Baileys (unofficial WhatsApp Web multi-device protocol). Not affiliated with or endorsed by WhatsApp.",
+  "type": "module",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,9 +1,13 @@
 package auth
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -16,15 +20,17 @@ import (
 	"github.com/kuwrir-platform/backend/internal/config"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/service"
 )
 
 type Handler struct {
-	db  *gorm.DB
-	cfg *config.Config
+	db       *gorm.DB
+	cfg      *config.Config
+	whatsapp service.WhatsAppSender
 }
 
-func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+func NewHandler(db *gorm.DB, cfg *config.Config, whatsapp service.WhatsAppSender) *Handler {
+	return &Handler{db: db, cfg: cfg, whatsapp: whatsapp}
 }
 
 // RegisterRoutes sets up auth routes
@@ -34,6 +40,8 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
 		auth.POST("/google", h.GoogleLogin)
+		auth.POST("/otp/request", h.RequestOTP)
+		auth.POST("/otp/verify", h.VerifyOTP)
 	}
 
 	// Authenticated routes
@@ -58,6 +66,15 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Phone    string `json:"phone" binding:"required"`
 	Password string `json:"password" binding:"required"`
+}
+
+type RequestOTPRequest struct {
+	Phone string `json:"phone" binding:"required"`
+}
+
+type VerifyOTPRequest struct {
+	Phone string `json:"phone" binding:"required"`
+	Code  string `json:"code" binding:"required"`
 }
 
 type AuthResponse struct {
@@ -246,6 +263,154 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+const (
+	otpTTL             = 5 * time.Minute
+	otpResendCooldown  = 60 * time.Second
+	otpMaxPerHour      = 5
+	otpMaxVerifyTries  = 5
+)
+
+func hashOTP(code string) string {
+	sum := sha256.Sum256([]byte(code))
+	return hex.EncodeToString(sum[:])
+}
+
+// generateOTP returns a random 6-digit numeric code (zero-padded).
+func generateOTP() (string, error) {
+	max := int64(1000000)
+	n, err := rand.Int(rand.Reader, big.NewInt(max))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+// RequestOTP generates and sends a WhatsApp OTP for phone-based login.
+// POST /auth/otp/request   Body: {"phone": "..."}
+func (h *Handler) RequestOTP(c *gin.Context) {
+	var req RequestOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+
+	// Resend cooldown: reject if the most recent unconsumed code for this
+	// phone was issued less than otpResendCooldown ago.
+	var lastOtp model.OtpCode
+	if err := h.db.Where("phone = ? AND consumed_at IS NULL", req.Phone).
+		Order("created_at DESC").First(&lastOtp).Error; err == nil {
+		if now.Sub(lastOtp.CreatedAt) < otpResendCooldown {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Please wait before requesting another code"})
+			return
+		}
+	}
+
+	// Request cap: reject beyond otpMaxPerHour requests/phone/hour.
+	var countLastHour int64
+	h.db.Model(&model.OtpCode{}).
+		Where("phone = ? AND created_at > ?", req.Phone, now.Add(-time.Hour)).
+		Count(&countLastHour)
+	if countLastHour >= otpMaxPerHour {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many OTP requests, try again later"})
+		return
+	}
+
+	code, err := generateOTP()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
+		return
+	}
+
+	otp := model.OtpCode{
+		Phone:     req.Phone,
+		CodeHash:  hashOTP(code),
+		ExpiresAt: now.Add(otpTTL),
+	}
+	if err := h.db.Create(&otp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create code"})
+		return
+	}
+
+	if err := h.whatsapp.SendOTP(req.Phone, code); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to send WhatsApp message"})
+		return
+	}
+
+	resp := gin.H{"message": "OTP sent"}
+	if h.cfg.Server.Mode == "debug" {
+		resp["debug_code"] = code
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// VerifyOTP checks the code and logs the user in, auto-creating a customer
+// account on first successful verify for an unknown phone number (same
+// auto-register shape as GoogleLogin above).
+// POST /auth/otp/verify   Body: {"phone": "...", "code": "..."}
+func (h *Handler) VerifyOTP(c *gin.Context) {
+	var req VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var otp model.OtpCode
+	if err := h.db.Where("phone = ? AND consumed_at IS NULL AND expires_at > ?", req.Phone, time.Now()).
+		Order("created_at DESC").First(&otp).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Code expired or not found, request a new one"})
+		return
+	}
+
+	if otp.Attempts >= otpMaxVerifyTries {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts, request a new code"})
+		return
+	}
+
+	if hashOTP(req.Code) != otp.CodeHash {
+		h.db.Model(&otp).Update("attempts", otp.Attempts+1)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid code"})
+		return
+	}
+
+	now := time.Now()
+	h.db.Model(&otp).Update("consumed_at", now)
+
+	var user model.User
+	if err := h.db.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
+		// Unknown phone — auto-register a bare customer account, same
+		// placeholder-password pattern GoogleLogin uses for accounts with
+		// no real password.
+		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
+		user = model.User{
+			Phone:    req.Phone,
+			Password: string(fakePassword),
+			Role:     model.RoleCustomer,
+			IsActive: true,
+		}
+		if err := h.db.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create account"})
+			return
+		}
+	} else if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Account is deactivated"})
+		return
+	}
+
+	token, refreshToken, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         user,
+	})
 }
 
 // SaveDeviceToken stores the FCM device token for push notifications.

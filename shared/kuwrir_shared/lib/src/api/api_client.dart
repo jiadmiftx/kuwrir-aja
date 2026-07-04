@@ -435,6 +435,16 @@ class ApiClient {
   Future<Map<String, dynamic>> googleLogin(String idToken, String role) async {
     return await post('/auth/google', {'id_token': idToken, 'role': role});
   }
+
+  // --- Phone + OTP Auth ---
+
+  Future<Map<String, dynamic>> requestOtp(String phone) async {
+    return await post('/auth/otp/request', {'phone': phone});
+  }
+
+  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
+    return await post('/auth/otp/verify', {'phone': phone, 'code': code});
+  }
 }
 
 /// Custom API exception

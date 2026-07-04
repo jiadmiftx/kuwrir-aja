@@ -51,6 +51,7 @@ func main() {
 	// Auto-migrate all models
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.OtpCode{},
 		&model.Address{},
 		&model.Merchant{},
 		&model.ProductCategory{},
@@ -120,7 +121,11 @@ func main() {
 	v1 := r.Group("/api/v1")
 	{
 		// Public routes (no auth required)
-		authH := authHandler.NewHandler(db, cfg)
+		var whatsappSender service.WhatsAppSender = service.LogWhatsAppSender{}
+		if cfg.WhatsApp.GatewayURL != "" {
+			whatsappSender = service.NewHTTPWhatsAppSender(cfg.WhatsApp.GatewayURL, cfg.WhatsApp.APIKey)
+		}
+		authH := authHandler.NewHandler(db, cfg, whatsappSender)
 		authH.RegisterRoutes(v1)
 
 		// Merchant handler (has both public and protected routes)

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
+import 'otp_login_screen.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -162,6 +163,19 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 ),
                 icon: const Icon(Icons.g_mobiledata, size: 28),
                 label: const Text('Masuk dengan Google'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _loading
+                    ? null
+                    : () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const OtpLoginScreen())),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.sms_outlined, size: 22),
+                label: const Text('Masuk dengan OTP WhatsApp'),
               ),
               const SizedBox(height: 12),
               OutlinedButton(

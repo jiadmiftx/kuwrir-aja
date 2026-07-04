@@ -89,6 +89,19 @@ type User struct {
 	Driver    *Driver   `gorm:"foreignKey:UserID" json:"driver,omitempty"`
 }
 
+// OtpCode is a short-lived phone verification code for OTP login. CodeHash
+// is a SHA-256 digest, not bcrypt — a 6-digit code with a 5-minute expiry
+// and attempt-limiting doesn't need bcrypt's cost factor; hashing at all is
+// just cheap defense-in-depth against a DB read exposing a live code.
+type OtpCode struct {
+	Base
+	Phone      string     `gorm:"not null;index" json:"-"`
+	CodeHash   string     `gorm:"not null" json:"-"`
+	ExpiresAt  time.Time  `gorm:"not null" json:"-"`
+	ConsumedAt *time.Time `json:"-"`
+	Attempts   int        `gorm:"default:0" json:"-"`
+}
+
 // Address for customer delivery addresses
 type Address struct {
 	Base
