@@ -26,6 +26,7 @@ import (
 	walletHandler "github.com/kuwrir-platform/backend/internal/handler/wallet"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/upload"
 )
 
 func main() {
@@ -36,6 +37,10 @@ func main() {
 
 	// Load config
 	cfg := config.Load()
+
+	// Uploads go to R2 when credentials are configured, else local disk —
+	// see internal/upload's package doc for the fallback shape.
+	upload.Init(cfg.R2)
 
 	// Set Gin mode
 	gin.SetMode(cfg.Server.Mode)
