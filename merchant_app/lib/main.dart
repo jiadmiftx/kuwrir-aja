@@ -161,7 +161,6 @@ class _SplashRouterState extends State<_SplashRouter> {
       final res = await api.get('/auth/me');
       if (!mounted) return;
       final role = res['user']?['role'];
-      final isActive = res['user']?['is_active'] ?? false;
 
       if (role != 'merchant') {
         await api.clearTokens();
@@ -181,7 +180,19 @@ class _SplashRouterState extends State<_SplashRouter> {
         return;
       }
 
-      Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
+      // user.is_active only means "this login account is enabled" — it's
+      // true from account creation and says nothing about store approval.
+      // The actual gate is the Merchant row's own verification status.
+      var approved = false;
+      try {
+        final statusRes = await api.get('/my-store/status');
+        approved = statusRes['status'] == 'approved' && statusRes['is_active'] == true;
+      } catch (_) {
+        // Treat an unreachable status check as not-yet-approved rather
+        // than silently granting Home access.
+      }
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, approved ? '/home' : '/pending');
     } catch (_) {
       await api.clearTokens();
       if (mounted) Navigator.pushReplacementNamed(context, '/login');
