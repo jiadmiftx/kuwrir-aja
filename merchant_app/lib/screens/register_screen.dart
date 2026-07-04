@@ -285,13 +285,16 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
           },
           child: const Text('Lanjut →'),
         )),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: () => widget.startAtStep > 0
-              ? Navigator.pop(context)
-              : setState(() => _step = 0),
-          child: const Text('← Kembali'),
-        ),
+        // No "Kembali" when entering here via OTP/Google (startAtStep > 0)
+        // — the account is already created and this screen replaced login
+        // in the nav stack, so there's nothing valid to pop back to.
+        if (widget.startAtStep == 0) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => setState(() => _step = 0),
+            child: const Text('← Kembali'),
+          ),
+        ],
       ],
     );
   }
