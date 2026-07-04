@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"sort"
@@ -11,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/kuwrir-platform/backend/internal/config"
 	"github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/service"
@@ -18,11 +22,12 @@ import (
 )
 
 type Handler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg *config.Config
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
+	return &Handler{db: db, cfg: cfg}
 }
 
 func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
@@ -78,6 +83,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.PUT("/promotions/:id", h.UpdatePromotion)
 	r.DELETE("/promotions/:id", h.DeletePromotion)
 	r.PUT("/promotions/:id/toggle", h.TogglePromotion)
+	r.POST("/promotions/:id/image", h.UploadPromotionImage)
 
 	// Delivery zones (city reference points for pricing)
 	r.GET("/delivery-zones", h.GetDeliveryZones)
@@ -101,6 +107,13 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.PUT("/banners/:id", h.UpdateBanner)
 	r.DELETE("/banners/:id", h.DeleteBanner)
 	r.POST("/banners/:id/image", h.UploadBannerImage)
+
+	// WhatsApp gateway pairing/status/logs (proxied — the gateway container
+	// has no host-published port, only reachable from sibling containers)
+	r.GET("/whatsapp/status", h.WhatsAppStatus)
+	r.GET("/whatsapp/qr", h.WhatsAppQR)
+	r.GET("/whatsapp/logs", h.WhatsAppLogs)
+	r.POST("/whatsapp/send-message", h.WhatsAppSendMessage)
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -793,6 +806,78 @@ func (h *Handler) UploadBannerImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
+// --- WhatsApp gateway proxy ---
+// The gateway container has no host-published port (only reachable from
+// sibling containers on the compose network), so every admin-panel call
+// goes through these proxy routes instead of hitting it directly.
+
+func (h *Handler) whatsappRequest(method, path string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(method, h.cfg.WhatsApp.GatewayURL+path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-API-Key", h.cfg.WhatsApp.APIKey)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	client := &http.Client{Timeout: 15 * time.Second}
+	return client.Do(req)
+}
+
+func (h *Handler) proxyWhatsAppJSON(c *gin.Context, path string) {
+	resp, err := h.whatsappRequest(http.MethodGet, path, nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "WhatsApp gateway unreachable"})
+		return
+	}
+	defer resp.Body.Close()
+	c.Status(resp.StatusCode)
+	c.Header("Content-Type", "application/json")
+	io.Copy(c.Writer, resp.Body)
+}
+
+func (h *Handler) WhatsAppStatus(c *gin.Context) {
+	h.proxyWhatsAppJSON(c, "/status")
+}
+
+func (h *Handler) WhatsAppLogs(c *gin.Context) {
+	h.proxyWhatsAppJSON(c, "/logs")
+}
+
+func (h *Handler) WhatsAppQR(c *gin.Context) {
+	resp, err := h.whatsappRequest(http.MethodGet, "/qr", nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "WhatsApp gateway unreachable"})
+		return
+	}
+	defer resp.Body.Close()
+	c.Status(resp.StatusCode)
+	c.Header("Content-Type", resp.Header.Get("Content-Type"))
+	io.Copy(c.Writer, resp.Body)
+}
+
+func (h *Handler) WhatsAppSendMessage(c *gin.Context) {
+	var req struct {
+		Phone   string `json:"phone" binding:"required"`
+		Message string `json:"message" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	payload, _ := json.Marshal(req)
+	resp, err := h.whatsappRequest(http.MethodPost, "/send-message", bytes.NewReader(payload))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "WhatsApp gateway unreachable"})
+		return
+	}
+	defer resp.Body.Close()
+	c.Status(resp.StatusCode)
+	c.Header("Content-Type", "application/json")
+	io.Copy(c.Writer, resp.Body)
+}
+
 // PublicActiveBanners returns active homepage promo banners, ordered for
 // display as the customer app's Home carousel — no auth required.
 func (h *Handler) PublicActiveBanners(c *gin.Context) {
@@ -827,6 +912,32 @@ func (h *Handler) TogglePromotion(c *gin.Context) {
 	}
 	h.db.Model(&promo).Update("is_active", !promo.IsActive)
 	c.JSON(http.StatusOK, gin.H{"is_active": !promo.IsActive})
+}
+
+// UploadPromotionImage uploads a promo card image, set after creation
+// (mirrors banner/product image upload's create-then-upload flow).
+func (h *Handler) UploadPromotionImage(c *gin.Context) {
+	id := c.Param("id")
+	var promo model.Promotion
+	if err := h.db.Where("id = ?", id).First(&promo).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Promotion not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "promotions")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(&promo).Update("image_url", url)
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
 // ─── WALLET & WITHDRAWALS ────────────────────────────────────────────────────
@@ -1049,7 +1160,10 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 		"boundary_geojson": req.BoundaryGeoJSON,
 		"parent_zone_id":   parentUID,
 	}
-	h.db.Model(&zone).Updates(updates)
+	if err := h.db.Model(&zone).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update zone: " + err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"zone": zone})
 }
 

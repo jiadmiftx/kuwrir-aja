@@ -434,6 +434,7 @@ type Promotion struct {
 	IsActive    bool      `gorm:"default:true" json:"is_active"`
 	StartsAt    time.Time `gorm:"not null" json:"starts_at"`
 	ExpiresAt   time.Time `gorm:"not null" json:"expires_at"`
+	ImageURL    string    `json:"image_url,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

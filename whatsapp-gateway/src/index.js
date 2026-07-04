@@ -11,12 +11,23 @@ import {
 const PORT = process.env.PORT || 3000
 const API_KEY = process.env.WHATSAPP_API_KEY || ''
 const AUTH_DIR = process.env.AUTH_DIR || './auth_session'
+const MAX_LOGS = 100
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' })
 
 let sock = null
 let latestQrPng = null
 let isPaired = false
+let pairedNumber = null
+const logs = []
+
+// Operational activity log (pairing/connection/send events), most-recent
+// first — purely for admin-panel visibility, not a business record, so an
+// in-memory ring buffer is enough; no persistence needed.
+function pushLog(type, message) {
+  logs.unshift({ timestamp: new Date().toISOString(), type, message })
+  if (logs.length > MAX_LOGS) logs.pop()
+}
 
 // Normalizes Indonesian phone numbers (08xx, +628xx, 628xx) into the
 // country-code-first digit string Baileys/WhatsApp JIDs expect.
@@ -46,20 +57,28 @@ async function startSocket() {
     if (qr) {
       latestQrPng = await QRCode.toBuffer(qr, { type: 'png', width: 320 })
       isPaired = false
+      pairedNumber = null
       logger.info('New pairing QR generated — fetch it from GET /qr and scan with WhatsApp')
+      pushLog('qr', 'Pairing QR generated, waiting to be scanned')
     }
 
     if (connection === 'open') {
       isPaired = true
       latestQrPng = null
+      pairedNumber = sock?.user?.id ? sock.user.id.split(':')[0] : null
       logger.info('WhatsApp session paired and connected')
+      pushLog('connected', `Paired and connected as ${pairedNumber ?? 'unknown number'}`)
     }
 
     if (connection === 'close') {
       isPaired = false
+      pairedNumber = null
       const statusCode = lastDisconnect?.error?.output?.statusCode
       const loggedOut = statusCode === DisconnectReason.loggedOut
       logger.warn({ statusCode, loggedOut }, 'WhatsApp connection closed')
+      pushLog('disconnected', loggedOut
+        ? 'Session logged out from the phone, needs a fresh QR scan'
+        : 'Connection closed, reconnecting')
       if (!loggedOut) {
         startSocket()
       } else {
@@ -85,7 +104,11 @@ const app = express()
 app.use(express.json())
 
 app.get('/status', requireApiKey, (req, res) => {
-  res.json({ paired: isPaired })
+  res.json({ paired: isPaired, number: pairedNumber })
+})
+
+app.get('/logs', requireApiKey, (req, res) => {
+  res.json({ logs })
 })
 
 app.get('/qr', requireApiKey, (req, res) => {
@@ -116,9 +139,37 @@ app.post('/send-otp', requireApiKey, async (req, res) => {
     await sock.sendMessage(jid, {
       text: `Kode OTP Cocourir kamu: *${code}*\n\nJangan bagikan kode ini ke siapa pun, termasuk pihak yang mengaku dari Cocourir.`,
     })
+    pushLog('otp-sent', `OTP sent to ${phone}`)
     res.json({ message: 'sent' })
   } catch (err) {
     logger.error({ err }, 'Failed to send OTP')
+    pushLog('otp-failed', `Failed to send OTP to ${phone}: ${err.message}`)
+    res.status(502).json({ error: 'Failed to send WhatsApp message' })
+  }
+})
+
+// Freeform message send, separate from /send-otp's fixed template — for
+// one-off manual sends from the admin panel (testing delivery, quick
+// support outreach). Not the bulk WA-blast/marketing feature, which is
+// intentionally out of scope here.
+app.post('/send-message', requireApiKey, async (req, res) => {
+  const { phone, message } = req.body || {}
+  if (!phone || !message) {
+    res.status(400).json({ error: 'phone and message are required' })
+    return
+  }
+  if (!isPaired || !sock) {
+    res.status(503).json({ error: 'WhatsApp session not paired yet' })
+    return
+  }
+  try {
+    const jid = toWhatsAppJid(phone)
+    await sock.sendMessage(jid, { text: message })
+    pushLog('message-sent', `Message sent to ${phone}`)
+    res.json({ message: 'sent' })
+  } catch (err) {
+    logger.error({ err }, 'Failed to send message')
+    pushLog('message-failed', `Failed to send message to ${phone}: ${err.message}`)
     res.status(502).json({ error: 'Failed to send WhatsApp message' })
   }
 })

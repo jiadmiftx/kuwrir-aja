@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +13,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Tag, Plus, Pencil, Trash2, Power, Loader2 } from 'lucide-react'
+import { Tag, Plus, Pencil, Trash2, Power, Loader2, Upload, ImageOff } from 'lucide-react'
 import { apiFetch as api } from '@/lib/api'
 
 interface Promo {
@@ -29,6 +29,7 @@ interface Promo {
   is_active: boolean
   starts_at: string
   expires_at: string
+  image_url?: string
 }
 
 const fmt = (v: number) => 'Rp ' + v.toLocaleString('id-ID')
@@ -51,6 +52,9 @@ export default function PromotionsPage() {
   const [form, setForm] = useState(emptyForm)
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<Promo | null>(null)
 
@@ -65,10 +69,17 @@ export default function PromotionsPage() {
 
   useEffect(() => { fetchPromos() }, [])
 
+  const resetImagePicker = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const openCreate = () => {
     setEditTarget(null)
     setForm(emptyForm)
     setFormError('')
+    resetImagePicker()
     setDialogOpen(true)
   }
 
@@ -86,7 +97,15 @@ export default function PromotionsPage() {
       expires_at: toInputDate(p.expires_at),
     })
     setFormError('')
+    resetImagePicker()
     setDialogOpen(true)
+  }
+
+  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
   }
 
   const submitForm = async () => {
@@ -112,8 +131,31 @@ export default function PromotionsPage() {
       const url = editTarget ? `/api/v1/admin/promotions/${editTarget.id}` : '/api/v1/admin/promotions'
       const method = editTarget ? 'PUT' : 'POST'
       const res = await api(url, { method, body: JSON.stringify(body) })
-      if (res.ok) { setDialogOpen(false); fetchPromos() }
-      else { const err = await res.json(); setFormError(err.error || 'Gagal menyimpan') }
+      if (!res.ok) {
+        const err = await res.json()
+        setFormError(err.error || 'Gagal menyimpan')
+        return
+      }
+
+      let promoId = editTarget?.id
+      if (!editTarget) {
+        const data = await res.json()
+        promoId = data.promotion?.id
+      }
+
+      if (imageFile && promoId) {
+        const imgForm = new FormData()
+        imgForm.append('image', imageFile)
+        const imgRes = await api(`/api/v1/admin/promotions/${promoId}/image`, { method: 'POST', body: imgForm })
+        if (!imgRes.ok) {
+          const err = await imgRes.json()
+          setFormError(err.error || 'Promo tersimpan, tapi gagal upload gambar')
+          return
+        }
+      }
+
+      setDialogOpen(false)
+      fetchPromos()
     } finally { setSubmitting(false) }
   }
 
@@ -203,6 +245,7 @@ export default function PromotionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Gambar</TableHead>
                   <TableHead>Kode</TableHead>
                   <TableHead>Judul</TableHead>
                   <TableHead>Tipe</TableHead>
@@ -217,6 +260,15 @@ export default function PromotionsPage() {
               <TableBody>
                 {promos.map(p => (
                   <TableRow key={p.id} className={(!p.is_active || isExpired(p)) ? 'opacity-50' : ''}>
+                    <TableCell>
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.title} className="h-10 w-14 object-cover rounded" />
+                      ) : (
+                        <div className="h-10 w-14 rounded bg-muted flex items-center justify-center">
+                          <ImageOff className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono">{p.code}</code>
                     </TableCell>
@@ -276,6 +328,31 @@ export default function PromotionsPage() {
             <DialogTitle>{editTarget ? 'Edit Promo' : 'Buat Promo Baru'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Gambar Promo (opsional)</Label>
+              <div
+                className="rounded-md border border-dashed h-28 flex items-center justify-center cursor-pointer overflow-hidden hover:bg-accent/50"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : editTarget?.image_url ? (
+                  <img src={editTarget.image_url} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center text-muted-foreground text-sm">
+                    <Upload className="h-6 w-6 mb-1" />
+                    Klik untuk pilih gambar
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onPickImage}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Kode Promo *</Label>

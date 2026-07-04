@@ -66,6 +66,11 @@ services:
       # FIREBASE_SERVICE_ACCOUNT_JSON: set in .env.production (base64-encoded service account JSON)
     ports:
       - "8090:8080"
+    volumes:
+      # Without this, every redeploy wipes all uploaded banner/merchant/
+      # product images — the container's writable layer isn't persisted,
+      # only this named volume is.
+      - uploads_data:/app/uploads
     depends_on:
       - postgres
       - redis
@@ -85,3 +90,4 @@ volumes:
   postgres_data:
   redis_data:
   whatsapp_session:
+  uploads_data:

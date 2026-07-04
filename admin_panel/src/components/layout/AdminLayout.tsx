@@ -16,6 +16,7 @@ import {
   Map,
   UtensilsCrossed,
   Image,
+  MessageCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -33,6 +34,7 @@ const navItems = [
   { to: '/settlements', icon: Banknote, label: 'Settlements' },
   { to: '/revenue', icon: TrendingUp, label: 'Revenue' },
   { to: '/support', icon: MessageSquare, label: 'Support Chat' },
+  { to: '/whatsapp', icon: MessageCircle, label: 'WhatsApp Gateway' },
   { to: '/delivery-zones', icon: Map, label: 'Delivery Zones' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

@@ -137,7 +137,7 @@ func main() {
 		// Admin handler instantiated here (before the admin-only group)
 		// so its public-facing methods (e.g. active promotions for the
 		// customer app's Home promo carousel) can be registered on v1.
-		adminH := adminHandler.NewHandler(db)
+		adminH := adminHandler.NewHandler(db, cfg)
 		v1.GET("/promotions/active", adminH.PublicActivePromotions)
 		v1.GET("/banners/active", adminH.PublicActiveBanners)
 

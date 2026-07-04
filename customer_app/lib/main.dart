@@ -327,25 +327,130 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _PromoScreen extends StatelessWidget {
+class _PromoScreen extends StatefulWidget {
   const _PromoScreen();
+
+  @override
+  State<_PromoScreen> createState() => _PromoScreenState();
+}
+
+class _PromoScreenState extends State<_PromoScreen> {
+  late Future<List<Promotion>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ApiClient().getActivePromotions();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = ApiClient().getActivePromotions());
+    await _future;
+  }
+
+  String _valueLabel(Promotion p) {
+    switch (p.type) {
+      case 'percentage':
+        return 'Diskon ${p.value.toStringAsFixed(0)}%';
+      case 'fixed':
+        return 'Potongan Rp ${p.value.toStringAsFixed(0)}';
+      case 'free_delivery':
+        return 'Gratis Ongkir';
+      default:
+        return p.title;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Promo')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.local_offer_outlined, size: 72, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            const Text('Promo segera hadir!',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
-            const SizedBox(height: 8),
-            const Text('Pantau terus untuk penawaran terbaik',
-                style: TextStyle(color: Colors.grey)),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<List<Promotion>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final promos = snapshot.data ?? const [];
+            if (promos.isEmpty) {
+              return LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.local_offer_outlined, size: 72, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          const Text('Belum ada promo aktif',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey)),
+                          const SizedBox(height: 8),
+                          const Text('Pantau terus untuk penawaran terbaik',
+                              style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: promos.length,
+              itemBuilder: (context, i) {
+                final p = promos[i];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (p.imageUrl != null)
+                        Image.network(p.imageUrl!,
+                            height: 140, width: double.infinity, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: KuwrirColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(p.code,
+                                      style: const TextStyle(
+                                          fontSize: 11, fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(_valueLabel(p),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 2),
+                            Text(p.title, style: TextStyle(color: KuwrirColors.textSecondary)),
+                            if (p.minOrder > 0) ...[
+                              const SizedBox(height: 6),
+                              Text('Min. belanja Rp ${p.minOrder.toStringAsFixed(0)}',
+                                  style: TextStyle(fontSize: 12, color: KuwrirColors.textHint)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
     );

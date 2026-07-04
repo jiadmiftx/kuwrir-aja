@@ -6,6 +6,7 @@ class Promotion {
   final double value;
   final double minOrder;
   final double maxDiscount;
+  final String? imageUrl;
 
   const Promotion({
     required this.id,
@@ -15,6 +16,7 @@ class Promotion {
     this.value = 0,
     this.minOrder = 0,
     this.maxDiscount = 0,
+    this.imageUrl,
   });
 
   factory Promotion.fromJson(Map<String, dynamic> json) => Promotion(
@@ -25,5 +27,6 @@ class Promotion {
         value: (json['value'] as num?)?.toDouble() ?? 0,
         minOrder: (json['min_order'] as num?)?.toDouble() ?? 0,
         maxDiscount: (json['max_discount'] as num?)?.toDouble() ?? 0,
+        imageUrl: json['image_url'] as String?,
       );
 }

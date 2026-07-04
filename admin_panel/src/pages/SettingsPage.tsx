@@ -65,15 +65,21 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await Promise.all(
-        settings.map((s) =>
-          apiFetch(`/api/v1/admin/settings/${s.key}`, {
+      const results = await Promise.all(
+        settings.map(async (s) => {
+          const res = await apiFetch(`/api/v1/admin/settings/${s.key}`, {
             method: 'PUT',
             body: JSON.stringify({ value: s.value }),
           })
-        )
+          return { key: s.key, ok: res.ok }
+        })
       )
-      toast.success('Settings saved')
+      const failed = results.filter((r) => !r.ok)
+      if (failed.length > 0) {
+        toast.error(`Gagal menyimpan: ${failed.map((f) => f.key).join(', ')}`)
+      } else {
+        toast.success('Settings saved')
+      }
     } catch {
       toast.error('Failed to save settings')
     } finally {
