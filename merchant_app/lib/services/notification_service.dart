@@ -5,7 +5,7 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 class NotificationService {
   static final _localNotif = FlutterLocalNotificationsPlugin();
   static const _channelId = 'kuwrir_merchant';
-  static const _channelName = 'KUWRIR Merchant Notifications';
+  static const _channelName = 'Cocourir Merchant Notifications';
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');

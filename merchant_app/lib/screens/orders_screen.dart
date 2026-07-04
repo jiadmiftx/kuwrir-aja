@@ -27,8 +27,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return BlocBuilder<StoreOrdersCubit, StoreOrdersState>(
       builder: (context, state) {
         return Scaffold(
+          backgroundColor: KuwrirColors.background,
           appBar: AppBar(
             title: const Text('Pesanan Masuk'),
+            backgroundColor: KuwrirColors.background,
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -51,7 +53,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<StoreOrdersCubit>().load(),
@@ -72,24 +74,37 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
       if (active.isEmpty) {
         return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
-              const SizedBox(height: 16),
-              const Text('Tidak ada pesanan aktif', style: TextStyle(color: Colors.grey, fontSize: 16)),
-              const SizedBox(height: 8),
-              const Text('Pesanan baru akan muncul di sini otomatis',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.success.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.check_circle_outline, size: 36, color: KuwrirColors.success),
+                ),
+                const SizedBox(height: 20),
+                const Text('Tidak ada pesanan aktif',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary)),
+                const SizedBox(height: 6),
+                Text('Pesanan baru akan muncul di sini otomatis',
+                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
+              ],
+            ),
           ),
         );
       }
 
       return RefreshIndicator(
         onRefresh: () => context.read<StoreOrdersCubit>().load(),
+        color: KuwrirColors.primary,
         child: ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           itemCount: active.length,
           itemBuilder: (context, i) {
             final order = active[i];
@@ -118,8 +133,13 @@ class _OrderCard extends StatelessWidget {
     final total = (order['total'] as num?)?.toDouble() ?? 0;
     final deliveryType = order['delivery_type'] as String? ?? 'platform';
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KuwrirColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -255,7 +275,11 @@ class _ActionButtonState extends State<_ActionButton> {
     }
 
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
       onPressed: _loading ? null : () => _act(context),
       child: _loading
           ? const SizedBox(

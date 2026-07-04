@@ -86,9 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            Icon(Icons.wifi_off, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.wifi_off, size: 48, color: KuwrirColors.textHint),
                             const SizedBox(height: 16),
-                            Text(state.message, style: const TextStyle(color: Colors.grey)),
+                            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
                             const SizedBox(height: 12),
                             TextButton(onPressed: _refresh, child: const Text('Coba lagi')),
                           ],

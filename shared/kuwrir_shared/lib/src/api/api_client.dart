@@ -389,6 +389,30 @@ class ApiClient {
     await put('/my-store/products/$productId', body);
   }
 
+  Future<String> uploadStoreLogo(File imageFile) async {
+    final token = await _getToken();
+    final uri = Uri.parse('$baseUrl/my-store/logo');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    final streamed = await req.send().timeout(_kTimeout);
+    final body = await http.Response.fromStream(streamed);
+    final data = _handleResponse(body);
+    return data['logo_url'] as String;
+  }
+
+  Future<String> uploadStoreBanner(File imageFile) async {
+    final token = await _getToken();
+    final uri = Uri.parse('$baseUrl/my-store/banner');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    final streamed = await req.send().timeout(_kTimeout);
+    final body = await http.Response.fromStream(streamed);
+    final data = _handleResponse(body);
+    return data['banner_url'] as String;
+  }
+
   Future<void> deleteProduct(String productId) async {
     final headers = await _headers();
     await _client.delete(

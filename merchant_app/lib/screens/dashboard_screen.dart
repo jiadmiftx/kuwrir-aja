@@ -58,8 +58,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return BlocBuilder<DashboardCubit, DashboardState>(
       builder: (context, state) {
         return Scaffold(
+          backgroundColor: KuwrirColors.background,
           appBar: AppBar(
             title: const Text('Dashboard'),
+            backgroundColor: KuwrirColors.background,
             actions: [
               if (state is DashboardLoaded)
                 IconButton(
@@ -87,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<DashboardCubit>().load(),
@@ -101,14 +103,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final s = state as DashboardLoaded;
     return RefreshIndicator(
       onRefresh: () => context.read<DashboardCubit>().load(),
+      color: KuwrirColors.primary,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           Material(
             color: KuwrirColors.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               onTap: () => Navigator.pushNamed(context, '/wallet'),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -206,12 +209,15 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: KuwrirColors.surface,
-      borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

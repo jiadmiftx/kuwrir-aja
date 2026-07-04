@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_cubit.dart';
 import 'kasir_hub_screen.dart';
@@ -14,6 +16,9 @@ class StoreScreen extends StatefulWidget {
 class _StoreScreenState extends State<StoreScreen> {
   final _selfDeliveryFeeCtrl = TextEditingController();
   final _taxRateCtrl = TextEditingController();
+  final _picker = ImagePicker();
+  bool _uploadingLogo = false;
+  bool _uploadingBanner = false;
 
   @override
   void initState() {
@@ -28,25 +33,50 @@ class _StoreScreenState extends State<StoreScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAndUpload({required bool isBanner}) async {
+    final xfile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: isBanner ? 1600 : 800,
+    );
+    if (xfile == null) return;
+
+    setState(() {
+      if (isBanner) {
+        _uploadingBanner = true;
+      } else {
+        _uploadingLogo = true;
+      }
+    });
+    try {
+      final api = context.read<ApiClient>();
+      if (isBanner) {
+        await api.uploadStoreBanner(File(xfile.path));
+      } else {
+        await api.uploadStoreLogo(File(xfile.path));
+      }
+      if (context.mounted) context.read<StoreCubit>().load();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal upload: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingBanner = false;
+          _uploadingLogo = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<StoreCubit, StoreState>(
       builder: (context, state) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Toko Saya'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => context.read<StoreCubit>().load(),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                tooltip: 'Keluar',
-                onPressed: () => _confirmLogout(context),
-              ),
-            ],
-          ),
+          backgroundColor: KuwrirColors.background,
           body: _buildBody(context, state),
         );
       },
@@ -62,7 +92,7 @@ class _StoreScreenState extends State<StoreScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Keluar'),
           ),
@@ -85,7 +115,7 @@ class _StoreScreenState extends State<StoreScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<StoreCubit>().load(),
@@ -104,304 +134,140 @@ class _StoreScreenState extends State<StoreScreen> {
 
       return RefreshIndicator(
         onRefresh: () => context.read<StoreCubit>().load(),
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Today summary
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _StoreHero(
+                merchant: merchant,
+                uploadingLogo: _uploadingLogo,
+                uploadingBanner: _uploadingBanner,
+                onPickBanner: () => _pickAndUpload(isBanner: true),
+                onPickLogo: () => _pickAndUpload(isBanner: false),
+                onLogout: () => _confirmLogout(context),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _SectionLabel('Hari Ini'),
+                  Row(
                     children: [
-                      Text('Ringkasan Hari Ini',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              )),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _StatBox(
-                            label: 'Pesanan',
-                            value: state.todayOrders.toString(),
-                            color: KuwrirColors.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          _StatBox(
-                            label: 'Pendapatan',
-                            value: 'IDR ${_fmt(state.todayRevenue)}',
-                            color: KuwrirColors.success,
-                          ),
-                        ],
+                      _StatBox(
+                        label: 'Pesanan',
+                        value: state.todayOrders.toString(),
+                        color: KuwrirColors.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      _StatBox(
+                        label: 'Pendapatan',
+                        value: 'Rp ${_fmt(state.todayRevenue)}',
+                        color: KuwrirColors.success,
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Kasir / POS entry point
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.point_of_sale_outlined, color: KuwrirColors.primary),
-                  title: const Text('Kasir / POS'),
-                  subtitle: const Text('Transaksi walk-in, laporan, piutang & hutang'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KasirHub())),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Store info
-              _InfoTile(icon: Icons.store, label: 'Nama Toko', value: merchant.name),
-              if (merchant.phone != null)
-                _InfoTile(icon: Icons.phone, label: 'Telepon', value: merchant.phone!),
-              _InfoTile(icon: Icons.location_on_outlined, label: 'Alamat', value: merchant.address),
-              _InfoTile(
-                icon: Icons.star,
-                label: 'Rating',
-                value: '${merchant.rating.toStringAsFixed(1)} (${merchant.totalReviews} ulasan)',
-              ),
-
-              const SizedBox(height: 16),
-
-              // Open/closed toggle
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Status Toko',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text(
-                            merchant.isOpen ? 'Buka — menerima pesanan' : 'Tutup',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: merchant.isOpen ? KuwrirColors.success : KuwrirColors.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Switch.adaptive(
-                        value: merchant.isOpen,
-                        onChanged: (v) => context.read<StoreCubit>().toggleOpen(v),
-                        activeColor: KuwrirColors.success,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Self-delivery toggle
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Antar Sendiri',
-                                style: TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Antar pesanan tanpa driver Kuwrir',
-                              style: TextStyle(
-                                  fontSize: 12, color: KuwrirColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: merchant.canSelfDeliver,
-                        onChanged: (v) => _toggleSelfDeliver(context, v),
-                        activeColor: KuwrirColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              if (merchant.canSelfDeliver) ...[
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  const SizedBox(height: 28),
+                  _SectionLabel('Info Toko'),
+                  _SoftPanel(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Ongkir Antar Sendiri',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Tarif yang ditampilkan ke pelanggan (0 = gratis)',
-                          style: TextStyle(
-                              fontSize: 12, color: KuwrirColors.textSecondary),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Text('Rp ',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 16)),
-                            Expanded(
-                              child: TextField(
-                                controller: _selfDeliveryFeeCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  hintText: '0',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => _saveSelfDeliveryFee(context),
-                              child: const Text('Simpan'),
-                            ),
-                          ],
+                        _InfoRow(icon: Icons.storefront_outlined, label: 'Nama Toko', value: merchant.name),
+                        if (merchant.phone != null) ...[
+                          const _Hairline(),
+                          _InfoRow(icon: Icons.call_outlined, label: 'Telepon', value: merchant.phone!),
+                        ],
+                        const _Hairline(),
+                        _InfoRow(icon: Icons.location_on_outlined, label: 'Alamat', value: merchant.address),
+                        const _Hairline(),
+                        _InfoRow(
+                          icon: Icons.star_rounded,
+                          label: 'Rating',
+                          value: '${merchant.rating.toStringAsFixed(1)} · ${merchant.totalReviews} ulasan',
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
-
-              const SizedBox(height: 12),
-
-              // Free-delivery toggle (store-wide — powers the customer app's
-              // "Gratis Ongkir" search filter)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Gratis Ongkir',
-                                style: TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Semua produk tokomu muncul di filter Gratis Ongkir pelanggan',
-                              style: TextStyle(
-                                  fontSize: 12, color: KuwrirColors.textSecondary),
-                            ),
-                          ],
+                  const SizedBox(height: 28),
+                  _SectionLabel('Operasional'),
+                  _SoftPanel(
+                    child: Column(
+                      children: [
+                        _ToggleRow(
+                          title: 'Status Toko',
+                          subtitle: merchant.isOpen ? 'Buka — menerima pesanan' : 'Tutup sementara',
+                          subtitleColor: merchant.isOpen ? KuwrirColors.success : KuwrirColors.textHint,
+                          value: merchant.isOpen,
+                          onChanged: (v) => context.read<StoreCubit>().toggleOpen(v),
                         ),
-                      ),
-                      Switch.adaptive(
-                        value: merchant.isFreeDelivery,
-                        onChanged: (v) => _toggleFreeDelivery(context, v),
-                        activeColor: KuwrirColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ── Tax / PKP Settings ──
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Pemungut Pajak (PKP)',
-                                    style: TextStyle(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  merchant.taxEnabled
-                                      ? 'Aktif — PPN dikenakan ke pelanggan'
-                                      : 'Nonaktif — toko UMKM, tanpa PPN',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: merchant.taxEnabled
-                                          ? KuwrirColors.primary
-                                          : KuwrirColors.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch.adaptive(
-                            value: merchant.taxEnabled,
-                            onChanged: (v) => _toggleTax(context, v, merchant.taxRate),
-                            activeColor: KuwrirColors.primary,
+                        const _Hairline(),
+                        _ToggleRow(
+                          title: 'Antar Sendiri',
+                          subtitle: 'Antar pesanan tanpa driver Cocourir',
+                          value: merchant.canSelfDeliver,
+                          onChanged: (v) => _toggleSelfDeliver(context, v),
+                        ),
+                        if (merchant.canSelfDeliver) ...[
+                          const _Hairline(),
+                          _InlineFeeEditor(
+                            label: 'Ongkir Antar Sendiri (0 = gratis)',
+                            controller: _selfDeliveryFeeCtrl,
+                            prefixText: 'Rp ',
+                            onSave: () => _saveSelfDeliveryFee(context),
                           ),
                         ],
-                      ),
-                      if (merchant.taxEnabled) ...[
-                        const SizedBox(height: 12),
-                        const Text('Rate Pajak (%)',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _taxRateCtrl
-                                  ..text = merchant.taxRate != null
-                                      ? merchant.taxRate!.toStringAsFixed(0)
-                                      : '',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  hintText: 'Kosong = ikuti default platform (11%)',
-                                  suffixText: '%',
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => _saveTaxRate(context),
-                              child: const Text('Simpan'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Biarkan kosong untuk menggunakan rate default platform',
-                          style: TextStyle(
-                              fontSize: 11, color: KuwrirColors.textSecondary),
+                        const _Hairline(),
+                        _ToggleRow(
+                          title: 'Gratis Ongkir',
+                          subtitle: 'Semua produk tokomu tampil di filter Gratis Ongkir',
+                          value: merchant.isFreeDelivery,
+                          onChanged: (v) => _toggleFreeDelivery(context, v),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 28),
+                  _SectionLabel('Pajak'),
+                  _SoftPanel(
+                    child: Column(
+                      children: [
+                        _ToggleRow(
+                          title: 'Pemungut Pajak (PKP)',
+                          subtitle: merchant.taxEnabled
+                              ? 'Aktif — PPN dikenakan ke pelanggan'
+                              : 'Nonaktif — toko UMKM, tanpa PPN',
+                          subtitleColor: merchant.taxEnabled ? KuwrirColors.primary : KuwrirColors.textSecondary,
+                          value: merchant.taxEnabled,
+                          onChanged: (v) => _toggleTax(context, v, merchant.taxRate),
+                        ),
+                        if (merchant.taxEnabled) ...[
+                          const _Hairline(),
+                          _InlineFeeEditor(
+                            label: 'Rate Pajak — kosong = default platform (11%)',
+                            controller: _taxRateCtrl..text = merchant.taxRate?.toStringAsFixed(0) ?? '',
+                            suffixText: '%',
+                            onSave: () => _saveTaxRate(context),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _SectionLabel('Lainnya'),
+                  _SoftPanel(
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      leading: Icon(Icons.point_of_sale_outlined, color: KuwrirColors.primary),
+                      title: const Text('Kasir / POS', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text('Transaksi walk-in, laporan, piutang & hutang',
+                          style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+                      trailing: Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KasirHub())),
+                    ),
+                  ),
+                ]),
               ),
-
-              const SizedBox(height: 32),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -489,28 +355,323 @@ class _StoreScreenState extends State<StoreScreen> {
       .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 }
 
-class _InfoTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
+/// Banner + overlapping circular logo, both tap-to-upload — the store's
+/// storefront exactly as customers see it at the top of the merchant
+/// detail page, with an edit affordance layered directly on top instead
+/// of a separate settings form buried below.
+class _StoreHero extends StatelessWidget {
+  final Merchant merchant;
+  final bool uploadingLogo;
+  final bool uploadingBanner;
+  final VoidCallback onPickBanner;
+  final VoidCallback onPickLogo;
+  final VoidCallback onLogout;
 
-  const _InfoTile({required this.icon, required this.label, required this.value});
+  const _StoreHero({
+    required this.merchant,
+    required this.uploadingLogo,
+    required this.uploadingBanner,
+    required this.onPickBanner,
+    required this.onPickLogo,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: onPickBanner,
+          child: Container(
+            height: 168,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: KuwrirColors.primary.withValues(alpha: 0.08),
+              image: merchant.bannerUrl != null
+                  ? DecorationImage(image: NetworkImage(merchant.bannerUrl!), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (merchant.bannerUrl == null)
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_photo_alternate_outlined, color: KuwrirColors.primary, size: 28),
+                        const SizedBox(height: 6),
+                        Text('Tambah banner toko',
+                            style: TextStyle(color: KuwrirColors.primary, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                if (uploadingBanner)
+                  Container(
+                    color: Colors.black38,
+                    child: const Center(
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    ),
+                  ),
+                if (merchant.bannerUrl != null && !uploadingBanner)
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: _EditChip(),
+                  ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: SafeArea(
+                    bottom: false,
+                    child: IconButton(
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      style: IconButton.styleFrom(backgroundColor: Colors.black26),
+                      tooltip: 'Keluar',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          bottom: -36,
+          child: GestureDetector(
+            onTap: onPickLogo,
+            child: Container(
+              width: 76,
+              height: 76,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: KuwrirColors.surface,
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: ClipOval(
+                child: Container(
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  child: uploadingLogo
+                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                      : merchant.logoUrl != null
+                          ? Image.network(merchant.logoUrl!, fit: BoxFit.cover)
+                          : Icon(Icons.storefront, color: KuwrirColors.primary, size: 30),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(108, 12, 20, 0),
+          child: SizedBox(
+            height: 44,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                merchant.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 44),
+      ],
+    );
+  }
+}
+
+class _EditChip extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(100)),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.edit_outlined, size: 12, color: Colors.white),
+          SizedBox(width: 4),
+          Text('Ganti', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10, top: 4),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: KuwrirColors.textHint,
+        ),
+      ),
+    );
+  }
+}
+
+/// Flat tinted surface, replacing default boxy Material Cards — one
+/// consistent container language across the screen instead of stacked
+/// elevated cards.
+class _SoftPanel extends StatelessWidget {
+  final Widget child;
+  const _SoftPanel({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _Hairline extends StatelessWidget {
+  const _Hairline();
+  @override
+  Widget build(BuildContext context) => Divider(height: 1, color: KuwrirColors.border);
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           Icon(icon, size: 20, color: KuwrirColors.textSecondary),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Color? subtitleColor;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ToggleRow({
+    required this.title,
+    required this.subtitle,
+    this.subtitleColor,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                const SizedBox(height: 3),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: subtitleColor ?? KuwrirColors.textSecondary)),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: KuwrirColors.primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineFeeEditor extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String? prefixText;
+  final String? suffixText;
+  final VoidCallback onSave;
+
+  const _InlineFeeEditor({
+    required this.label,
+    required this.controller,
+    this.prefixText,
+    this.suffixText,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+          const SizedBox(height: 8),
+          Row(
             children: [
-              Text(label,
-                  style: TextStyle(fontSize: 11, color: KuwrirColors.textHint)),
-              Text(value,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixText: prefixText,
+                    suffixText: suffixText,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: KuwrirColors.primary),
+                onPressed: onSave,
+                child: const Text('Simpan'),
+              ),
             ],
           ),
         ],
@@ -530,19 +691,17 @@ class _StatBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(label,
-                style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
           ],
         ),
       ),

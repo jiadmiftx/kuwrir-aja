@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Kuwrir Driver',
+                'Cocourir Driver',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

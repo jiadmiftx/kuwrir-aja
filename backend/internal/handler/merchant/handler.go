@@ -87,6 +87,8 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		owner.GET("/status", h.GetMerchantStatus) // cek status verifikasi
 		owner.GET("", h.GetMyMerchant)
 		owner.PUT("", h.UpdateMyMerchant)
+		owner.POST("/logo", h.UploadStoreLogo)
+		owner.POST("/banner", h.UploadStoreBanner)
 		owner.PUT("/toggle-open", h.ToggleOpen)
 		owner.PUT("/toggle-self-deliver", h.ToggleSelfDeliver)
 		owner.PUT("/self-delivery-fee", h.SetSelfDeliveryFee)
@@ -574,6 +576,59 @@ func (h *Handler) UpdateMyMerchant(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Merchant updated"})
+}
+
+// UploadStoreLogo uploads and sets the merchant's own store logo.
+// POST /my-store/logo   multipart field "image"
+func (h *Handler) UploadStoreLogo(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "merchants")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(merchant).Update("logo_url", url)
+	c.JSON(http.StatusOK, gin.H{"logo_url": url})
+}
+
+// UploadStoreBanner uploads and sets the merchant's own store banner —
+// shown at the top of its detail page in customer_app.
+// POST /my-store/banner   multipart field "image"
+func (h *Handler) UploadStoreBanner(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "merchants")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(merchant).Update("banner_url", url)
+	c.JSON(http.StatusOK, gin.H{"banner_url": url})
 }
 
 // ToggleOpen toggles the merchant's open/closed status

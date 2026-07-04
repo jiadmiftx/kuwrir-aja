@@ -102,37 +102,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(title: const Text('Profil Saya')),
+      appBar: AppBar(
+        title: const Text('Profil Saya'),
+        backgroundColor: KuwrirColors.background,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               children: [
                 Center(
                   child: Column(
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: KuwrirColors.primary.withValues(alpha: 0.1),
+                        backgroundColor: KuwrirColors.primary.withValues(alpha: 0.08),
                         child: Icon(Icons.person, size: 40, color: KuwrirColors.primary),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Text(_user?.name.isNotEmpty == true ? _user!.name : 'Tanpa nama',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
                       Text(_user?.phone ?? '-',
-                          style: TextStyle(color: KuwrirColors.textSecondary)),
+                          style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                Card(
+                const SizedBox(height: 28),
+                const _ProfileSectionLabel('Informasi Akun'),
+                const SizedBox(height: 10),
+                _ProfileSoftPanel(
                   child: Column(
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.badge_outlined),
-                        title: const Text('Nama'),
-                        subtitle: Text(_user?.name.isNotEmpty == true ? _user!.name : 'Belum diisi'),
-                        trailing: const Icon(Icons.edit_outlined, size: 18),
+                      _ProfileRow(
+                        icon: Icons.badge_outlined,
+                        label: 'Nama',
+                        value: _user?.name.isNotEmpty == true ? _user!.name : 'Belum diisi',
                         onTap: () => _editField(
                           label: 'Nama',
                           currentValue: _user?.name,
@@ -140,12 +145,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onSave: (value) => ApiClient().updateProfile(name: value),
                         ),
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.email_outlined),
-                        title: const Text('Email'),
-                        subtitle: Text(_user?.email.isNotEmpty == true ? _user!.email : 'Belum diisi'),
-                        trailing: const Icon(Icons.edit_outlined, size: 18),
+                      Divider(height: 1, color: KuwrirColors.border),
+                      _ProfileRow(
+                        icon: Icons.email_outlined,
+                        label: 'Email',
+                        value: _user?.email.isNotEmpty == true ? _user!.email : 'Belum diisi',
                         onTap: () => _editField(
                           label: 'Email',
                           currentValue: _user?.email,
@@ -153,25 +157,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onSave: (value) => ApiClient().updateProfile(email: value),
                         ),
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.phone_outlined),
-                        title: const Text('No. Telepon'),
-                        subtitle: Text(_user?.phone ?? '-'),
+                      Divider(height: 1, color: KuwrirColors.border),
+                      _ProfileRow(
+                        icon: Icons.phone_outlined,
+                        label: 'No. Telepon',
+                        value: _user?.phone ?? '-',
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Card(
+                const SizedBox(height: 28),
+                _ProfileSoftPanel(
                   child: ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text('Keluar', style: TextStyle(color: Colors.red)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    leading: Icon(Icons.logout, color: KuwrirColors.error),
+                    title: Text('Keluar', style: TextStyle(color: KuwrirColors.error, fontWeight: FontWeight.w600)),
                     onTap: _logout,
                   ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _ProfileSectionLabel extends StatelessWidget {
+  final String text;
+  const _ProfileSectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: KuwrirColors.textHint,
+      ),
+    );
+  }
+}
+
+class _ProfileSoftPanel extends StatelessWidget {
+  final Widget child;
+  const _ProfileSoftPanel({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+}
+
+class _ProfileRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+  const _ProfileRow({required this.icon, required this.label, required this.value, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: KuwrirColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: KuwrirColors.primary),
+      ),
+      title: Text(label, style: const TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
+      subtitle: Text(value, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+      trailing: onTap != null ? Icon(Icons.edit_outlined, size: 18, color: KuwrirColors.textHint) : null,
+      onTap: onTap,
     );
   }
 }

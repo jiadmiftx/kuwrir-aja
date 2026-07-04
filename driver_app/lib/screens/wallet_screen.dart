@@ -124,7 +124,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'You have collected cash from COD deliveries. This amount belongs to Kuwrir and Merchants, and must be deposited.',
+                      'You have collected cash from COD deliveries. This amount belongs to Cocourir and Merchants, and must be deposited.',
                       style: TextStyle(color: Colors.grey, height: 1.5),
                     ),
                     const SizedBox(height: 24),

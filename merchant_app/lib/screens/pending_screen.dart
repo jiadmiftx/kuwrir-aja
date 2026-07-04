@@ -98,7 +98,7 @@ class _MerchantPendingScreenState extends State<MerchantPendingScreen> {
   String _body() {
     switch (_status) {
       case 'approved':
-        return 'Toko kamu sudah aktif. Selamat berjualan di KUWRIR.';
+        return 'Toko kamu sudah aktif. Selamat berjualan di Cocourir.';
       case 'rejected':
         return 'Ada beberapa hal yang perlu dilengkapi sebelum toko kamu bisa disetujui.';
       default:

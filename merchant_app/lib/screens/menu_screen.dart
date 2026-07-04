@@ -25,8 +25,10 @@ class _MenuScreenState extends State<MenuScreen> {
     return BlocBuilder<MenuCubit, MenuState>(
       builder: (context, state) {
         return Scaffold(
+          backgroundColor: KuwrirColors.background,
           appBar: AppBar(
             title: const Text('Menu Saya'),
+            backgroundColor: KuwrirColors.background,
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -59,7 +61,7 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<MenuCubit>().load(),
@@ -76,25 +78,32 @@ class _MenuScreenState extends State<MenuScreen> {
 
     if (categories.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.inventory_2_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Belum ada menu',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Tambah kategori dan produk pertama Anda',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.inventory_2_outlined, size: 36, color: KuwrirColors.primary),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Belum ada menu',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tambah kategori dan produk pertama Anda',
+                style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -529,9 +538,15 @@ class _ProductTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+      ),
       child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: Container(
           width: 48,
           height: 48,
@@ -577,7 +592,7 @@ class _ProductTile extends StatelessWidget {
               value: product.isAvailable,
               onChanged: (v) =>
                   context.read<MenuCubit>().toggleAvailability(product.id, v),
-              activeColor: KuwrirColors.success,
+              activeThumbColor: KuwrirColors.success,
             ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 18),
@@ -792,7 +807,7 @@ class _ProductTile extends StatelessWidget {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: KuwrirColors.error),
             onPressed: () {
               context.read<MenuCubit>().deleteProduct(product.id);
               Navigator.pop(ctx);

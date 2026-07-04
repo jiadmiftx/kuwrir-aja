@@ -5,7 +5,7 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 class NotificationService {
   static final _localNotif = FlutterLocalNotificationsPlugin();
   static const _channelId = 'kuwrir_driver';
-  static const _channelName = 'KUWRIR Driver Notifications';
+  static const _channelName = 'Cocourir Driver Notifications';
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');

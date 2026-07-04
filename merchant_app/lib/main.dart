@@ -50,7 +50,7 @@ class KuwrirMerchantApp extends StatelessWidget {
           BlocProvider(create: (_) => MerchantWalletCubit(apiClient)),
         ],
         child: MaterialApp(
-          title: 'KUWRIR Merchant',
+          title: 'Cocourir Merchant',
           debugShowCheckedModeBanner: false,
           theme: KuwrirTheme.light,
           darkTheme: KuwrirTheme.dark,
@@ -208,7 +208,7 @@ class _SplashRouterState extends State<_SplashRouter> {
           children: [
             Icon(Icons.store, size: 72, color: KuwrirColors.primary),
             SizedBox(height: 16),
-            Text('KUWRIR Merchant',
+            Text('Cocourir Merchant',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             SizedBox(height: 24),
             CircularProgressIndicator(),
