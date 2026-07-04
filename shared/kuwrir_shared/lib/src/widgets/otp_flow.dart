@@ -22,12 +22,19 @@ class OtpFlow extends StatefulWidget {
   final String headerSubtitle;
   final String verifyButtonLabel;
 
+  /// Set false when the calling page already shows its own icon/title
+  /// above this widget — avoids two icon+heading blocks stacking on top
+  /// of each other. The code step still shows which phone number the code
+  /// went to either way, since that's information, not decoration.
+  final bool showHeaderIcon;
+
   const OtpFlow({
     super.key,
     required this.onVerify,
     this.headerTitle = 'Masukkan nomor HP kamu',
     this.headerSubtitle = 'Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
     this.verifyButtonLabel = 'Verifikasi',
+    this.showHeaderIcon = true,
   });
 
   @override
@@ -122,17 +129,19 @@ class _OtpFlowState extends State<OtpFlow> {
 
   List<Widget> _buildPhoneStep() {
     return [
-      const SizedBox(height: 24),
-      const Icon(Icons.sms_outlined, size: 56, color: KuwrirColors.primary),
-      const SizedBox(height: 16),
-      Text(widget.headerTitle,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 8),
-      Text(widget.headerSubtitle,
-          style: TextStyle(color: KuwrirColors.textSecondary),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 32),
+      if (widget.showHeaderIcon) ...[
+        const SizedBox(height: 24),
+        const Icon(Icons.sms_outlined, size: 56, color: KuwrirColors.primary),
+        const SizedBox(height: 16),
+        Text(widget.headerTitle,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        Text(widget.headerSubtitle,
+            style: TextStyle(color: KuwrirColors.textSecondary),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 32),
+      ],
       TextField(
         controller: _phoneCtrl,
         keyboardType: TextInputType.phone,
@@ -161,15 +170,18 @@ class _OtpFlowState extends State<OtpFlow> {
 
   List<Widget> _buildCodeStep() {
     return [
-      const SizedBox(height: 24),
-      const Icon(Icons.mark_email_read_outlined, size: 56, color: KuwrirColors.primary),
-      const SizedBox(height: 16),
-      const Text('Masukkan kode OTP',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 8),
+      if (widget.showHeaderIcon) ...[
+        const SizedBox(height: 24),
+        const Icon(Icons.mark_email_read_outlined, size: 56, color: KuwrirColors.primary),
+        const SizedBox(height: 16),
+        const Text('Masukkan kode OTP',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+      ] else
+        const SizedBox(height: 4),
       Text('Kode dikirim lewat WhatsApp ke ${_phoneCtrl.text.trim()}',
-          style: TextStyle(color: KuwrirColors.textSecondary),
+          style: TextStyle(color: KuwrirColors.textSecondary, fontSize: widget.showHeaderIcon ? 14 : 13.5),
           textAlign: TextAlign.center),
       const SizedBox(height: 32),
       TextField(
