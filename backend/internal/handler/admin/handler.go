@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/service"
+	"github.com/kuwrir-platform/backend/internal/upload"
 )
 
 type Handler struct {
@@ -92,6 +94,13 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/food-categories", h.CreateFoodCategory)
 	r.PUT("/food-categories/:id", h.UpdateFoodCategory)
 	r.DELETE("/food-categories/:id", h.DeleteFoodCategory)
+
+	// Homepage promo banners (customer app Home carousel)
+	r.GET("/banners", h.GetBanners)
+	r.POST("/banners", h.CreateBanner)
+	r.PUT("/banners/:id", h.UpdateBanner)
+	r.DELETE("/banners/:id", h.DeleteBanner)
+	r.POST("/banners/:id/image", h.UploadBannerImage)
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -530,7 +539,7 @@ type PromoRequest struct {
 	Code        string  `json:"code" binding:"required"`
 	Title       string  `json:"title" binding:"required"`
 	Type        string  `json:"type" binding:"required"` // percentage, fixed, free_delivery
-	Value       float64 `json:"value" binding:"required,gt=0"`
+	Value       float64 `json:"value"`                    // required > 0 unless type is free_delivery, checked below
 	MinOrder    float64 `json:"min_order"`
 	MaxDiscount float64 `json:"max_discount"`
 	UsageLimit  int     `json:"usage_limit"`
@@ -538,9 +547,23 @@ type PromoRequest struct {
 	ExpiresAt   string  `json:"expires_at" binding:"required"`
 }
 
+// validatePromoValue enforces a positive value for percentage/fixed promos;
+// free_delivery promos carry no numeric value (the discount is "the whole
+// delivery fee"), so 0 is valid for that type only.
+func validatePromoValue(req PromoRequest) error {
+	if req.Type != "free_delivery" && req.Value <= 0 {
+		return fmt.Errorf("value must be greater than 0")
+	}
+	return nil
+}
+
 func (h *Handler) CreatePromotion(c *gin.Context) {
 	var req PromoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatePromoValue(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -578,6 +601,10 @@ func (h *Handler) UpdatePromotion(c *gin.Context) {
 	id := c.Param("id")
 	var req PromoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatePromoValue(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -650,6 +677,128 @@ func (h *Handler) DeleteFoodCategory(c *gin.Context) {
 	id := c.Param("id")
 	h.db.Where("id = ?", id).Delete(&model.FoodCategory{})
 	c.JSON(http.StatusOK, gin.H{"message": "Food category deleted"})
+}
+
+// GetBanners returns all homepage promo banners (admin view — includes inactive).
+func (h *Handler) GetBanners(c *gin.Context) {
+	var banners []model.Banner
+	h.db.Order("sort_order ASC, created_at DESC").Find(&banners)
+	c.JSON(http.StatusOK, gin.H{"banners": banners})
+}
+
+type BannerRequest struct {
+	Title          string  `json:"title" binding:"required"`
+	Subtitle       string  `json:"subtitle"`
+	CTAText        string  `json:"cta_text"`
+	FoodCategoryID *string `json:"food_category_id"`
+	SortOrder      int     `json:"sort_order"`
+	IsActive       bool    `json:"is_active"`
+}
+
+func (h *Handler) CreateBanner(c *gin.Context) {
+	var req BannerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var foodCategoryUUID *uuid.UUID
+	if req.FoodCategoryID != nil && *req.FoodCategoryID != "" {
+		parsed, err := uuid.Parse(*req.FoodCategoryID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid food_category_id"})
+			return
+		}
+		foodCategoryUUID = &parsed
+	}
+
+	ctaText := req.CTAText
+	if ctaText == "" {
+		ctaText = "Lihat Menu"
+	}
+
+	banner := model.Banner{
+		Title:          req.Title,
+		Subtitle:       req.Subtitle,
+		CTAText:        ctaText,
+		FoodCategoryID: foodCategoryUUID,
+		SortOrder:      req.SortOrder,
+		IsActive:       true,
+	}
+	if err := h.db.Create(&banner).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create banner"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"banner": banner})
+}
+
+func (h *Handler) UpdateBanner(c *gin.Context) {
+	id := c.Param("id")
+	var req BannerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var foodCategoryUUID *uuid.UUID
+	if req.FoodCategoryID != nil && *req.FoodCategoryID != "" {
+		parsed, err := uuid.Parse(*req.FoodCategoryID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid food_category_id"})
+			return
+		}
+		foodCategoryUUID = &parsed
+	}
+
+	result := h.db.Model(&model.Banner{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"title": req.Title, "subtitle": req.Subtitle, "cta_text": req.CTAText,
+		"food_category_id": foodCategoryUUID, "sort_order": req.SortOrder, "is_active": req.IsActive,
+	})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Banner not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Banner updated"})
+}
+
+func (h *Handler) DeleteBanner(c *gin.Context) {
+	id := c.Param("id")
+	h.db.Where("id = ?", id).Delete(&model.Banner{})
+	c.JSON(http.StatusOK, gin.H{"message": "Banner deleted"})
+}
+
+// UploadBannerImage uploads the banner's promo image, set after creation
+// (mirrors merchant.UploadProductImage's create-then-upload flow).
+func (h *Handler) UploadBannerImage(c *gin.Context) {
+	id := c.Param("id")
+	var banner model.Banner
+	if err := h.db.Where("id = ?", id).First(&banner).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Banner not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "banners")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(&banner).Update("image_url", url)
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
+}
+
+// PublicActiveBanners returns active homepage promo banners, ordered for
+// display as the customer app's Home carousel — no auth required.
+func (h *Handler) PublicActiveBanners(c *gin.Context) {
+	var banners []model.Banner
+	h.db.Where("is_active = ?", true).Order("sort_order ASC, created_at DESC").Find(&banners)
+	c.JSON(http.StatusOK, gin.H{"banners": banners})
 }
 
 // PublicActivePromotions returns currently-active, non-expired promotions

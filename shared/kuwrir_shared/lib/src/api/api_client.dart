@@ -9,6 +9,7 @@ import '../models/order.dart';
 import '../models/support_message.dart';
 import '../models/food_category.dart';
 import '../models/promotion.dart';
+import '../models/promo_banner.dart';
 
 /// HTTP API client with JWT token management
 class ApiClient {
@@ -173,6 +174,12 @@ class ApiClient {
     final data = await get('/promotions/active', auth: false);
     final list = data['promotions'] as List<dynamic>? ?? [];
     return list.map((p) => Promotion.fromJson(p as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<PromoBanner>> getActiveBanners() async {
+    final data = await get('/banners/active', auth: false);
+    final list = data['banners'] as List<dynamic>? ?? [];
+    return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
   }
 
   Future<Merchant> getMerchant(String id) async {

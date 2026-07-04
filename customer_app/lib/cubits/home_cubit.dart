@@ -12,6 +12,7 @@ class HomeLoaded extends HomeState {
   final List<Merchant> popular;
   final List<FoodCategory> categories;
   final List<Promotion> promotions;
+  final List<PromoBanner> banners;
   final String? selectedCategoryId;
 
   HomeLoaded({
@@ -19,6 +20,7 @@ class HomeLoaded extends HomeState {
     required this.popular,
     required this.categories,
     required this.promotions,
+    required this.banners,
     this.selectedCategoryId,
   });
 
@@ -27,6 +29,7 @@ class HomeLoaded extends HomeState {
     List<Merchant>? popular,
     List<FoodCategory>? categories,
     List<Promotion>? promotions,
+    List<PromoBanner>? banners,
     String? selectedCategoryId,
     bool clearSelectedCategory = false,
   }) =>
@@ -35,6 +38,7 @@ class HomeLoaded extends HomeState {
         popular: popular ?? this.popular,
         categories: categories ?? this.categories,
         promotions: promotions ?? this.promotions,
+        banners: banners ?? this.banners,
         selectedCategoryId:
             clearSelectedCategory ? null : (selectedCategoryId ?? this.selectedCategoryId),
       );
@@ -65,12 +69,14 @@ class HomeCubit extends Cubit<HomeState> {
         _api.getPopularMerchants(),
         _api.getFoodCategories(),
         _api.getActivePromotions(),
+        _api.getActiveBanners(),
       ]);
       emit(HomeLoaded(
         nearby: results[0] as List<Merchant>,
         popular: results[1] as List<Merchant>,
         categories: results[2] as List<FoodCategory>,
         promotions: results[3] as List<Promotion>,
+        banners: results[4] as List<PromoBanner>,
       ));
     } on ApiException catch (e) {
       emit(HomeError(e.message));

@@ -173,6 +173,21 @@ type FoodCategory struct {
 	IsActive  bool   `gorm:"default:true" json:"is_active"`
 }
 
+// Banner is an admin-managed homepage promo image, shown as a carousel on
+// the customer app's Home screen. Tapping one filters Home to
+// FoodCategoryID when set (reuses the existing category-filter behavior),
+// otherwise the banner is purely informational.
+type Banner struct {
+	Base
+	ImageURL       string     `json:"image_url,omitempty"`
+	Title          string     `gorm:"not null" json:"title"`
+	Subtitle       string     `json:"subtitle,omitempty"`
+	CTAText        string     `gorm:"default:'Lihat Menu'" json:"cta_text"`
+	FoodCategoryID *uuid.UUID `gorm:"type:uuid" json:"food_category_id,omitempty"`
+	SortOrder      int        `gorm:"default:0" json:"sort_order"`
+	IsActive       bool       `gorm:"default:true" json:"is_active"`
+}
+
 // Product is an item sold by the merchant
 type Product struct {
 	Base

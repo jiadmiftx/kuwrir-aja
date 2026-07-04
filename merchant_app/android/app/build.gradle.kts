@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "com.kuwrir.merchant"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

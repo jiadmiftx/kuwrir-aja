@@ -12,7 +12,28 @@
           "package_name": "com.kuwrir.customer"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "55640900910-84bv4cb5vi76ifpjtbiqbv5chd5erb8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.customer",
+            "certificate_hash": "8a6743776a63dff502c2fb65c0f523d71c651ef9"
+          }
+        },
+        {
+          "client_id": "55640900910-srlchav27fujtgjmvb54spdlikv8psno.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.customer",
+            "certificate_hash": "20620a03c3a44d5dcdcda6a49f0d74800bad4e83"
+          }
+        },
+        {
+          "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -31,7 +57,28 @@
           "package_name": "com.kuwrir.driver"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "55640900910-5vh9li2hvt360l3aootdcq0dbc8m3ed4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.driver",
+            "certificate_hash": "8a6743776a63dff502c2fb65c0f523d71c651ef9"
+          }
+        },
+        {
+          "client_id": "55640900910-6ue7l91tf5nelgk9b9a7ik1glrnobd0r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.driver",
+            "certificate_hash": "20620a03c3a44d5dcdcda6a49f0d74800bad4e83"
+          }
+        },
+        {
+          "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
@@ -39,7 +86,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -50,7 +102,28 @@
           "package_name": "com.kuwrir.merchant"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "55640900910-5a3nl97tl5qfaknhaerf58ai5gvscnr6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.merchant",
+            "certificate_hash": "8a6743776a63dff502c2fb65c0f523d71c651ef9"
+          }
+        },
+        {
+          "client_id": "55640900910-ai0ihgfjdnkgus5a7r7651047emp8aek.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuwrir.merchant",
+            "certificate_hash": "20620a03c3a44d5dcdcda6a49f0d74800bad4e83"
+          }
+        },
+        {
+          "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA5UI49un45DCtl7JqBwyce1hkg_ePwbKs"
@@ -58,7 +131,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "55640900910-02las0a6avljfjke7h9cnd2ntrdqgmui.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

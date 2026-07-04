@@ -14,11 +14,14 @@ function handleUnauthorized() {
  * /login on 401 instead of leaving pages silently empty.
  */
 export async function apiFetch(path: string, opts?: RequestInit): Promise<Response> {
+  // FormData bodies (file uploads) need the browser to set its own
+  // multipart boundary — a manual Content-Type header breaks the request.
+  const isFormData = opts?.body instanceof FormData
   const res = await fetch(path, {
     ...opts,
     headers: {
       Authorization: `Bearer ${getToken()}`,
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(opts?.headers ?? {}),
     },
   })

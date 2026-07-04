@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
@@ -99,12 +100,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 48),
-              const Icon(Icons.delivery_dining, size: 80, color: KuwrirColors.primary),
+              Center(
+                child: SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64),
+              ),
               const SizedBox(height: 24),
-              const Text('KUWRIR',
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 8),
               const Text('Pesan makanan, terima di depan pintu',
                   style: TextStyle(color: Colors.grey),
                   textAlign: TextAlign.center),

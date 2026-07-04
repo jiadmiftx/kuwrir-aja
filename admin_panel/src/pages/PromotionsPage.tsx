@@ -90,7 +90,8 @@ export default function PromotionsPage() {
   }
 
   const submitForm = async () => {
-    if (!form.code || !form.title || !form.value) {
+    const valueRequired = form.type !== 'free_delivery'
+    if (!form.code || !form.title || (valueRequired && !form.value)) {
       setFormError('Kode, judul, dan nilai wajib diisi')
       return
     }

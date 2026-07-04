@@ -55,6 +55,7 @@ func main() {
 		&model.Merchant{},
 		&model.ProductCategory{},
 		&model.FoodCategory{},
+		&model.Banner{},
 		&model.Product{},
 		&model.ProductVariant{},
 		&model.Driver{},
@@ -133,6 +134,7 @@ func main() {
 		// customer app's Home promo carousel) can be registered on v1.
 		adminH := adminHandler.NewHandler(db)
 		v1.GET("/promotions/active", adminH.PublicActivePromotions)
+		v1.GET("/banners/active", adminH.PublicActiveBanners)
 
 		// Protected routes (auth required)
 		protected := v1.Group("")

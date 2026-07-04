@@ -2,7 +2,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'firebase_options.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -23,12 +25,12 @@ import 'cubits/location_cubit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(const KuwrirCustomerApp());
   // Init notifications after runApp so Flutter renders first frame before
@@ -150,16 +152,14 @@ class _SplashRouterState extends State<_SplashRouter> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delivery_dining, size: 72, color: KuwrirColors.primary),
-            SizedBox(height: 16),
-            Text('KUWRIR', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-            SizedBox(height: 24),
-            CircularProgressIndicator(),
+            SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
           ],
         ),
       ),

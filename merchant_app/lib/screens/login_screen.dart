@@ -123,7 +123,12 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.store, size: 80, color: KuwrirColors.primary),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset('assets/images/app_icon.png', width: 88, height: 88),
+                ),
+              ),
               const SizedBox(height: 24),
               const Text('KUWRIR Merchant', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 8),

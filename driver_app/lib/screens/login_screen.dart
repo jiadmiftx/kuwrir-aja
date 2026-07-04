@@ -102,10 +102,11 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(
-                Icons.delivery_dining,
-                size: 80,
-                color: KuwrirColors.primary,
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset('assets/images/app_icon.png', width: 88, height: 88),
+                ),
               ),
               const SizedBox(height: 24),
               const Text(

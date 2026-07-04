@@ -49,9 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
       listenWhen: (prev, curr) => !prev.hasLocation && curr.hasLocation,
       listener: (context, loc) => context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng),
       child: Scaffold(
-        backgroundColor: KuwrirColors.background,
+        backgroundColor: KuwrirColors.surface,
         body: RefreshIndicator(
           onRefresh: _refresh,
+          color: KuwrirColors.primary,
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildHeader()),
@@ -84,17 +85,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   final loaded = state as HomeLoaded;
                   return SliverList(
                     delegate: SliverChildListDelegate([
-                      if (loaded.promotions.isNotEmpty) _PromoCarousel(promotions: loaded.promotions),
+                      if (loaded.banners.isNotEmpty)
+                        _BannerCarousel(
+                          banners: loaded.banners,
+                          onTapBanner: (b) => context.read<HomeCubit>().selectCategory(b.foodCategoryId),
+                        ),
                       if (loaded.categories.isNotEmpty)
-                        _CategoryChips(
+                        _CategorySection(
                           categories: loaded.categories,
                           selectedId: loaded.selectedCategoryId,
                           onSelect: (id) => context.read<HomeCubit>().selectCategory(id),
                         ),
-                      _SectionHeader(title: 'Warung Terdekat'),
+                      _SectionHeader(
+                        title: 'Warung Terdekat',
+                        onSeeAll: () => Navigator.pushNamed(context, '/search'),
+                      ),
                       _NearbySection(merchants: loaded.nearby),
                       const SizedBox(height: 8),
-                      _SectionHeader(title: 'Warung Rating Tertinggi'),
+                      _SectionHeader(
+                        title: 'Warung Rating Tertinggi',
+                        onSeeAll: () => Navigator.pushNamed(context, '/search'),
+                      ),
                       _PopularSection(merchants: loaded.popular),
                       const SizedBox(height: 24),
                     ]),
@@ -109,13 +120,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      color: KuwrirColors.primary,
+    return Padding(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
-        left: 16,
-        right: 16,
-        bottom: 20,
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 20,
+        right: 20,
+        bottom: 16,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,21 +139,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () => _openLocationPicker(loc),
                       child: Row(
                         children: [
-                          const Icon(Icons.location_on, color: Colors.white70, size: 16),
-                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: KuwrirColors.primary, width: 1.6),
+                            ),
+                            child: const Icon(Icons.location_on_outlined,
+                                color: KuwrirColors.primary, size: 14),
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: loc.detecting
-                                ? const Text('Mendeteksi lokasi...',
-                                    style: TextStyle(color: Colors.white70, fontSize: 13))
+                                ? Text('Mendeteksi lokasi...',
+                                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 14))
                                 : Text(
                                     loc.address,
                                     style: const TextStyle(
-                                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                        color: KuwrirColors.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                           ),
-                          const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
+                          Icon(Icons.keyboard_arrow_down_rounded, color: KuwrirColors.textSecondary),
                         ],
                       ),
                     );
@@ -153,32 +173,37 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.pushNamed(context, '/profile'),
-                child: const CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.white24,
-                  child: Icon(Icons.person, color: Colors.white, size: 18),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: KuwrirColors.border),
+                  ),
+                  child: const CircleAvatar(
+                    radius: 17,
+                    backgroundColor: KuwrirColors.background,
+                    child: Icon(Icons.person, color: KuwrirColors.primary, size: 19),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text('Mau pesan apa hari ini?',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/search'),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                color: KuwrirColors.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: KuwrirColors.border),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search, color: Colors.grey, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Cari restoran atau menu...',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                  Icon(Icons.search, color: KuwrirColors.textHint, size: 20),
+                  const SizedBox(width: 10),
+                  Text('Cari warung atau menu...',
+                      style: TextStyle(color: KuwrirColors.textHint, fontSize: 14)),
                 ],
               ),
             ),
@@ -189,19 +214,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Promo carousel ──────────────────────────────────────────────────────────
-// Real active coupons from the backend (GET /promotions/active). Section
-// simply doesn't render when there are none — no fabricated fallback copy.
+// ── Banner carousel ──────────────────────────────────────────────────────────
+// Admin-managed image banners (GET /banners/active). Hidden entirely when
+// there are none — no fabricated placeholder promo.
 
-class _PromoCarousel extends StatefulWidget {
-  final List<Promotion> promotions;
-  const _PromoCarousel({required this.promotions});
+class _BannerCarousel extends StatefulWidget {
+  final List<PromoBanner> banners;
+  final ValueChanged<PromoBanner> onTapBanner;
+  const _BannerCarousel({required this.banners, required this.onTapBanner});
 
   @override
-  State<_PromoCarousel> createState() => _PromoCarouselState();
+  State<_BannerCarousel> createState() => _BannerCarouselState();
 }
 
-class _PromoCarouselState extends State<_PromoCarousel> {
+class _BannerCarouselState extends State<_BannerCarousel> {
   final _controller = PageController(viewportFraction: 0.92);
   int _page = 0;
 
@@ -211,92 +237,112 @@ class _PromoCarouselState extends State<_PromoCarousel> {
     super.dispose();
   }
 
-  String _valueLabel(Promotion p) {
-    switch (p.type) {
-      case 'percentage':
-        return 'Diskon ${p.value.toStringAsFixed(0)}%';
-      case 'fixed':
-        return 'Potongan Rp ${p.value.toStringAsFixed(0)}';
-      case 'free_delivery':
-        return 'Gratis Ongkir';
-      default:
-        return p.title;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         SizedBox(
-          height: 130,
+          height: 172,
           child: PageView.builder(
             controller: _controller,
-            itemCount: widget.promotions.length,
+            itemCount: widget.banners.length,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) {
-              final promo = widget.promotions[i];
-              return Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [KuwrirColors.primary, KuwrirColors.primaryLight],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+              final banner = widget.banners[i];
+              return GestureDetector(
+                onTap: banner.foodCategoryId != null ? () => widget.onTapBanner(banner) : null,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.primary,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      right: -10,
-                      bottom: -10,
-                      child: Icon(Icons.local_offer,
-                          size: 110, color: Colors.white.withValues(alpha: 0.15)),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.warning,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(promo.code,
-                                style: const TextStyle(
-                                    color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (banner.imageUrl != null)
+                        Image.network(
+                          banner.imageUrl!,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.centerRight,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              KuwrirColors.primaryDark.withValues(alpha: 0.92),
+                              KuwrirColors.primaryDark.withValues(alpha: 0.55),
+                              KuwrirColors.primaryDark.withValues(alpha: 0.05),
+                            ],
+                            stops: const [0.0, 0.55, 1.0],
                           ),
-                          const SizedBox(height: 8),
-                          Text(_valueLabel(promo),
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.2)),
-                          const SizedBox(height: 2),
-                          Text(promo.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                      Padding(
+                        padding: const EdgeInsets.all(22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 210),
+                              child: Text(banner.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.2)),
+                            ),
+                            if (banner.subtitle?.isNotEmpty == true) ...[
+                              const SizedBox(height: 6),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 190),
+                                child: Text(banner.subtitle!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5)),
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            if (banner.foodCategoryId != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(banner.ctaText,
+                                    style: const TextStyle(
+                                        color: KuwrirColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13)),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
           ),
         ),
-        if (widget.promotions.length > 1) ...[
-          const SizedBox(height: 8),
+        if (widget.banners.length > 1) ...[
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              widget.promotions.length,
+              widget.banners.length,
               (i) => Container(
                 margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: i == _page ? 16 : 6,
+                width: i == _page ? 18 : 6,
                 height: 6,
                 decoration: BoxDecoration(
                   color: i == _page ? KuwrirColors.primary : KuwrirColors.border,
@@ -311,60 +357,63 @@ class _PromoCarouselState extends State<_PromoCarousel> {
   }
 }
 
-// ── Category chips ──────────────────────────────────────────────────────────
+// ── Category section ─────────────────────────────────────────────────────────
 
-class _CategoryChips extends StatelessWidget {
+class _CategorySection extends StatelessWidget {
   final List<FoodCategory> categories;
   final String? selectedId;
   final ValueChanged<String?> onSelect;
 
-  const _CategoryChips({required this.categories, required this.selectedId, required this.onSelect});
+  const _CategorySection({required this.categories, required this.selectedId, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: SizedBox(
-        height: 84,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: categories.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) {
-            final c = categories[i];
-            final selected = c.id == selectedId;
-            return GestureDetector(
-              onTap: () => onSelect(selected ? null : c.id),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: selected ? KuwrirColors.primary : KuwrirColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: selected ? Border.all(color: KuwrirColors.primary, width: 2) : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: 'Kategori', topPadding: 24),
+        SizedBox(
+          height: 92,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: categories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (context, i) {
+              final c = categories[i];
+              final selected = c.id == selectedId;
+              return GestureDetector(
+                onTap: () => onSelect(selected ? null : c.id),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? KuwrirColors.primary : KuwrirColors.primary.withValues(alpha: 0.08),
+                        border: selected ? Border.all(color: KuwrirColors.primaryDark, width: 2) : null,
+                      ),
+                      child: Center(
+                        child: Text(c.icon?.isNotEmpty == true ? c.icon! : '🍽️',
+                            style: const TextStyle(fontSize: 26)),
+                      ),
                     ),
-                    child: Center(
-                      child: Text(c.icon?.isNotEmpty == true ? c.icon! : '🍽️',
-                          style: const TextStyle(fontSize: 24)),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(c.name,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                        color: selected ? KuwrirColors.primary : KuwrirColors.textSecondary,
-                      )),
-                ],
-              ),
-            );
-          },
+                    const SizedBox(height: 8),
+                    Text(c.name,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                          color: selected ? KuwrirColors.primary : KuwrirColors.textSecondary,
+                        )),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -373,14 +422,33 @@ class _CategoryChips extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader({required this.title});
+  final VoidCallback? onSeeAll;
+  final double topPadding;
+  const _SectionHeader({required this.title, this.onSeeAll, this.topPadding = 20});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-      child: Text(title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: KuwrirColors.textPrimary)),
+      padding: EdgeInsets.fromLTRB(20, topPadding, 20, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.bold, color: KuwrirColors.textPrimary)),
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              child: Text('Lihat Semua',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: KuwrirColors.primary,
+                      decoration: TextDecoration.underline,
+                      decorationColor: KuwrirColors.primary)),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -395,13 +463,13 @@ class _NearbySection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (merchants.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Text('Belum ada warung di sekitar lokasimu',
             style: TextStyle(color: Colors.grey)),
       );
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: merchants
             .map((m) => _MerchantCard(
@@ -425,18 +493,18 @@ class _PopularSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (merchants.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Text('Belum ada warung dengan rating di area ini',
             style: TextStyle(color: Colors.grey)),
       );
     }
     return SizedBox(
-      height: 190,
+      height: 196,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: merchants.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, i) {
           final m = merchants[i];
           return _MerchantCardCompact(
@@ -461,9 +529,20 @@ class _MerchantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
         clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: KuwrirColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -479,7 +558,7 @@ class _MerchantCard extends StatelessWidget {
                   : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -493,7 +572,7 @@ class _MerchantCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                              color: Colors.grey[200], borderRadius: BorderRadius.circular(6)),
+                              color: Colors.grey[200], borderRadius: BorderRadius.circular(100)),
                           child: const Text('Tutup', style: TextStyle(fontSize: 11, color: Colors.grey)),
                         ),
                     ],
@@ -542,50 +621,58 @@ class _MerchantCardCompact extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Card(
-        margin: EdgeInsets.zero,
+      child: Container(
+        width: 160,
         clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          width: 160,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 100,
-                width: double.infinity,
-                color: KuwrirColors.primary.withValues(alpha: 0.08),
-                child: merchant.logoUrl != null
-                    ? Image.network(merchant.logoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                            child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)))
-                    : Center(child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)),
+        decoration: BoxDecoration(
+          color: KuwrirColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 100,
+              width: double.infinity,
+              color: KuwrirColors.primary.withValues(alpha: 0.08),
+              child: merchant.logoUrl != null
+                  ? Image.network(merchant.logoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(
+                          child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)))
+                  : Center(child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(merchant.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded, size: 13, color: Colors.amber[600]),
+                      const SizedBox(width: 2),
+                      Text(merchant.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text(' (${merchant.totalReviews})',
+                          style: TextStyle(fontSize: 10, color: KuwrirColors.textSecondary)),
+                    ],
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(merchant.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.star_rounded, size: 13, color: Colors.amber[600]),
-                        const SizedBox(width: 2),
-                        Text(merchant.rating.toStringAsFixed(1),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                        Text(' (${merchant.totalReviews})',
-                            style: TextStyle(fontSize: 10, color: KuwrirColors.textSecondary)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
