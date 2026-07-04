@@ -1155,10 +1155,10 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 		"base_fee":         req.BaseFee,
 		"per_km_fee":       req.PerKmFee,
 		"is_default":       req.IsDefault && parentUID == nil,
-		"is_active":        req.IsActive,
-		"osm_relation_id":  req.OsmRelationID,
-		"boundary_geojson": req.BoundaryGeoJSON,
-		"parent_zone_id":   parentUID,
+		"is_active":         req.IsActive,
+		"osm_relation_id":   req.OsmRelationID,
+		"boundary_geo_json": req.BoundaryGeoJSON,
+		"parent_zone_id":    parentUID,
 	}
 	if err := h.db.Model(&zone).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update zone: " + err.Error()})

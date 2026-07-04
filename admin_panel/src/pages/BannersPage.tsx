@@ -85,9 +85,9 @@ export default function BannersPage() {
   const openEdit = (b: Banner) => {
     setEditTarget(b)
     setForm({
-      title: b.title,
-      subtitle: b.subtitle,
-      cta_text: b.cta_text,
+      title: b.title ?? '',
+      subtitle: b.subtitle ?? '',
+      cta_text: b.cta_text ?? '',
       food_category_id: b.food_category_id ?? '',
       sort_order: String(b.sort_order),
       is_active: b.is_active,
