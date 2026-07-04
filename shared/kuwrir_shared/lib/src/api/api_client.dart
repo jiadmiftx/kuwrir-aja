@@ -570,8 +570,14 @@ class ApiClient {
     return await post('/auth/otp/request', {'phone': phone});
   }
 
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
-    return await post('/auth/otp/verify', {'phone': phone, 'code': code});
+  /// [role] only matters for auto-registering a brand-new phone number
+  /// (mirrors [googleLogin]'s role param) — leave null for customer_app.
+  Future<Map<String, dynamic>> verifyOtp(String phone, String code, {String? role}) async {
+    return await post('/auth/otp/verify', {
+      'phone': phone,
+      'code': code,
+      if (role != null) 'role': role,
+    });
   }
 
   Future<User> getMe() async {

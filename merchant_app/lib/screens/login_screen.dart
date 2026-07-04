@@ -16,7 +16,7 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
 
   Future<void> _handleOtpVerify(String phone, String code) async {
     final client = ApiClient();
-    final res = await client.verifyOtp(phone, code);
+    final res = await client.verifyOtp(phone, code, role: 'merchant');
     if (!mounted) return;
     if (res['token'] == null) {
       throw res['error'] ?? 'Verifikasi gagal';
@@ -25,12 +25,20 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
     if (role != 'merchant') {
       throw 'Akun ini bukan akun merchant';
     }
-    final isActive = res['user']?['is_active'] ?? false;
     await client.saveToken(res['token'], res['refresh_token'] ?? '');
     await NotificationService.uploadToken(client);
     if (!mounted) return;
     await maybePromptBiometricOptIn(context);
     if (!mounted) return;
+    final hasMerchantProfile = res['has_merchant_profile'] ?? false;
+    if (!hasMerchantProfile) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MerchantRegisterScreen(startAtStep: 1)),
+      );
+      return;
+    }
+    final isActive = res['user']?['is_active'] ?? false;
     Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
   }
 
@@ -132,11 +140,6 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
                 ),
                 icon: const Icon(Icons.g_mobiledata, size: 28),
                 label: const Text('Masuk dengan Google'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, '/register'),
-                child: const Text('Belum punya toko? Daftar sekarang'),
               ),
             ],
           ),

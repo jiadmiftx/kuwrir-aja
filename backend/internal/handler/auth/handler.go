@@ -77,6 +77,10 @@ type RequestOTPRequest struct {
 type VerifyOTPRequest struct {
 	Phone string `json:"phone" binding:"required"`
 	Code  string `json:"code" binding:"required"`
+	// Role only applies when auto-registering a brand-new phone (mirrors
+	// GoogleLogin's role param) — empty defaults to customer. Ignored for
+	// an already-existing phone, which keeps whatever role it already has.
+	Role model.Role `json:"role"`
 }
 
 type AuthResponse struct {
@@ -395,14 +399,19 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 
 	var user model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
-		// Unknown phone — auto-register a bare customer account, same
+		// Unknown phone — auto-register a bare account, same
 		// placeholder-password pattern GoogleLogin uses for accounts with
-		// no real password.
+		// no real password. Role comes from the caller (merchant_app/
+		// driver_app pass their own role; customer_app leaves it empty).
+		role := req.Role
+		if role == "" {
+			role = model.RoleCustomer
+		}
 		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
 		user = model.User{
 			Phone:           req.Phone,
 			Password:        string(fakePassword),
-			Role:            model.RoleCustomer,
+			Role:            role,
 			IsActive:        true,
 			PhoneVerifiedAt: &now,
 		}
@@ -424,11 +433,19 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, AuthResponse{
+	resp := AuthResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
 		User:         user,
-	})
+	}
+	if user.Role == model.RoleMerchant {
+		var count int64
+		h.db.Model(&model.Merchant{}).Where("user_id = ?", user.ID).Count(&count)
+		hasProfile := count > 0
+		resp.HasMerchantProfile = &hasProfile
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // VerifyPhone attaches and verifies a real phone number on the currently
