@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'register_screen.dart';
 
 /// Merchant waiting for admin verification.
 /// Polls GET /my-store/status every 30s.
@@ -209,7 +210,14 @@ class _MerchantPendingScreenState extends State<MerchantPendingScreen> {
                           backgroundColor: KuwrirColors.primary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/register'),
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          // The account already exists (this is a resubmit,
+                          // not a new signup) — skip straight to store info,
+                          // startAtStep: 0 here would 409 re-registering the
+                          // same phone number.
+                          MaterialPageRoute(builder: (_) => const MerchantRegisterScreen(startAtStep: 1)),
+                        ),
                         child: const Text('Lengkapi & Daftar Ulang',
                             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                       ),

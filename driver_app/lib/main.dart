@@ -89,14 +89,29 @@ class _InitialRouterState extends State<InitialRouter> {
   Future<void> _checkAuth() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.checkAuthStatus();
-    
+
     if (!mounted) return;
 
-    if (authProvider.isAuthenticated && authProvider.user?.role == 'driver') {
-      Navigator.pushReplacementNamed(context, '/job_board');
-    } else {
+    if (!authProvider.isAuthenticated || authProvider.user?.role != 'driver') {
       Navigator.pushReplacementNamed(context, '/login');
+      return;
     }
+
+    // authProvider.isAuthenticated only means the login account itself is
+    // enabled — it says nothing about driver-application approval. The
+    // real gate is GET /driver/application (same endpoint pending_screen
+    // already polls); anything other than approved+active routes to
+    // /pending instead of silently unlocking the job board.
+    var approved = false;
+    try {
+      final res = await ApiClient().get('/driver/application');
+      final application = res['application'];
+      approved = application != null && application['status'] == 'approved' && res['is_active'] == true;
+    } catch (_) {
+      // Treat an unreachable status check as not-yet-approved.
+    }
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, approved ? '/job_board' : '/pending');
   }
 
   @override

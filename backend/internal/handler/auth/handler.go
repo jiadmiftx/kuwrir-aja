@@ -4,9 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
 	"time"
@@ -39,7 +37,6 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
-		auth.POST("/google", h.GoogleLogin)
 		auth.POST("/otp/request", h.RequestOTP)
 		auth.POST("/otp/verify", h.VerifyOTP)
 		auth.POST("/refresh", h.RefreshToken)
@@ -50,6 +47,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	authed.Use(middleware.AuthMiddleware(h.cfg.JWT.Secret))
 	{
 		authed.GET("/me", h.GetMe)
+		authed.PUT("/me", h.UpdateMe)
 		authed.PUT("/device-token", h.SaveDeviceToken)
 		authed.POST("/verify-phone", h.VerifyPhone)
 	}
@@ -88,6 +86,7 @@ type AuthResponse struct {
 	RefreshToken       string     `json:"refresh_token"`
 	User               model.User `json:"user"`
 	HasMerchantProfile *bool      `json:"has_merchant_profile,omitempty"`
+	HasDriverProfile   *bool      `json:"has_driver_profile,omitempty"`
 }
 
 // --- Handlers ---
@@ -193,82 +192,6 @@ func (h *Handler) Login(c *gin.Context) {
 		RefreshToken: refreshToken,
 		User:         user,
 	})
-}
-
-// GoogleLogin authenticates or registers a user via Google ID token.
-// Body: {"id_token": "...", "role": "customer"}
-func (h *Handler) GoogleLogin(c *gin.Context) {
-	var req struct {
-		IDToken string     `json:"id_token" binding:"required"`
-		Role    model.Role `json:"role"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Role == "" {
-		req.Role = model.RoleCustomer
-	}
-
-	// Verify ID token with Google
-	info, err := verifyGoogleToken(req.IDToken)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
-		return
-	}
-
-	// Find existing user by google_id or email
-	var user model.User
-	err = h.db.Where("google_id = ? OR (email != '' AND email = ?)", info.Sub, info.Email).First(&user).Error
-	if err != nil {
-		// New user — auto-register
-		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
-		user = model.User{
-			Name:      info.Name,
-			Email:     info.Email,
-			Phone:     "", // Google users may not have phone; they can add later
-			Password:  string(fakePassword),
-			AvatarURL: info.Picture,
-			GoogleID:  &info.Sub,
-			Role:      req.Role,
-			IsActive:  true,
-		}
-		// Phone must be unique and not-null — use a placeholder
-		user.Phone = "G-" + info.Sub[:10]
-		if err := h.db.Create(&user).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create account"})
-			return
-		}
-	} else {
-		// Update google_id if linked via email
-		if user.GoogleID == nil {
-			h.db.Model(&user).Update("google_id", info.Sub)
-		}
-		if !user.IsActive {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Account is deactivated"})
-			return
-		}
-	}
-
-	token, refreshToken, err := h.generateTokens(user)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-		return
-	}
-
-	resp := AuthResponse{
-		Token:        token,
-		RefreshToken: refreshToken,
-		User:         user,
-	}
-	if user.Role == model.RoleMerchant {
-		var count int64
-		h.db.Model(&model.Merchant{}).Where("user_id = ?", user.ID).Count(&count)
-		hasProfile := count > 0
-		resp.HasMerchantProfile = &hasProfile
-	}
-
-	c.JSON(http.StatusOK, resp)
 }
 
 const (
@@ -444,15 +367,20 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		hasProfile := count > 0
 		resp.HasMerchantProfile = &hasProfile
 	}
+	if user.Role == model.RoleDriver {
+		var count int64
+		h.db.Model(&model.DriverApplication{}).Where("user_id = ?", user.ID).Count(&count)
+		hasProfile := count > 0
+		resp.HasDriverProfile = &hasProfile
+	}
 
 	c.JSON(http.StatusOK, resp)
 }
 
 // VerifyPhone attaches and verifies a real phone number on the currently
-// authenticated account — used by customer_app's mandatory phone-verify
-// gate for accounts whose Phone is still GoogleLogin's placeholder
-// ("G-..."). Reuses the same OTP validation as VerifyOTP but updates the
-// logged-in user's row instead of looking up/creating one by phone.
+// authenticated account. Reuses the same OTP validation as VerifyOTP but
+// updates the logged-in user's row instead of looking up/creating one by
+// phone.
 // POST /auth/verify-phone   Body: {"phone": "...", "code": "..."}   (auth required)
 func (h *Handler) VerifyPhone(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -512,6 +440,50 @@ func (h *Handler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// UpdateMe lets the current user fill in profile fields OTP login never
+// asks for (name/email) — phone is the only required identity, everything
+// else is optional and can be added any time after login.
+// PUT /auth/me   Body: {"name": "...", "email": "..."}
+func (h *Handler) UpdateMe(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req struct {
+		Name  *string `json:"name"`
+		Email *string `json:"email" binding:"omitempty,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Email != nil {
+		var conflicting model.User
+		if h.db.Where("email = ? AND id != ?", *req.Email, userID).First(&conflicting).Error == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah dipakai akun lain"})
+			return
+		}
+		updates["email"] = *req.Email
+	}
+
+	if len(updates) > 0 {
+		if err := h.db.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+			return
+		}
+	}
+
+	var user model.User
+	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load account"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
 func (h *Handler) SaveDeviceToken(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req struct {
@@ -530,39 +502,10 @@ func (h *Handler) SaveDeviceToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Device token saved"})
 }
 
-// --- Google token verification ---
-
-type googleTokenInfo struct {
-	Sub     string `json:"sub"`
-	Email   string `json:"email"`
-	Name    string `json:"name"`
-	Picture string `json:"picture"`
-}
-
-func verifyGoogleToken(idToken string) (*googleTokenInfo, error) {
-	resp, err := http.Get("https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("google rejected token: %s", string(body))
-	}
-	var info googleTokenInfo
-	if err := json.Unmarshal(body, &info); err != nil {
-		return nil, err
-	}
-	if info.Sub == "" {
-		return nil, fmt.Errorf("invalid token: missing sub")
-	}
-	return &info, nil
-}
-
 // RefreshToken exchanges a still-valid refresh token for a new access +
 // refresh token pair (sliding expiration) — as long as a user opens any app
 // at least once within JWT_REFRESH_EXPIRY_HOURS, they never have to
-// fully re-authenticate via OTP/Google/password. Rejects access tokens
+// fully re-authenticate via OTP/password. Rejects access tokens
 // presented here (TokenType must be "refresh") and deactivated accounts.
 // POST /auth/refresh   Body: {"refresh_token": "..."}
 func (h *Handler) RefreshToken(c *gin.Context) {

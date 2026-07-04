@@ -20,9 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     try {
-      final api = ApiClient();
-      final res = await api.get('/auth/me');
-      _user = User.fromJson(res['user'] as Map<String, dynamic>);
+      _user = await ApiClient().getMe();
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }
@@ -52,6 +50,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _editField({
+    required String label,
+    required String? currentValue,
+    required TextInputType keyboardType,
+    required Future<User> Function(String value) onSave,
+  }) async {
+    final ctrl = TextEditingController(text: currentValue ?? '');
+    String? error;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Ubah $label'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: keyboardType,
+            autofocus: true,
+            decoration: InputDecoration(labelText: label, errorText: error),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final value = ctrl.text.trim();
+                if (value.isEmpty) {
+                  setDialogState(() => error = '$label wajib diisi');
+                  return;
+                }
+                try {
+                  _user = await onSave(value);
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (e) {
+                  setDialogState(() => error = e is ApiException ? e.message : '$e');
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,7 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Icon(Icons.person, size: 40, color: KuwrirColors.primary),
                       ),
                       const SizedBox(height: 12),
-                      Text(_user?.name ?? '-',
+                      Text(_user?.name.isNotEmpty == true ? _user!.name : 'Tanpa nama',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       Text(_user?.phone ?? '-',
                           style: TextStyle(color: KuwrirColors.textSecondary)),
@@ -83,9 +129,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       ListTile(
+                        leading: const Icon(Icons.badge_outlined),
+                        title: const Text('Nama'),
+                        subtitle: Text(_user?.name.isNotEmpty == true ? _user!.name : 'Belum diisi'),
+                        trailing: const Icon(Icons.edit_outlined, size: 18),
+                        onTap: () => _editField(
+                          label: 'Nama',
+                          currentValue: _user?.name,
+                          keyboardType: TextInputType.name,
+                          onSave: (value) => ApiClient().updateProfile(name: value),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
                         leading: const Icon(Icons.email_outlined),
                         title: const Text('Email'),
-                        subtitle: Text(_user?.email ?? '-'),
+                        subtitle: Text(_user?.email.isNotEmpty == true ? _user!.email : 'Belum diisi'),
+                        trailing: const Icon(Icons.edit_outlined, size: 18),
+                        onTap: () => _editField(
+                          label: 'Email',
+                          currentValue: _user?.email,
+                          keyboardType: TextInputType.emailAddress,
+                          onSave: (value) => ApiClient().updateProfile(email: value),
+                        ),
                       ),
                       const Divider(height: 1),
                       ListTile(

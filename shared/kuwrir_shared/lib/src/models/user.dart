@@ -9,8 +9,7 @@ class User {
   final bool isActive;
   final DateTime? phoneVerifiedAt;
 
-  /// False for GoogleLogin's placeholder phone ("G-...") and any account
-  /// that has never completed a real OTP check.
+  /// False for any account that has never completed a real OTP check.
   bool get isPhoneVerified => phoneVerifiedAt != null;
 
   User({

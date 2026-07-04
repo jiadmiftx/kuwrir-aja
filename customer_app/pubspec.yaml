@@ -24,7 +24,6 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^3.0.0
   flutter_local_notifications: ^22.0.1
-  google_sign_in: ^7.2.0
   flutter_svg: ^2.2.1
   local_auth: ^2.3.0
 

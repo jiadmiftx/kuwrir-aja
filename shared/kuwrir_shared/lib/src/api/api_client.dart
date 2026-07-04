@@ -558,12 +558,6 @@ class ApiClient {
     await post('/admin/support/users/$userId/messages', {'text': text});
   }
 
-  // --- Google Auth ---
-
-  Future<Map<String, dynamic>> googleLogin(String idToken, String role) async {
-    return await post('/auth/google', {'id_token': idToken, 'role': role});
-  }
-
   // --- Phone + OTP Auth ---
 
   Future<Map<String, dynamic>> requestOtp(String phone) async {
@@ -571,7 +565,8 @@ class ApiClient {
   }
 
   /// [role] only matters for auto-registering a brand-new phone number
-  /// (mirrors [googleLogin]'s role param) — leave null for customer_app.
+  /// (merchant_app/driver_app pass their own role; customer_app leaves it
+  /// null and defaults to customer).
   Future<Map<String, dynamic>> verifyOtp(String phone, String code, {String? role}) async {
     return await post('/auth/otp/verify', {
       'phone': phone,
@@ -586,11 +581,21 @@ class ApiClient {
   }
 
   /// Attaches and verifies a real phone number on the currently
-  /// authenticated account (the phone-verification gate for accounts still
-  /// carrying GoogleLogin's placeholder phone). Throws [ApiException] on
-  /// invalid/expired code or if the phone is already used elsewhere.
+  /// authenticated account. Throws [ApiException] on invalid/expired code
+  /// or if the phone is already used on a different account.
   Future<User> verifyMyPhone(String phone, String code) async {
     final data = await post('/auth/verify-phone', {'phone': phone, 'code': code});
+    return User.fromJson(data['user'] as Map<String, dynamic>);
+  }
+
+  /// Fills in profile fields OTP login never asks for (name/email) — phone
+  /// is the only required identity. Throws [ApiException] (409) if the
+  /// email is already used on a different account.
+  Future<User> updateProfile({String? name, String? email}) async {
+    final data = await put('/auth/me', {
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+    });
     return User.fromJson(data['user'] as Map<String, dynamic>);
   }
 }

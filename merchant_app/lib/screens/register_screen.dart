@@ -10,8 +10,8 @@ import 'pending_screen.dart';
 /// Merchant registration: data diri + data toko + upload 3 dokumen
 /// Single-step form (semua sekaligus)
 class MerchantRegisterScreen extends StatefulWidget {
-  /// Step to start at. Use 1 to skip account creation (e.g. after Google
-  /// sign-in already created the user account) and go straight to store info.
+  /// Step to start at. Use 1 to skip account creation (e.g. after OTP
+  /// login already created the user account) and go straight to store info.
   final int startAtStep;
 
   const MerchantRegisterScreen({super.key, this.startAtStep = 0});
@@ -285,7 +285,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
           },
           child: const Text('Lanjut →'),
         )),
-        // No "Kembali" when entering here via OTP/Google (startAtStep > 0)
+        // No "Kembali" when entering here via OTP (startAtStep > 0)
         // — the account is already created and this screen replaced login
         // in the nav stack, so there's nothing valid to pop back to.
         if (widget.startAtStep == 0) ...[
