@@ -498,7 +498,18 @@ func (h *Handler) GetMe(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user})
+
+	resp := gin.H{"user": user}
+	// Lets merchant_app's splash check detect "account exists but store
+	// registration was never finished" (e.g. user closed the app mid-form)
+	// and send them back into the registration form instead of a dead end.
+	if user.Role == model.RoleMerchant {
+		var count int64
+		h.db.Model(&model.Merchant{}).Where("user_id = ?", user.ID).Count(&count)
+		resp["has_merchant_profile"] = count > 0
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) SaveDeviceToken(c *gin.Context) {

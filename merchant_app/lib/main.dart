@@ -168,6 +168,19 @@ class _SplashRouterState extends State<_SplashRouter> {
         if (mounted) Navigator.pushReplacementNamed(context, '/login');
         return;
       }
+
+      // Account exists (via OTP/Google) but the store form was never
+      // finished — send them back into it instead of a dead end on
+      // Home/Pending, which both assume a store already exists.
+      final hasMerchantProfile = res['has_merchant_profile'] ?? false;
+      if (!hasMerchantProfile) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MerchantRegisterScreen(startAtStep: 1)),
+        );
+        return;
+      }
+
       Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
     } catch (_) {
       await api.clearTokens();
