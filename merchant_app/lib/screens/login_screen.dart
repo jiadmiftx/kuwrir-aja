@@ -12,10 +12,7 @@ class MerchantLoginScreen extends StatefulWidget {
 }
 
 class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
-  final _phoneCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
   bool _loading = false;
-  bool _obscure = true;
 
   Future<void> _handleOtpVerify(String phone, String code) async {
     final client = ApiClient();
@@ -35,45 +32,6 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
     await maybePromptBiometricOptIn(context);
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, isActive ? '/home' : '/pending');
-  }
-
-  Future<void> _login() async {
-    if (_phoneCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) return;
-    setState(() => _loading = true);
-    try {
-      final client = ApiClient();
-      final res = await client.post('/auth/login', {
-        'phone': _phoneCtrl.text.trim(),
-        'password': _passwordCtrl.text,
-      });
-      if (!mounted) return;
-
-      if (res['token'] != null) {
-        final role = res['user']?['role'];
-        final isActive = res['user']?['is_active'] ?? false;
-
-        if (role != 'merchant') {
-          _showError('Akun ini bukan akun merchant');
-          return;
-        }
-        await client.saveToken(res['token'], res['refresh_token']);
-        await NotificationService.uploadToken(client);
-        if (!mounted) return;
-        await maybePromptBiometricOptIn(context);
-        if (!mounted) return;
-        if (!isActive) {
-          Navigator.pushReplacementNamed(context, '/pending');
-          return;
-        }
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        _showError(res['error'] ?? 'Login gagal');
-      }
-    } catch (e) {
-      _showError(_friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
   }
 
   Future<void> _loginWithGoogle() async {
@@ -132,21 +90,13 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
 
   @override
-  void dispose() {
-    _phoneCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
@@ -165,47 +115,6 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
                 headerTitle: 'Masuk dengan nomor HP toko',
                 headerSubtitle: 'Kode OTP dikirim lewat WhatsApp',
                 verifyButtonLabel: 'Masuk',
-              ),
-              const SizedBox(height: 16),
-              const Row(children: [
-                Expanded(child: Divider()),
-                Padding(padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('atau pakai password', style: TextStyle(color: Colors.grey))),
-                Expanded(child: Divider()),
-              ]),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Nomor HP',
-                  prefixIcon: const Icon(Icons.phone),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  onPressed: _loading ? null : _login,
-                  child: _loading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Login', style: TextStyle(fontSize: 16)),
-                ),
               ),
               const SizedBox(height: 12),
               const Row(children: [

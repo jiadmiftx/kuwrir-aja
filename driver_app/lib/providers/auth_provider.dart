@@ -24,23 +24,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String phone, String password) async {
-    try {
-      final res = await _apiClient.post('/auth/login', {
-        'phone': phone,
-        'password': password,
-      });
-      final authResponse = AuthResponse.fromJson(res);
-      await _apiClient.saveToken(authResponse.token, authResponse.refreshToken);
-      _user = authResponse.user;
-      _isAuthenticated = true;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
   Future<void> logout() async {
     await _apiClient.clearTokens();
     _user = null;
