@@ -31,12 +31,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
           appBar: AppBar(
             title: const Text('Pesanan Masuk'),
             backgroundColor: KuwrirColors.background,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => context.read<StoreOrdersCubit>().load(),
-              ),
-            ],
           ),
           body: _buildBody(context, state),
         );

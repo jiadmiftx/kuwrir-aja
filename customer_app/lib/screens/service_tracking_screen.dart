@@ -46,9 +46,6 @@ class ServiceTrackingScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Status Pesanan'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: () {}, tooltip: 'Refresh'),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

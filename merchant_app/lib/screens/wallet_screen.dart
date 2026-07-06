@@ -142,12 +142,6 @@ class _WalletScreenState extends State<WalletScreen> {
           appBar: AppBar(
             title: const Text('Keuangan'),
             backgroundColor: KuwrirColors.background,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => context.read<MerchantWalletCubit>().load(),
-              ),
-            ],
           ),
           body: _buildBody(context, state),
         );

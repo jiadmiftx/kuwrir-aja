@@ -52,7 +52,6 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Chat dengan Admin'),
-          centerTitle: true,
         ),
         body: Column(
           children: [

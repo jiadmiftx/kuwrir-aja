@@ -20,12 +20,24 @@ class KuwrirTheme {
         onError: Colors.white,
       ),
       scaffoldBackgroundColor: KuwrirColors.background,
+      // Flush with the scaffold (not a separate surface), left-aligned bold
+      // title, no shadow even on scroll — matches the flat "product app"
+      // header style already used for Home/Dashboard across both apps,
+      // instead of the boxy centered Material default.
       appBarTheme: const AppBarTheme(
         elevation: 0,
-        centerTitle: true,
-        backgroundColor: KuwrirColors.surface,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        backgroundColor: KuwrirColors.background,
         foregroundColor: KuwrirColors.textPrimary,
         surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: KuwrirColors.textPrimary,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Inter',
+        ),
+        iconTheme: IconThemeData(color: KuwrirColors.textPrimary),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
