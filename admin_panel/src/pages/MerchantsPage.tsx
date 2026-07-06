@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ interface DeliveryZone {
   id: string
   city_name: string
   parent_zone_id?: string | null
+  children?: DeliveryZone[]
 }
 
 interface Merchant {
@@ -43,6 +44,10 @@ export default function MerchantsPage() {
   const [search, setSearch] = useState('')
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [zones, setZones] = useState<DeliveryZone[]>([])
+  // `zones` only holds top-level (kota) zones, with kecamatan nested under
+  // `children` — but a merchant's zone_id may point at a kecamatan, so name
+  // lookups need the flattened set or they fall back to the raw id.
+  const flatZones = useMemo(() => zones.flatMap(z => [z, ...(z.children ?? [])]), [zones])
   const [selected, setSelected] = useState<Merchant | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -73,7 +78,7 @@ export default function MerchantsPage() {
       body: JSON.stringify({ zone_id: zoneId === 'none' ? null : zoneId }),
     })
     if (res.ok) {
-      const z = zones.find(z => z.id === zoneId)
+      const z = flatZones.find(z => z.id === zoneId)
       setMerchants(prev => prev.map(m =>
         m.id === merchantId ? { ...m, zone_id: zoneId === 'none' ? undefined : zoneId, zone: z } : m
       ))
@@ -223,9 +228,14 @@ export default function MerchantsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Unassigned</SelectItem>
-                        {zones.filter(z => !z.parent_zone_id).map(z => (
-                          <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>
-                        ))}
+                        {zones.filter(z => !z.parent_zone_id).flatMap(z => [
+                          <SelectItem key={z.id} value={z.id}>{z.city_name}</SelectItem>,
+                          ...(z.children ?? []).map(c => (
+                            <SelectItem key={c.id} value={c.id} className="pl-6 text-muted-foreground">
+                              └ {c.city_name}
+                            </SelectItem>
+                          )),
+                        ])}
                       </SelectContent>
                     </Select>
                   </TableCell>
