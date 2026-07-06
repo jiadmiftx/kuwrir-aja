@@ -76,6 +76,10 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 	// Cross-merchant product search (customer app Search screen filters).
 	public.GET("/products/search", h.SearchProducts)
 
+	// Cross-merchant trending products (customer app Home "sedang rame"
+	// section) — ranked by recent completed-order frequency.
+	public.GET("/products/popular", h.PopularProducts)
+
 	// Global food-category taxonomy — read-only for customer app (Home
 	// filter chips) and merchant app (product tagging picker).
 	public.GET("/food-categories", h.PublicFoodCategories)
@@ -294,6 +298,41 @@ func (h *Handler) SearchProducts(c *gin.Context) {
 	var items []ProductSearchItem
 	if err := query.Order("products.sort_order ASC").Limit(100).Scan(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search products"})
+		return
+	}
+
+	ps := pricing.LoadSettings(h.db)
+	for i := range items {
+		items[i].Price = pricing.ApplyMarkup(items[i].Price, ps)
+		if items[i].DiscountPrice != nil && *items[i].DiscountPrice > 0 {
+			marked := pricing.ApplyMarkup(*items[i].DiscountPrice, ps)
+			items[i].DiscountPrice = &marked
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"products": items})
+}
+
+// PopularProducts returns the most-ordered products across all merchants
+// in the last 30 days, for the customer app Home "Sedang Rame" section.
+// Ranking comes from real order_items on delivered orders, not a stored
+// counter — there's no popularity field on Product to keep in sync.
+func (h *Handler) PopularProducts(c *gin.Context) {
+	query := h.db.Table("products").
+		Select(`products.*, merchants.id AS merchant_id, merchants.name AS merchant_name,
+			merchants.logo_url AS merchant_logo_url, merchants.is_open AS merchant_is_open,
+			COUNT(order_items.id) AS order_count`).
+		Joins("JOIN product_categories ON product_categories.id = products.category_id").
+		Joins("JOIN merchants ON merchants.id = product_categories.merchant_id").
+		Joins("JOIN order_items ON order_items.product_id = products.id").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Where("products.is_available = ? AND merchants.is_active = ? AND merchants.is_verified = ?", true, true, true).
+		Where("orders.status = ? AND orders.created_at > ?", model.OrderStatusDelivered, time.Now().AddDate(0, 0, -30)).
+		Group("products.id, merchants.id")
+
+	var items []ProductSearchItem
+	if err := query.Order("order_count DESC").Limit(15).Scan(&items).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load popular products"})
 		return
 	}
 
