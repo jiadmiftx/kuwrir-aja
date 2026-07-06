@@ -336,6 +336,27 @@ func (h *Handler) PopularProducts(c *gin.Context) {
 		return
 	}
 
+	// No order history yet (e.g. fresh launch, nothing delivered in the last
+	// 30 days) — fall back to just-added available products so the section
+	// still has something to show instead of staying empty forever.
+	if len(items) == 0 {
+		fallback := h.db.Table("products").
+			Select(`products.*, merchants.id AS merchant_id, merchants.name AS merchant_name,
+				merchants.logo_url AS merchant_logo_url, merchants.is_open AS merchant_is_open,
+				0 AS order_count`).
+			Joins("JOIN product_categories ON product_categories.id = products.category_id").
+			Joins("JOIN merchants ON merchants.id = product_categories.merchant_id").
+			Where("products.is_available = ? AND merchants.is_active = ? AND merchants.is_verified = ?", true, true, true)
+		if err := fallback.Order("products.created_at DESC").Limit(15).Scan(&items).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load popular products"})
+			return
+		}
+	}
+
+	if items == nil {
+		items = []ProductSearchItem{}
+	}
+
 	ps := pricing.LoadSettings(h.db)
 	for i := range items {
 		items[i].Price = pricing.ApplyMarkup(items[i].Price, ps)
