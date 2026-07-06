@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_config.dart';
+import 'api_logger.dart';
 import '../models/merchant.dart';
 import '../models/user.dart';
 import '../models/product.dart';
@@ -81,13 +82,18 @@ class ApiClient {
     final refreshToken = await _getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
     try {
-      final response = await _client
-          .post(
-            Uri.parse('$baseUrl/auth/refresh'),
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-            body: jsonEncode({'refresh_token': refreshToken}),
-          )
-          .timeout(_kTimeout);
+      final response = await _logged(
+        'POST',
+        '/auth/refresh',
+        body: {'refresh_token': '(redacted)'},
+        send: () => _client
+            .post(
+              Uri.parse('$baseUrl/auth/refresh'),
+              headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+              body: jsonEncode({'refresh_token': refreshToken}),
+            )
+            .timeout(_kTimeout),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) return false;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (body['token'] == null) return false;
@@ -137,11 +143,39 @@ class ApiClient {
     return response;
   }
 
+  /// Runs [send], logging the request/response pair (method, URL, body,
+  /// status, elapsed time) to the debug console — every JSON call funnels
+  /// through here so nothing needs its own logging.
+  Future<http.Response> _logged(
+    String method,
+    String endpoint, {
+    Object? body,
+    required Future<http.Response> Function() send,
+  }) async {
+    final url = '$baseUrl$endpoint';
+    ApiLogger.request(method: method, url: url, body: body);
+    final sw = Stopwatch()..start();
+    final response = await send();
+    sw.stop();
+    ApiLogger.response(
+      method: method,
+      url: url,
+      statusCode: response.statusCode,
+      rawBody: response.body,
+      elapsed: sw.elapsed,
+    );
+    return response;
+  }
+
   /// GET request
   Future<Map<String, dynamic>> get(String endpoint, {bool auth = true}) async {
-    final response = await _sendWithRetry(
-      (headers) => _client.get(Uri.parse('$baseUrl$endpoint'), headers: headers),
-      auth: auth,
+    final response = await _logged(
+      'GET',
+      endpoint,
+      send: () => _sendWithRetry(
+        (headers) => _client.get(Uri.parse('$baseUrl$endpoint'), headers: headers),
+        auth: auth,
+      ),
     );
     return _handleResponse(response);
   }
@@ -152,9 +186,14 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final response = await _sendWithRetry(
-      (headers) => _client.post(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-      auth: auth,
+    final response = await _logged(
+      'POST',
+      endpoint,
+      body: body,
+      send: () => _sendWithRetry(
+        (headers) => _client.post(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
+        auth: auth,
+      ),
     );
     return _handleResponse(response);
   }
@@ -165,9 +204,14 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final response = await _sendWithRetry(
-      (headers) => _client.put(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-      auth: auth,
+    final response = await _logged(
+      'PUT',
+      endpoint,
+      body: body,
+      send: () => _sendWithRetry(
+        (headers) => _client.put(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
+        auth: auth,
+      ),
     );
     return _handleResponse(response);
   }
@@ -178,9 +222,14 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final response = await _sendWithRetry(
-      (headers) => _client.patch(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-      auth: auth,
+    final response = await _logged(
+      'PATCH',
+      endpoint,
+      body: body,
+      send: () => _sendWithRetry(
+        (headers) => _client.patch(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
+        auth: auth,
+      ),
     );
     return _handleResponse(response);
   }
@@ -271,6 +320,12 @@ class ApiClient {
     ];
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     final data = await get('/products/search$query', auth: false);
+    final list = data['products'] as List<dynamic>? ?? [];
+    return list.map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<ProductSearchResult>> getPopularProducts() async {
+    final data = await get('/products/popular', auth: false);
     final list = data['products'] as List<dynamic>? ?? [];
     return list.map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>)).toList();
   }
@@ -371,16 +426,34 @@ class ApiClient {
     return Product.fromJson(data['product'] as Map<String, dynamic>);
   }
 
-  /// Uploads a photo for a product owned by the calling merchant.
-  /// Returns the new image URL.
-  Future<String> uploadProductImage(String productId, File imageFile) async {
+  /// Sends a single-file multipart POST, logging it like every other
+  /// request. Used by the three image/logo/banner upload endpoints.
+  Future<http.Response> _loggedMultipart(String endpoint, File imageFile) async {
+    final url = '$baseUrl$endpoint';
+    ApiLogger.request(method: 'POST', url: url, body: {'file': imageFile.path});
     final token = await _getToken();
-    final uri = Uri.parse('$baseUrl/my-store/products/$productId/image');
+    final uri = Uri.parse(url);
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    final sw = Stopwatch()..start();
     final streamed = await req.send().timeout(_kTimeout);
-    final body = await http.Response.fromStream(streamed);
+    final response = await http.Response.fromStream(streamed);
+    sw.stop();
+    ApiLogger.response(
+      method: 'POST',
+      url: url,
+      statusCode: response.statusCode,
+      rawBody: response.body,
+      elapsed: sw.elapsed,
+    );
+    return response;
+  }
+
+  /// Uploads a photo for a product owned by the calling merchant.
+  /// Returns the new image URL.
+  Future<String> uploadProductImage(String productId, File imageFile) async {
+    final body = await _loggedMultipart('/my-store/products/$productId/image', imageFile);
     final data = _handleResponse(body);
     return data['image_url'] as String;
   }
@@ -390,34 +463,25 @@ class ApiClient {
   }
 
   Future<String> uploadStoreLogo(File imageFile) async {
-    final token = await _getToken();
-    final uri = Uri.parse('$baseUrl/my-store/logo');
-    final req = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-    final streamed = await req.send().timeout(_kTimeout);
-    final body = await http.Response.fromStream(streamed);
+    final body = await _loggedMultipart('/my-store/logo', imageFile);
     final data = _handleResponse(body);
     return data['logo_url'] as String;
   }
 
   Future<String> uploadStoreBanner(File imageFile) async {
-    final token = await _getToken();
-    final uri = Uri.parse('$baseUrl/my-store/banner');
-    final req = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-    final streamed = await req.send().timeout(_kTimeout);
-    final body = await http.Response.fromStream(streamed);
+    final body = await _loggedMultipart('/my-store/banner', imageFile);
     final data = _handleResponse(body);
     return data['banner_url'] as String;
   }
 
   Future<void> deleteProduct(String productId) async {
-    final headers = await _headers();
-    await _client.delete(
-      Uri.parse('$baseUrl/my-store/products/$productId'),
-      headers: headers,
+    await _logged(
+      'DELETE',
+      '/my-store/products/$productId',
+      send: () async => _client.delete(
+        Uri.parse('$baseUrl/my-store/products/$productId'),
+        headers: await _headers(),
+      ),
     );
   }
 
@@ -431,10 +495,13 @@ class ApiClient {
   }
 
   Future<void> deleteVariant(String variantId) async {
-    final headers = await _headers();
-    await _client.delete(
-      Uri.parse('$baseUrl/my-store/variants/$variantId'),
-      headers: headers,
+    await _logged(
+      'DELETE',
+      '/my-store/variants/$variantId',
+      send: () async => _client.delete(
+        Uri.parse('$baseUrl/my-store/variants/$variantId'),
+        headers: await _headers(),
+      ),
     );
   }
 

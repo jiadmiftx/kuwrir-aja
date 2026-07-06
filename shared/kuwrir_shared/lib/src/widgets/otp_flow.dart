@@ -1,10 +1,30 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api/api_client.dart';
 import '../theme/kuwrir_colors.dart';
 
 enum _OtpStep { phone, code }
+
+class _Country {
+  final String iso;
+  final String name;
+  final String dialCode;
+  final String flag;
+  const _Country(this.iso, this.name, this.dialCode, this.flag);
+}
+
+const _kCountries = [
+  _Country('ID', 'Indonesia', '+62', '🇮🇩'),
+  _Country('MY', 'Malaysia', '+60', '🇲🇾'),
+  _Country('SG', 'Singapura', '+65', '🇸🇬'),
+  _Country('TL', 'Timor Leste', '+670', '🇹🇱'),
+  _Country('AU', 'Australia', '+61', '🇦🇺'),
+  _Country('US', 'Amerika Serikat', '+1', '🇺🇸'),
+  _Country('GB', 'Inggris Raya', '+44', '🇬🇧'),
+  _Country('NL', 'Belanda', '+31', '🇳🇱'),
+];
 
 /// Reusable phone-entry -> code-entry -> resend-cooldown flow, shared by
 /// every app's login screen (verify == log in) and customer_app's
@@ -28,6 +48,13 @@ class OtpFlow extends StatefulWidget {
   /// went to either way, since that's information, not decoration.
   final bool showHeaderIcon;
 
+  /// Shows a tappable country-dial-code chip (flag + code) in front of the
+  /// phone field, defaulting to Indonesia (+62). The number sent to the
+  /// backend for Indonesia is still composed in the app's original local
+  /// format (leading "0", no "+62") so existing accounts keep matching —
+  /// only non-Indonesia codes are sent with an explicit dial-code prefix.
+  final bool showCountryCode;
+
   const OtpFlow({
     super.key,
     required this.onVerify,
@@ -35,6 +62,7 @@ class OtpFlow extends StatefulWidget {
     this.headerSubtitle = 'Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
     this.verifyButtonLabel = 'Verifikasi',
     this.showHeaderIcon = true,
+    this.showCountryCode = false,
   });
 
   @override
@@ -50,6 +78,7 @@ class _OtpFlowState extends State<OtpFlow> {
   bool _loading = false;
   int _resendSeconds = 0;
   Timer? _resendTimer;
+  _Country _country = _kCountries.first;
 
   @override
   void dispose() {
@@ -81,9 +110,28 @@ class _OtpFlowState extends State<OtpFlow> {
     });
   }
 
+  /// Backend phone string. Indonesia keeps the legacy "0-prefixed" local
+  /// format already stored for every existing account; other countries use
+  /// an explicit dial-code prefix (e.g. "+60") since there's no legacy data
+  /// to match.
+  String _backendPhone() {
+    final digits = _phoneCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
+    if (!widget.showCountryCode) return digits;
+    final local = digits.startsWith('0') ? digits.substring(1) : digits;
+    return _country.dialCode == '+62' ? '0$local' : '${_country.dialCode}$local';
+  }
+
+  /// User-facing phone string shown on the code step ("kode dikirim ke...").
+  String _displayPhone() {
+    if (!widget.showCountryCode) return _phoneCtrl.text.trim();
+    final digits = _phoneCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
+    final local = digits.startsWith('0') ? digits.substring(1) : digits;
+    return '${_country.dialCode} $local';
+  }
+
   Future<void> _requestOtp() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) return;
+    if (_phoneCtrl.text.trim().isEmpty) return;
+    final phone = _backendPhone();
     setState(() => _loading = true);
     try {
       final res = await _client.requestOtp(phone);
@@ -111,12 +159,121 @@ class _OtpFlowState extends State<OtpFlow> {
     if (code.isEmpty) return;
     setState(() => _loading = true);
     try {
-      await widget.onVerify(_phoneCtrl.text.trim(), code);
+      await widget.onVerify(_backendPhone(), code);
     } catch (e) {
       if (mounted) _showError(e is ApiException ? e.message : '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _pickCountry() async {
+    final searchCtrl = TextEditingController();
+    final picked = await showModalBottomSheet<_Country>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final query = searchCtrl.text.trim().toLowerCase();
+          final filtered = query.isEmpty
+              ? _kCountries
+              : _kCountries
+                  .where((c) =>
+                      c.name.toLowerCase().contains(query) || c.dialCode.contains(query))
+                  .toList();
+          return Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.7),
+            decoration: const BoxDecoration(
+              color: KuwrirColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.border,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('Pilih Kode Negara',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      controller: searchCtrl,
+                      autofocus: false,
+                      onChanged: (_) => setSheetState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Cari negara',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final c = filtered[i];
+                        return ListTile(
+                          leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
+                          title: Text(c.name, style: const TextStyle(fontSize: 14.5)),
+                          trailing: Text(c.dialCode,
+                              style: TextStyle(color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
+                          onTap: () => Navigator.pop(sheetContext, c),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (picked != null) setState(() => _country = picked);
+  }
+
+  Widget _countryChip() {
+    return InkWell(
+      onTap: _pickCountry,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: KuwrirColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_country.flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 6),
+            Text(_country.dialCode, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+            const SizedBox(width: 2),
+            Icon(Icons.keyboard_arrow_down, size: 18, color: KuwrirColors.textHint),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -128,6 +285,19 @@ class _OtpFlowState extends State<OtpFlow> {
   }
 
   List<Widget> _buildPhoneStep() {
+    final phoneField = TextField(
+      controller: _phoneCtrl,
+      keyboardType: TextInputType.phone,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        labelText: 'Nomor HP',
+        hintText: widget.showCountryCode ? '812xxxxxxxx' : '08xxxxxxxxxx',
+        prefixIcon: widget.showCountryCode ? null : const Icon(Icons.phone),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      onSubmitted: (_) => _requestOtp(),
+    );
+
     return [
       if (widget.showHeaderIcon) ...[
         const SizedBox(height: 24),
@@ -142,17 +312,16 @@ class _OtpFlowState extends State<OtpFlow> {
             textAlign: TextAlign.center),
         const SizedBox(height: 32),
       ],
-      TextField(
-        controller: _phoneCtrl,
-        keyboardType: TextInputType.phone,
-        decoration: InputDecoration(
-          labelText: 'Nomor HP',
-          hintText: '08xxxxxxxxxx',
-          prefixIcon: const Icon(Icons.phone),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onSubmitted: (_) => _requestOtp(),
-      ),
+      widget.showCountryCode
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _countryChip(),
+                const SizedBox(width: 10),
+                Expanded(child: phoneField),
+              ],
+            )
+          : phoneField,
       const SizedBox(height: 24),
       SizedBox(
         height: 50,
@@ -180,7 +349,7 @@ class _OtpFlowState extends State<OtpFlow> {
         const SizedBox(height: 8),
       ] else
         const SizedBox(height: 4),
-      Text('Kode dikirim lewat WhatsApp ke ${_phoneCtrl.text.trim()}',
+      Text('Kode dikirim lewat WhatsApp ke ${_displayPhone()}',
           style: TextStyle(color: KuwrirColors.textSecondary, fontSize: widget.showHeaderIcon ? 14 : 13.5),
           textAlign: TextAlign.center),
       const SizedBox(height: 32),
