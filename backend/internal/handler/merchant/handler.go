@@ -837,13 +837,20 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 
 	updates := map[string]interface{}{
 		"name": req.Name, "description": req.Description,
-		"price": req.Price, "image_url": req.ImageURL, "sort_order": req.SortOrder,
+		"price": req.Price, "sort_order": req.SortOrder,
 		"track_stock": req.TrackStock, "stock_quantity": req.StockQuantity, "sku": req.SKU,
 		"food_category_id":     req.FoodCategoryID,
 		"discount_price":       req.DiscountPrice,
 		"packaging_fee":        req.PackagingFee,
 		"visible_from_minute":  req.VisibleFromMinute,
 		"visible_until_minute": req.VisibleUntilMinute,
+	}
+	// Photos are set via the separate UploadProductImage endpoint, not this
+	// JSON body — the app never sends image_url here, so req.ImageURL is
+	// always the zero value "" on edit. Including it unconditionally would
+	// wipe the existing photo on every save that doesn't also re-upload one.
+	if req.ImageURL != "" {
+		updates["image_url"] = req.ImageURL
 	}
 
 	h.db.Model(&model.Product{}).Where("id = ?", productID).Updates(updates)
