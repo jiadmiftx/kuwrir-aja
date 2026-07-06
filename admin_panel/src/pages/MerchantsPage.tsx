@@ -12,7 +12,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2 } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
 
@@ -47,6 +47,7 @@ export default function MerchantsPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Merchant | null>(null)
 
   const fetchMerchants = async () => {
     setIsLoading(true)
@@ -96,6 +97,22 @@ export default function MerchantsPage() {
           prev.map(m => m.id === id ? { ...m, is_verified: verified, is_active: verified } : m)
         )
         if (selected?.id === id) setSelected(s => s ? { ...s, is_verified: verified } : s)
+      }
+    } finally { setActionLoading(null) }
+  }
+
+  const deleteMerchant = async () => {
+    if (!deleteTarget) return
+    setActionLoading(deleteTarget.id + '-delete')
+    try {
+      const res = await api(`/api/v1/admin/merchants/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setMerchants(prev => prev.filter(m => m.id !== deleteTarget.id))
+        toast.success('Merchant deleted')
+        setDeleteTarget(null)
+        if (selected?.id === deleteTarget.id) setDetailOpen(false)
+      } else {
+        toast.error('Failed to delete merchant')
       }
     } finally { setActionLoading(null) }
   }
@@ -265,6 +282,13 @@ export default function MerchantsPage() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost" size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setDeleteTarget(m)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -302,24 +326,60 @@ export default function MerchantsPage() {
             </div>
           )}
           <DialogFooter>
-            {selected && !selected.is_verified && (
-              <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end w-full">
+              {selected && !selected.is_verified && (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={!!actionLoading}
+                    onClick={async () => { await verify(selected.id, true); setDetailOpen(false) }}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" /> Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={!!actionLoading}
+                    onClick={async () => { await verify(selected.id, false); setDetailOpen(false) }}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" /> Reject
+                  </Button>
+                </>
+              )}
+              {selected && (
                 <Button
-                  className="bg-green-600 hover:bg-green-700"
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   disabled={!!actionLoading}
-                  onClick={async () => { await verify(selected.id, true); setDetailOpen(false) }}
+                  onClick={() => setDeleteTarget(selected)}
                 >
-                  <CheckCircle className="mr-2 h-4 w-4" /> Approve
+                  <Trash2 className="mr-2 h-4 w-4" /> Hapus Merchant
                 </Button>
-                <Button
-                  variant="destructive"
-                  disabled={!!actionLoading}
-                  onClick={async () => { await verify(selected.id, false); setDetailOpen(false) }}
-                >
-                  <XCircle className="mr-2 h-4 w-4" /> Reject
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <Dialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Merchant?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            <strong>{deleteTarget?.name}</strong> akan dihapus dan hilang dari aplikasi customer.
+            Riwayat pesanan dan settlement tetap tersimpan untuk pembukuan.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Batal</Button>
+            <Button
+              variant="destructive"
+              disabled={actionLoading === deleteTarget?.id + '-delete'}
+              onClick={deleteMerchant}
+            >
+              {actionLoading === deleteTarget?.id + '-delete' && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Hapus
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -43,6 +43,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/customers", h.GetCustomers)
 	r.GET("/merchants", h.GetMerchants)
 	r.PUT("/merchants/:id/verify", h.VerifyMerchant)
+	r.DELETE("/merchants/:id", h.DeleteMerchant)
 	r.PUT("/users/:id/toggle-active", h.ToggleUserActive)
 
 	// Driver COD deposits
@@ -243,6 +244,40 @@ func (h *Handler) GetMerchants(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"merchants": merchants})
+}
+
+// DeleteMerchant removes a merchant from customer-facing browsing. It's a
+// soft delete (GORM's default via Base.DeletedAt) so historical orders,
+// settlements, and reviews that reference this merchant stay intact — only
+// the merchant row itself, and its own product catalog, stop showing up.
+// is_active is cleared first because several customer-facing queries join
+// merchants via raw SQL (not GORM's model scope), which doesn't
+// automatically respect deleted_at — but they do already filter on
+// is_active, so this guarantees the merchant disappears everywhere.
+func (h *Handler) DeleteMerchant(c *gin.Context) {
+	id := c.Param("id")
+
+	var merchant model.Merchant
+	if err := h.db.First(&merchant, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	h.db.Model(&merchant).Update("is_active", false)
+
+	var catIDs []string
+	h.db.Model(&model.ProductCategory{}).Where("merchant_id = ?", id).Pluck("id", &catIDs)
+	if len(catIDs) > 0 {
+		h.db.Where("category_id IN ?", catIDs).Delete(&model.Product{})
+	}
+	h.db.Where("merchant_id = ?", id).Delete(&model.ProductCategory{})
+
+	if err := h.db.Delete(&merchant).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete merchant"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Merchant deleted"})
 }
 
 // VerifyMerchant approves or rejects a merchant registration
