@@ -422,6 +422,22 @@ class ApiClient {
     await post('/my-store/categories', {'name': name});
   }
 
+  /// Throws [ApiException] (400) with a clear message when the category
+  /// still has products — unlike deleteProduct/deleteVariant, this one
+  /// surfaces backend errors instead of firing-and-forgetting, since "why
+  /// didn't it delete" is exactly what the merchant needs to see here.
+  Future<void> deleteCategory(String catId) async {
+    final response = await _logged(
+      'DELETE',
+      '/my-store/categories/$catId',
+      send: () => _sendWithRetry(
+        (headers) => _client.delete(Uri.parse('$baseUrl/my-store/categories/$catId'), headers: headers),
+        auth: true,
+      ),
+    );
+    _handleResponse(response);
+  }
+
   Future<Product> createProduct(String catId, Map<String, dynamic> body) async {
     final data = await post('/my-store/categories/$catId/products', body);
     return Product.fromJson(data['product'] as Map<String, dynamic>);

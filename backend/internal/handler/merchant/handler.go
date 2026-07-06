@@ -771,7 +771,25 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	h.db.Where("id = ? AND merchant_id = ?", catID, merchant.ID).Delete(&model.ProductCategory{})
+	var category model.ProductCategory
+	if err := h.db.Where("id = ? AND merchant_id = ?", catID, merchant.ID).First(&category).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+		return
+	}
+
+	var productCount int64
+	h.db.Model(&model.Product{}).Where("category_id = ?", catID).Count(&productCount)
+	if productCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Kategori masih punya %d produk. Hapus atau pindahkan produknya dulu.", productCount),
+		})
+		return
+	}
+
+	if err := h.db.Delete(&category).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Category deleted"})
 }
 

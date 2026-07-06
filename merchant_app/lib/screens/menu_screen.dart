@@ -167,6 +167,34 @@ class _CategorySection extends StatelessWidget {
   final ProductCategory category;
   const _CategorySection({required this.category});
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Kategori?'),
+        content: Text('${category.name} akan dihapus permanen.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: KuwrirColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await context.read<MenuCubit>().deleteCategory(category.id);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus kategori')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -177,12 +205,16 @@ class _CategorySection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                category.name,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: KuwrirColors.primary,
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: KuwrirColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
@@ -190,6 +222,15 @@ class _CategorySection extends StatelessWidget {
                 color: KuwrirColors.primary,
                 onPressed: () =>
                     _showAddProductDialog(context, category.id, category.name),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, size: 18, color: KuwrirColors.textHint),
+                onSelected: (action) {
+                  if (action == 'delete') _confirmDelete(context);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'delete', child: Text('Hapus Kategori')),
+                ],
               ),
             ],
           ),

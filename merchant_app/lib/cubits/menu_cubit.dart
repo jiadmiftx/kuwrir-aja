@@ -66,6 +66,14 @@ class MenuCubit extends Cubit<MenuState> {
     await load();
   }
 
+  /// Throws [ApiException] (e.g. "kategori masih punya N produk") — the
+  /// caller shows it rather than this cubit swallowing it into MenuError,
+  /// since the category list should stay visible either way.
+  Future<void> deleteCategory(String catId) async {
+    await _api.deleteCategory(catId);
+    await load();
+  }
+
   Future<void> toggleAvailability(String productId, bool available) async {
     await _api.toggleProductAvailability(productId, available);
     await load();
