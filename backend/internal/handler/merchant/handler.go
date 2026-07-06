@@ -1163,5 +1163,52 @@ func (h *Handler) GetDashboardSummary(c *gin.Context) {
 		"today_revenue":     totalRevenue,
 		"rating":            merchant.Rating,
 		"total_reviews":     merchant.TotalReviews,
+		"top_products":      h.topProducts(merchant.ID),
 	})
+}
+
+// TopProductItem is a lightweight product projection for the merchant
+// Dashboard's "Menu Terlaris" rail — just enough to render a row, ranked
+// by real order frequency rather than a stored counter.
+type TopProductItem struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	ImageURL      string    `json:"image_url,omitempty"`
+	Price         float64   `json:"price"`
+	DiscountPrice *float64  `json:"discount_price,omitempty"`
+	OrderCount    int       `json:"order_count"`
+}
+
+// topProducts ranks this merchant's own products by delivered-order
+// frequency in the last 30 days. Falls back to the merchant's most
+// recently added available products when there's no order history yet
+// (e.g. a brand-new store), so the rail isn't just empty.
+func (h *Handler) topProducts(merchantID uuid.UUID) []TopProductItem {
+	var items []TopProductItem
+	h.db.Table("products").
+		Select("products.id, products.name, products.image_url, products.price, products.discount_price, COUNT(order_items.id) AS order_count").
+		Joins("JOIN product_categories ON product_categories.id = products.category_id").
+		Joins("JOIN order_items ON order_items.product_id = products.id").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Where("product_categories.merchant_id = ? AND orders.status = ? AND orders.created_at > ?",
+			merchantID, model.OrderStatusDelivered, time.Now().AddDate(0, 0, -30)).
+		Group("products.id").
+		Order("order_count DESC").
+		Limit(5).
+		Scan(&items)
+
+	if len(items) == 0 {
+		h.db.Table("products").
+			Select("products.id, products.name, products.image_url, products.price, products.discount_price, 0 AS order_count").
+			Joins("JOIN product_categories ON product_categories.id = products.category_id").
+			Where("product_categories.merchant_id = ? AND products.is_available = ?", merchantID, true).
+			Order("products.created_at DESC").
+			Limit(5).
+			Scan(&items)
+	}
+
+	if items == nil {
+		items = []TopProductItem{}
+	}
+	return items
 }

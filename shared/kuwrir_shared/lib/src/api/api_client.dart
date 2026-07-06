@@ -529,6 +529,14 @@ class ApiClient {
     await put('/my-store', {'is_free_delivery': enabled});
   }
 
+  Future<void> updateMerchantDetails({String? name, String? phone, String? address}) async {
+    await put('/my-store', {
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (address != null) 'address': address,
+    });
+  }
+
   Future<Merchant> getMyMerchant() async {
     final data = await get('/my-store');
     return Merchant.fromJson(data['merchant'] as Map<String, dynamic>);
