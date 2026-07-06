@@ -37,6 +37,168 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
 	}
+
+	addresses := r.Group("/addresses")
+	{
+		addresses.GET("", h.MyAddresses)
+		addresses.POST("", h.CreateAddress)
+		addresses.PUT("/:id", h.UpdateAddress)
+		addresses.DELETE("/:id", h.DeleteAddress)
+		addresses.PUT("/:id/default", h.SetDefaultAddress)
+	}
+}
+
+// --- Addresses ---
+
+type AddressRequest struct {
+	Label     string  `json:"label" binding:"required"`
+	Address   string  `json:"address" binding:"required"`
+	Latitude  float64 `json:"latitude" binding:"required"`
+	Longitude float64 `json:"longitude" binding:"required"`
+	IsDefault bool    `json:"is_default"`
+}
+
+// MyAddresses lists the current customer's saved addresses, default first.
+func (h *Handler) MyAddresses(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var addresses []model.Address
+	h.db.Where("user_id = ?", userID).Order("is_default DESC, created_at DESC").Find(&addresses)
+	c.JSON(http.StatusOK, gin.H{"addresses": addresses})
+}
+
+// CreateAddress saves a new address for the current customer. The very
+// first address a user saves is always the default, regardless of what's
+// sent, so there's never a moment with saved addresses but no default.
+func (h *Handler) CreateAddress(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req AddressRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var count int64
+	h.db.Model(&model.Address{}).Where("user_id = ?", userID).Count(&count)
+	isDefault := req.IsDefault || count == 0
+
+	address := model.Address{
+		UserID:    uuid.MustParse(userID),
+		Label:     req.Label,
+		Address:   req.Address,
+		Latitude:  req.Latitude,
+		Longitude: req.Longitude,
+		IsDefault: isDefault,
+	}
+
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if isDefault {
+			if err := tx.Model(&model.Address{}).Where("user_id = ?", userID).
+				Update("is_default", false).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Create(&address).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save address"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"address": address})
+}
+
+// UpdateAddress edits a saved address owned by the current customer.
+func (h *Handler) UpdateAddress(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	var address model.Address
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+		return
+	}
+
+	var req AddressRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if req.IsDefault && !address.IsDefault {
+			if err := tx.Model(&model.Address{}).Where("user_id = ?", userID).
+				Update("is_default", false).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&address).Updates(map[string]interface{}{
+			"label":      req.Label,
+			"address":    req.Address,
+			"latitude":   req.Latitude,
+			"longitude":  req.Longitude,
+			"is_default": req.IsDefault,
+		}).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update address"})
+		return
+	}
+
+	h.db.First(&address, "id = ?", id)
+	c.JSON(http.StatusOK, gin.H{"address": address})
+}
+
+// DeleteAddress removes a saved address. If the deleted address was the
+// default and other addresses remain, the most recently added one becomes
+// the new default so there's always a default whenever any address exists.
+func (h *Handler) DeleteAddress(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	var address model.Address
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+		return
+	}
+
+	h.db.Delete(&address)
+
+	if address.IsDefault {
+		var next model.Address
+		if err := h.db.Where("user_id = ?", userID).Order("created_at DESC").First(&next).Error; err == nil {
+			h.db.Model(&next).Update("is_default", true)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Address deleted"})
+}
+
+// SetDefaultAddress marks one address as the default, clearing the flag on
+// every other address the customer has saved.
+func (h *Handler) SetDefaultAddress(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	var address model.Address
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&address).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+		return
+	}
+
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Address{}).Where("user_id = ?", userID).
+			Update("is_default", false).Error; err != nil {
+			return err
+		}
+		return tx.Model(&address).Update("is_default", true).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set default address"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Default address updated"})
 }
 
 // --- Request DTOs ---
