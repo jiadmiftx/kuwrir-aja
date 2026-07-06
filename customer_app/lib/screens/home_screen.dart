@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onSelect: (id) => context.read<HomeCubit>().selectCategory(id),
                         ),
                       if (loaded.trending.isNotEmpty) ...[
-                        const _SectionHeader(title: 'Sedang Rame Dipesan'),
+                        const _SectionHeader(title: 'Sedang Rame Dipesan', emoji: '🔥'),
                         _TrendingSection(products: loaded.trending),
                         const SizedBox(height: 8),
                       ],
@@ -354,7 +354,7 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     return Column(
       children: [
         SizedBox(
-          height: 172,
+          height: 192,
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.banners.isEmpty ? 0 : _kInfiniteMultiplier * widget.banners.length,
@@ -383,65 +383,85 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                           alignment: Alignment.centerRight,
                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                         ),
-                      DecoratedBox(
+                      // Bottom-anchored scrim, not left-to-right — the
+                      // content (title/subtitle bottom-left, CTA
+                      // bottom-right) all lives in the bottom band now, so
+                      // that's the region that needs to stay legible over
+                      // any image, regardless of horizontal position.
+                      const DecoratedBox(
                         decoration: BoxDecoration(
+                          // Same hue as KuwrirColors.primaryDark (0xFF004024)
+                          // at rising alpha — can't call .withValues() in a
+                          // const context, so the stops are spelled out.
                           gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                             colors: [
-                              KuwrirColors.primaryDark.withValues(alpha: 0.92),
-                              KuwrirColors.primaryDark.withValues(alpha: 0.55),
-                              KuwrirColors.primaryDark.withValues(alpha: 0.05),
+                              Colors.transparent,
+                              Color(0x1A004024),
+                              Color(0xE6004024),
                             ],
-                            stops: const [0.0, 0.55, 1.0],
+                            stops: [0.25, 0.6, 1.0],
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(22),
+                      // Title/subtitle anchored bottom-left, CTA anchored
+                      // bottom-right — two independent Positioned blocks
+                      // instead of one stacked Column, so the button reads
+                      // as a distinct tap target rather than just the last
+                      // line of text.
+                      Positioned(
+                        left: 22,
+                        right: banner.foodCategoryId != null ? 108 : 22,
+                        bottom: 18,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 210),
-                              child: Text(banner.title,
+                            Text(banner.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.15)),
+                            if (banner.subtitle?.isNotEmpty == true) ...[
+                              const SizedBox(height: 4),
+                              Text(banner.subtitle!,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 19,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.2)),
-                            ),
-                            if (banner.subtitle?.isNotEmpty == true) ...[
-                              const SizedBox(height: 6),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 190),
-                                child: Text(banner.subtitle!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5)),
-                              ),
+                                  style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.85),
+                                      fontSize: 12.5,
+                                      height: 1.15)),
                             ],
-                            const SizedBox(height: 14),
-                            if (banner.foodCategoryId != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(100),
-                                ),
-                                child: Text(banner.ctaText,
-                                    style: const TextStyle(
-                                        color: KuwrirColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13)),
-                              ),
                           ],
                         ),
                       ),
+                      if (banner.foodCategoryId != null)
+                        Positioned(
+                          right: 18,
+                          bottom: 18,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 90),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: Text(banner.ctaText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: KuwrirColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5)),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -474,6 +494,18 @@ class _BannerCarouselState extends State<_BannerCarousel> {
 
 // ── Category section ─────────────────────────────────────────────────────────
 
+// Rotating swatch of existing brand tokens (not arbitrary new hex values) so
+// each category chip gets its own soft tint instead of one flat repeated
+// color — a small, deliberate touch of variety for a food app that should
+// feel appetizing, not a rainbow of unrelated colors.
+const _kCategorySwatches = [
+  KuwrirColors.primary,
+  KuwrirColors.warning,
+  KuwrirColors.accent,
+  KuwrirColors.info,
+  KuwrirColors.secondary,
+];
+
 class _CategorySection extends StatelessWidget {
   final List<FoodCategory> categories;
   final String? selectedId;
@@ -497,6 +529,7 @@ class _CategorySection extends StatelessWidget {
             itemBuilder: (context, i) {
               final c = categories[i];
               final selected = c.id == selectedId;
+              final swatch = _kCategorySwatches[i % _kCategorySwatches.length];
               return GestureDetector(
                 onTap: () => onSelect(selected ? null : c.id),
                 child: Column(
@@ -507,8 +540,11 @@ class _CategorySection extends StatelessWidget {
                       height: 64,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: selected ? KuwrirColors.primary : KuwrirColors.primary.withValues(alpha: 0.08),
-                        border: selected ? Border.all(color: KuwrirColors.primaryDark, width: 2) : null,
+                        color: selected ? swatch : swatch.withValues(alpha: 0.12),
+                        border: selected ? Border.all(color: swatch, width: 2) : null,
+                        boxShadow: selected
+                            ? [BoxShadow(color: swatch.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4))]
+                            : null,
                       ),
                       child: Center(
                         child: Text(c.icon?.isNotEmpty == true ? c.icon! : '🍽️',
@@ -520,7 +556,7 @@ class _CategorySection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                          color: selected ? KuwrirColors.primary : KuwrirColors.textSecondary,
+                          color: selected ? swatch : KuwrirColors.textSecondary,
                         )),
                   ],
                 ),
@@ -539,7 +575,8 @@ class _SectionHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onSeeAll;
   final double topPadding;
-  const _SectionHeader({required this.title, this.onSeeAll, this.topPadding = 20});
+  final String? emoji;
+  const _SectionHeader({required this.title, this.onSeeAll, this.topPadding = 20, this.emoji});
 
   @override
   Widget build(BuildContext context) {
@@ -548,9 +585,17 @@ class _SectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.bold, color: KuwrirColors.textPrimary)),
+          Row(
+            children: [
+              if (emoji != null) ...[
+                Text(emoji!, style: const TextStyle(fontSize: 17)),
+                const SizedBox(width: 6),
+              ],
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.bold, color: KuwrirColors.textPrimary)),
+            ],
+          ),
           if (onSeeAll != null)
             GestureDetector(
               onTap: onSeeAll,
@@ -577,10 +622,10 @@ class _NearbySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (merchants.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Text('Belum ada warung di sekitar lokasimu',
-            style: TextStyle(color: Colors.grey)),
+            style: TextStyle(color: KuwrirColors.textSecondary)),
       );
     }
     return Padding(
@@ -607,10 +652,10 @@ class _PopularSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (merchants.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Text('Belum ada warung dengan rating di area ini',
-            style: TextStyle(color: Colors.grey)),
+            style: TextStyle(color: KuwrirColors.textSecondary)),
       );
     }
     return SizedBox(
@@ -835,8 +880,10 @@ class _MerchantCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                              color: Colors.grey[200], borderRadius: BorderRadius.circular(100)),
-                          child: const Text('Tutup', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              color: KuwrirColors.textHint.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(100)),
+                          child: Text('Tutup',
+                              style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
                         ),
                     ],
                   ),

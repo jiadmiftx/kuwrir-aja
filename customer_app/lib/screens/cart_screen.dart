@@ -145,20 +145,41 @@ class _CartScreenState extends State<CartScreen> {
           ),
           body: cart.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.shopping_cart_outlined,
-                        size: 64,
-                        color: KuwrirColors.textHint,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Keranjang kosong',
-                        style: TextStyle(color: KuwrirColors.textSecondary),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: KuwrirColors.primary.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.shopping_cart_outlined,
+                            size: 36,
+                            color: KuwrirColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Keranjang kosong',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: KuwrirColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Yuk mulai belanja dari warung favoritmu',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : Column(
@@ -167,21 +188,41 @@ class _CartScreenState extends State<CartScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+                        horizontal: 20,
+                        vertical: 12,
                       ),
-                      color: KuwrirColors.primary.withValues(alpha: 0.05),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.surface,
+                        border: Border(
+                          bottom: BorderSide(color: KuwrirColors.border),
+                        ),
+                      ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.store,
-                            size: 18,
-                            color: KuwrirColors.primary,
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.storefront_outlined,
+                              size: 17,
+                              color: KuwrirColors.primary,
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            cart.merchantName ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              cart.merchantName ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -190,23 +231,41 @@ class _CartScreenState extends State<CartScreen> {
                     // Item list
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text(
+                              'PESANAN',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                                color: KuwrirColors.textHint,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
                             // Items
                             ...cart.items.map(
                               (item) => Container(
-                                margin: const EdgeInsets.only(bottom: 8),
+                                margin: const EdgeInsets.only(bottom: 10),
                                 decoration: BoxDecoration(
                                   color: KuwrirColors.surface,
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: KuwrirColors.border,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: KuwrirColors.textPrimary
+                                          .withValues(alpha: 0.04),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(14),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -221,14 +280,14 @@ class _CartScreenState extends State<CartScreen> {
                                                 Text(
                                                   item.product.name,
                                                   style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 14.5,
                                                   ),
                                                 ),
                                                 if (item
                                                     .selectedVariants
                                                     .isNotEmpty) ...[
-                                                  const SizedBox(height: 2),
+                                                  const SizedBox(height: 3),
                                                   Text(
                                                     item.selectedVariants
                                                         .map((v) => v.name)
@@ -240,68 +299,84 @@ class _CartScreenState extends State<CartScreen> {
                                                     ),
                                                   ),
                                                 ],
-                                                const SizedBox(height: 4),
+                                                const SizedBox(height: 5),
                                                 Text(
-                                                  'IDR ${_fmt(item.unitPrice)}',
+                                                  'Rp ${_fmt(item.unitPrice)}',
                                                   style: const TextStyle(
                                                     color: KuwrirColors.primary,
                                                     fontSize: 13,
-                                                    fontWeight: FontWeight.w500,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                          Row(
-                                            children: [
-                                              _QtyBtn(
-                                                icon: Icons.remove,
-                                                onTap: () => context
-                                                    .read<CartCubit>()
-                                                    .decrementItem(
-                                                      item.product.id,
-                                                      variantKey:
-                                                          item.variantKey,
-                                                    ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: KuwrirColors.background,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: KuwrirColors.border,
                                               ),
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                _QtyBtn(
+                                                  icon: Icons.remove,
+                                                  onTap: () => context
+                                                      .read<CartCubit>()
+                                                      .decrementItem(
+                                                        item.product.id,
+                                                        variantKey:
+                                                            item.variantKey,
+                                                      ),
+                                                ),
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                      ),
+                                                  child: Text(
+                                                    '${item.quantity}',
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.w800,
+                                                      fontSize: 14.5,
                                                     ),
-                                                child: Text(
-                                                  '${item.quantity}',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
                                                   ),
                                                 ),
-                                              ),
-                                              _QtyBtn(
-                                                icon: Icons.add,
-                                                onTap: () => context
-                                                    .read<CartCubit>()
-                                                    .addItem(
-                                                      item.product,
-                                                      merchantId:
-                                                          cart.merchantId,
-                                                      merchantName:
-                                                          cart.merchantName,
-                                                      selectedVariants:
-                                                          item.selectedVariants,
-                                                    ),
-                                              ),
-                                            ],
+                                                _QtyBtn(
+                                                  icon: Icons.add,
+                                                  onTap: () => context
+                                                      .read<CartCubit>()
+                                                      .addItem(
+                                                        item.product,
+                                                        merchantId:
+                                                            cart.merchantId,
+                                                        merchantName:
+                                                            cart.merchantName,
+                                                        selectedVariants: item
+                                                            .selectedVariants,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 8),
+                                      Divider(height: 1, color: KuwrirColors.border),
+                                      const SizedBox(height: 8),
                                       InkWell(
                                         onTap: () => _editItemNotes(item),
                                         borderRadius: BorderRadius.circular(8),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
-                                            vertical: 4,
+                                            vertical: 2,
                                           ),
                                           child: Row(
                                             children: [
@@ -310,7 +385,7 @@ class _CartScreenState extends State<CartScreen> {
                                                 size: 16,
                                                 color: KuwrirColors.textHint,
                                               ),
-                                              const SizedBox(width: 4),
+                                              const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
                                                   item.notes != null &&
@@ -352,30 +427,44 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
 
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 22),
                             // Delivery address
-                            const Text(
-                              'Alamat Pengiriman',
+                            Text(
+                              'ALAMAT PENGIRIMAN',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                                color: KuwrirColors.textHint,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _addressCtrl,
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(
-                                  Icons.location_on_outlined,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                hintText: 'Masukkan alamat pengiriman',
+                            const SizedBox(height: 10),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: KuwrirColors.surface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: KuwrirColors.border),
                               ),
-                              maxLines: 2,
+                              child: TextField(
+                                controller: _addressCtrl,
+                                style: const TextStyle(fontSize: 13.5),
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.location_on_outlined,
+                                    color: KuwrirColors.primary,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  filled: false,
+                                  hintText: 'Masukkan alamat pengiriman',
+                                  hintStyle: TextStyle(color: KuwrirColors.textHint),
+                                ),
+                                maxLines: 2,
+                              ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             Row(
                               children: [
                                 Expanded(
@@ -407,9 +496,17 @@ class _CartScreenState extends State<CartScreen> {
                                         ),
                                       );
                                     },
-                                    icon: const Icon(
+                                    style: OutlinedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      side: BorderSide(color: KuwrirColors.border),
+                                      foregroundColor: KuwrirColors.textPrimary,
+                                    ),
+                                    icon: Icon(
                                       Icons.bookmark_border,
                                       size: 18,
+                                      color: KuwrirColors.primary,
                                     ),
                                     label: const Text('Alamat Tersimpan'),
                                   ),
@@ -455,45 +552,85 @@ class _CartScreenState extends State<CartScreen> {
                                         }
                                       }
                                     },
-                                    icon: const Icon(
+                                    style: OutlinedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      side: BorderSide(color: KuwrirColors.border),
+                                      foregroundColor: KuwrirColors.textPrimary,
+                                    ),
+                                    icon: Icon(
                                       Icons.map_outlined,
                                       size: 18,
+                                      color: KuwrirColors.primary,
                                     ),
                                     label: const Text('Pilih di Peta'),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 22),
+                            Text(
+                              'PENERIMA',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                                color: KuwrirColors.textHint,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
                             Row(
                               children: [
                                 Expanded(
-                                  child: TextField(
-                                    controller: _receiverCtrl,
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(
-                                        Icons.person_outline,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: KuwrirColors.surface,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: KuwrirColors.border),
+                                    ),
+                                    child: TextField(
+                                      controller: _receiverCtrl,
+                                      style: const TextStyle(fontSize: 13.5),
+                                      decoration: InputDecoration(
+                                        prefixIcon: Icon(
+                                          Icons.person_outline,
+                                          color: KuwrirColors.textHint,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        hintText: 'Nama penerima',
+                                        hintStyle: TextStyle(color: KuwrirColors.textHint),
                                       ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      hintText: 'Nama penerima',
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: TextField(
-                                    controller: _phoneCtrl,
-                                    keyboardType: TextInputType.phone,
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(
-                                        Icons.phone_outlined,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: KuwrirColors.surface,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: KuwrirColors.border),
+                                    ),
+                                    child: TextField(
+                                      controller: _phoneCtrl,
+                                      keyboardType: TextInputType.phone,
+                                      style: const TextStyle(fontSize: 13.5),
+                                      decoration: InputDecoration(
+                                        prefixIcon: Icon(
+                                          Icons.phone_outlined,
+                                          color: KuwrirColors.textHint,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        hintText: 'No. HP penerima',
+                                        hintStyle: TextStyle(color: KuwrirColors.textHint),
                                       ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      hintText: 'No. HP penerima',
                                     ),
                                   ),
                                 ),
@@ -507,14 +644,17 @@ class _CartScreenState extends State<CartScreen> {
 
                     // Summary + Continue
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
                       decoration: BoxDecoration(
                         color: KuwrirColors.surface,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(24),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, -2),
+                            color: KuwrirColors.textPrimary.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
                           ),
                         ],
                       ),
@@ -525,28 +665,45 @@ class _CartScreenState extends State<CartScreen> {
                             amount: cart.subtotal - cart.packagingFeeTotal,
                           ),
                           if (cart.packagingFeeTotal > 0) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             _PriceRow(
                               label: 'Biaya kemasan (dari merchant)',
                               amount: cart.packagingFeeTotal,
                             ),
                           ],
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           _PriceRow(label: 'Ongkir (estimasi)', amount: 15000),
-                          const Divider(height: 12),
+                          const SizedBox(height: 10),
+                          Divider(height: 1, color: KuwrirColors.border),
+                          const SizedBox(height: 10),
                           _PriceRow(
                             label: 'Est. total',
                             amount: cart.subtotal + 15000,
                             isBold: true,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
+                            height: 50,
                             child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: KuwrirColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
                               onPressed: cart.isEmpty
                                   ? null
                                   : () => _goToSummary(cart),
-                              child: const Text('Lanjut ke Konfirmasi'),
+                              child: const Text(
+                                'Checkout',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -602,17 +759,17 @@ class _PriceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = TextStyle(
-      fontSize: isBold ? 16 : 14,
-      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-      color: isBold ? null : KuwrirColors.textSecondary,
+      fontSize: isBold ? 16.5 : 13.5,
+      fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
+      color: isBold ? KuwrirColors.textPrimary : KuwrirColors.textSecondary,
     );
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: style),
         Text(
-          'IDR ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-          style: style.copyWith(color: isBold ? KuwrirColors.primary : null),
+          'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
+          style: style.copyWith(color: isBold ? KuwrirColors.primary : KuwrirColors.textSecondary),
         ),
       ],
     );

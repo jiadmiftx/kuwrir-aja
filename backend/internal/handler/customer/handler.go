@@ -301,6 +301,10 @@ func (h *Handler) calculateOrderPricing(
 		shapes := []pricing.ZoneShape{{Lat: merchant.Latitude, Lng: merchant.Longitude, RadiusKm: 5.0}}
 		deliveryFee = priceDropoff(shapes, dropoffLat, dropoffLng, zoneBasisFee, zonePerKmFee)
 	}
+	// The per-km formula produces odd figures like 11,412 — round to the
+	// nearest thousand rupiah so the customer sees a clean number both in
+	// the checkout quote and the actual charge.
+	deliveryFee = math.Round(deliveryFee/1000) * 1000
 
 	var orderItems []model.OrderItem
 	var subtotalWithMarkup float64

@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -307,47 +308,112 @@ class _OrdersScreenState extends State<_OrdersScreen> {
         child: ListView.builder(
           padding: const EdgeInsets.all(20),
           itemCount: _orders.length,
-          itemBuilder: (_, i) {
-            final o = _orders[i];
-            return _SoftListTile(
-              margin: const EdgeInsets.only(bottom: 12),
-              onTap: () => Navigator.pushNamed(
-                context,
-                '/tracking',
-                arguments: {'order_id': o.id},
-              ),
-              leading: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: KuwrirColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.receipt_long_outlined,
-                  color: KuwrirColors.primary,
-                  size: 20,
-                ),
-              ),
-              title: o.orderNumber,
-              subtitle: o.merchantName ?? o.senderName ?? '-',
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _StatusBadge(o.status),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rp ${o.total.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+          itemBuilder: (_, i) => _OrderCard(
+            order: _orders[i],
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/tracking',
+              arguments: {'order_id': _orders[i].id},
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderCard extends StatelessWidget {
+  final Order order;
+  final VoidCallback onTap;
+  const _OrderCard({required this.order, required this.onTap});
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+
+  String get _itemSummary {
+    if (order.items.isEmpty) return order.merchantName ?? order.senderName ?? '-';
+    final first = order.items.first.itemName;
+    final extra = order.items.length - 1;
+    return extra > 0 ? '$first +$extra lainnya' : first;
+  }
+
+  String? get _dateLabel {
+    final t = order.createdAt;
+    if (t == null) return null;
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    if (diff.inDays < 7) return '${diff.inDays} hari lalu';
+    return '${t.day}/${t.month}/${t.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(Icons.storefront_outlined, color: KuwrirColors.primary, size: 19),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(order.merchantName ?? order.senderName ?? 'Pesanan',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                          const SizedBox(height: 2),
+                          Text('#${order.orderNumber}${_dateLabel != null ? ' · ${_dateLabel!}' : ''}',
+                              style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
+                        ],
+                      ),
+                    ),
+                    _StatusBadge(order.status),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Divider(height: 1, color: KuwrirColors.border),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(_itemSummary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Rp ${_fmt(order.total)}',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: KuwrirColors.primary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -493,34 +559,60 @@ class _StatusBadge extends StatelessWidget {
   final String status;
   const _StatusBadge(this.status);
 
-  @override
-  Widget build(BuildContext context) {
-    Color c;
+  Color get _color {
     switch (status) {
       case 'delivered':
       case 'returned':
-        c = Colors.green;
-        break;
+        return KuwrirColors.success;
       case 'cancelled':
-        c = Colors.red;
-        break;
+        return KuwrirColors.error;
+      case 'pending':
       case 'preparing':
       case 'ready':
+        return KuwrirColors.warning;
+      case 'confirmed':
       case 'picked_up':
-        c = Colors.orange;
-        break;
+        return KuwrirColors.info;
       default:
-        c = Colors.grey;
+        return KuwrirColors.textHint;
     }
+  }
+
+  String get _label {
+    switch (status) {
+      case 'pending':
+        return 'Menunggu';
+      case 'confirmed':
+        return 'Dikonfirmasi';
+      case 'preparing':
+        return 'Diproses';
+      case 'ready':
+        return 'Siap Diambil';
+      case 'picked_up':
+        return 'Dikirim';
+      case 'delivered':
+        return 'Selesai';
+      case 'returned':
+        return 'Dikembalikan';
+      case 'cancelled':
+        return 'Dibatalkan';
+      default:
+        return status.replaceAll('_', ' ');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: c.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(7),
       ),
       child: Text(
-        status.replaceAll('_', ' '),
-        style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w600),
+        _label,
+        style: TextStyle(fontSize: 10.5, color: c, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -543,21 +635,11 @@ class _PromoScreenState extends State<_PromoScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = ApiClient().getActivePromotions());
-    await _future;
-  }
-
-  String _valueLabel(Promotion p) {
-    switch (p.type) {
-      case 'percentage':
-        return 'Diskon ${p.value.toStringAsFixed(0)}%';
-      case 'fixed':
-        return 'Potongan Rp ${p.value.toStringAsFixed(0)}';
-      case 'free_delivery':
-        return 'Gratis Ongkir';
-      default:
-        return p.title;
-    }
+    final future = ApiClient().getActivePromotions();
+    setState(() {
+      _future = future;
+    });
+    await future;
   }
 
   @override
@@ -583,9 +665,7 @@ class _PromoScreenState extends State<_PromoScreen> {
                 builder: (context, constraints) => SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
                     child: _EmptyState(
                       icon: Icons.local_offer_outlined,
                       title: 'Belum ada promo aktif',
@@ -596,95 +676,204 @@ class _PromoScreenState extends State<_PromoScreen> {
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
               itemCount: promos.length,
-              itemBuilder: (context, i) {
-                final p = promos[i];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: KuwrirColors.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: KuwrirColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (p.imageUrl != null)
-                        Image.network(
-                          p.imageUrl!,
-                          height: 140,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: KuwrirColors.primary.withValues(
-                                      alpha: 0.08,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    p.code,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: KuwrirColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _valueLabel(p),
-                              style: const TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              p.title,
-                              style: TextStyle(
-                                color: KuwrirColors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                            if (p.minOrder > 0) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Min. belanja Rp ${p.minOrder.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: KuwrirColors.textHint,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              itemBuilder: (context, i) => _PromoCard(promo: promos[i]),
             );
           },
         ),
       ),
+    );
+  }
+}
+
+/// Per-type accent + icon so a promo reads at a glance without parsing the
+/// title text — percentage/fixed/free-delivery each get their own personality
+/// instead of one flat green treatment for every card.
+class _PromoStyle {
+  final Color color;
+  final IconData icon;
+  const _PromoStyle(this.color, this.icon);
+}
+
+_PromoStyle _promoStyle(String type) {
+  switch (type) {
+    case 'fixed':
+      return const _PromoStyle(KuwrirColors.accent, Icons.savings_outlined);
+    case 'free_delivery':
+      return const _PromoStyle(KuwrirColors.warning, Icons.delivery_dining_outlined);
+    default:
+      return const _PromoStyle(KuwrirColors.primary, Icons.percent_rounded);
+  }
+}
+
+class _PromoCard extends StatelessWidget {
+  final Promotion promo;
+  const _PromoCard({required this.promo});
+
+  String get _valueLabel {
+    switch (promo.type) {
+      case 'percentage':
+        return 'Diskon ${promo.value.toStringAsFixed(0)}%';
+      case 'fixed':
+        return 'Potongan Rp ${_fmt(promo.value)}';
+      case 'free_delivery':
+        return 'Gratis Ongkir';
+      default:
+        return promo.title;
+    }
+  }
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+
+  Future<void> _copyCode(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: promo.code));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kode ${promo.code} disalin'),
+          backgroundColor: KuwrirColors.primaryDark,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _promoStyle(promo.type);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(color: KuwrirColors.textPrimary.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (promo.imageUrl != null)
+            Image.network(
+              promo.imageUrl!,
+              height: 132,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _PromoHeroFallback(style: style),
+            )
+          else
+            _PromoHeroFallback(style: style),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_valueLabel,
+                    style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, color: style.color)),
+                const SizedBox(height: 4),
+                Text(promo.title,
+                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13, height: 1.35)),
+                if (promo.minOrder > 0 || (promo.type == 'percentage' && promo.maxDiscount > 0)) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      if (promo.minOrder > 0)
+                        _PromoInfoChip(text: 'Min. belanja Rp ${_fmt(promo.minOrder)}'),
+                      if (promo.type == 'percentage' && promo.maxDiscount > 0)
+                        _PromoInfoChip(text: 'Maks. Rp ${_fmt(promo.maxDiscount)}'),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: () => _copyCode(context),
+                  borderRadius: BorderRadius.circular(12),
+                  child: DottedCodeChip(code: promo.code, color: style.color),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromoInfoChip extends StatelessWidget {
+  final String text;
+  const _PromoInfoChip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: KuwrirColors.background,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+/// A coupon-style code pill with a dashed border, doubling as the tap
+/// target to copy the code — makes "Salin Kode" a real affordance instead
+/// of a static label.
+class DottedCodeChip extends StatelessWidget {
+  final String code;
+  final Color color;
+  const DottedCodeChip({super.key, required this.code, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.confirmation_number_outlined, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(code,
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5)),
+          ),
+          Icon(Icons.copy_rounded, size: 15, color: color.withValues(alpha: 0.7)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromoHeroFallback extends StatelessWidget {
+  final _PromoStyle style;
+  const _PromoHeroFallback({required this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 92,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [style.color.withValues(alpha: 0.16), style.color.withValues(alpha: 0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(child: Icon(style.icon, size: 34, color: style.color)),
     );
   }
 }

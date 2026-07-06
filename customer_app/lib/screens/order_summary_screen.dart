@@ -117,7 +117,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       child: Scaffold(
         backgroundColor: KuwrirColors.background,
         appBar: AppBar(
-          title: const Text('Konfirmasi Pesanan'),
+          title: const Text('Checkout'),
           backgroundColor: KuwrirColors.background,
         ),
         body: ListView(
@@ -128,11 +128,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             _SoftPanel(
               child: Row(
                 children: [
-                  Icon(
-                    Icons.storefront_outlined,
-                    color: KuwrirColors.primary,
-                    size: 20,
-                  ),
+                  const _PanelIcon(Icons.storefront_outlined),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -166,11 +162,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    color: KuwrirColors.primary,
-                    size: 20,
-                  ),
+                  const _PanelIcon(Icons.location_on_outlined),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -209,11 +201,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             _SoftPanel(
               child: Row(
                 children: [
-                  Icon(
-                    Icons.payments_outlined,
-                    color: KuwrirColors.primary,
-                    size: 20,
-                  ),
+                  const _PanelIcon(Icons.payments_outlined),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -290,10 +278,21 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                             amount: _quote!.taxAmount,
                           ),
                         Divider(height: 20, color: KuwrirColors.border),
-                        _PriceRow(
-                          label: 'Total',
-                          amount: _quote!.total,
-                          isBold: true,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: KuwrirColors.primary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: _PriceRow(
+                            label: 'Total',
+                            amount: _quote!.total,
+                            isBold: true,
+                          ),
                         ),
                       ],
                     ),
@@ -314,11 +313,24 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               ),
               decoration: BoxDecoration(
                 color: KuwrirColors.surface,
-                border: Border(top: BorderSide(color: KuwrirColors.border)),
+                boxShadow: [
+                  BoxShadow(
+                    color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
               child: SizedBox(
-                height: 50,
+                height: 52,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: KuwrirColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   onPressed: canConfirm ? _confirmOrder : null,
                   child: placing
                       ? const SizedBox(
@@ -331,8 +343,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         )
                       : Text(
                           _quote != null
-                              ? 'Konfirmasi · Rp ${_fmt(_quote!.total)}'
-                              : 'Konfirmasi Pesanan',
+                              ? 'Buat Pesanan · Rp ${_fmt(_quote!.total)}'
+                              : 'Buat Pesanan',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                 ),
               ),
@@ -370,13 +386,39 @@ class _SoftPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: KuwrirColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: child,
+    );
+  }
+}
+
+class _PanelIcon extends StatelessWidget {
+  final IconData icon;
+  const _PanelIcon(this.icon);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: KuwrirColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Icon(icon, color: KuwrirColors.primary, size: 19),
     );
   }
 }

@@ -60,6 +60,7 @@ class Order {
   final String? merchantId;
   final String? merchantName;
   final List<OrderItem> items;
+  final DateTime? createdAt;
 
   const Order({
     required this.id,
@@ -90,6 +91,7 @@ class Order {
     this.merchantId,
     this.merchantName,
     this.items = const [],
+    this.createdAt,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -126,6 +128,7 @@ class Order {
               ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
     );
   }
 
