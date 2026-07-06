@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/location_cubit.dart';
 import '../cubits/session_cubit.dart';
-import 'location_picker_screen.dart';
+import 'addresses_screen.dart';
 import 'banner_detail_screen.dart';
 import 'phone_verification_gate.dart';
 import 'notifications_screen.dart';
@@ -52,21 +51,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openLocationPicker(LocationState loc) async {
-    final initial = loc.hasLocation ? LatLng(loc.lat!, loc.lng!) : null;
-    final result = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(builder: (_) => LocationPickerScreen(initial: initial)),
-    );
-    if (result != null && context.mounted) {
-      final latlng = result['latlng'] as LatLng;
-      final address = result['address'] as String;
-      await context.read<LocationCubit>().setLocation(
-            latlng.latitude, latlng.longitude, address);
-      if (context.mounted) {
-        context.read<HomeCubit>().load(lat: latlng.latitude, lng: latlng.longitude);
-      }
+  Future<void> _useLocation(double lat, double lng, String address) async {
+    await context.read<LocationCubit>().setLocation(lat, lng, address);
+    if (context.mounted) {
+      context.read<HomeCubit>().load(lat: lat, lng: lng);
     }
+  }
+
+  /// Tapping the location chip opens the saved-addresses picker first
+  /// (matching Gojek's "Pilih alamat" flow — saved places take priority,
+  /// with a map pick as the fallback for a one-off destination), instead
+  /// of jumping straight into the raw map every time.
+  Future<void> _openLocationPicker(LocationState loc) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddressesScreen(
+          onPick: (a) {
+            _useLocation(a.latitude, a.longitude, a.address);
+            Navigator.pop(context);
+          },
+          onPickAdHoc: (address, lat, lng) {
+            _useLocation(lat, lng, address);
+            Navigator.pop(context);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _refresh() async {

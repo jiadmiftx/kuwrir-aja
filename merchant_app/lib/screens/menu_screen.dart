@@ -13,30 +13,108 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen>
+    with SingleTickerProviderStateMixin {
+  TabController? _tabController;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
   @override
   void initState() {
     super.initState();
     context.read<MenuCubit>().load();
+    _searchCtrl.addListener(() {
+      setState(() => _query = _searchCtrl.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Rebuilds the TabController whenever the category count changes
+  /// (category added/deleted) — Flutter's TabController has a fixed
+  /// `length`, so it can't just be reused across a changing category list.
+  void _syncTabController(int categoryCount) {
+    if (_tabController != null && _tabController!.length == categoryCount)
+      return;
+    _tabController?.dispose();
+    _tabController = categoryCount > 0
+        ? TabController(length: categoryCount, vsync: this)
+        : null;
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MenuCubit, MenuState>(
       builder: (context, state) {
+        final categories = state is MenuLoaded
+            ? state.categories
+            : (state is MenuSaving ? state.categories : <ProductCategory>[]);
+        _syncTabController(categories.length);
+
         return Scaffold(
           backgroundColor: KuwrirColors.background,
           appBar: AppBar(
             title: const Text('Menu Saya'),
             backgroundColor: KuwrirColors.background,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => context.read<MenuCubit>().load(),
+            bottom:
+                (categories.isEmpty ||
+                    _query.isNotEmpty ||
+                    _tabController == null)
+                ? null
+                : PreferredSize(
+                    preferredSize: const Size.fromHeight(44),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelColor: KuwrirColors.primary,
+                      unselectedLabelColor: KuwrirColors.textSecondary,
+                      indicatorColor: KuwrirColors.primary,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [for (final c in categories) Tab(text: c.name)],
+                    ),
+                  ),
+          ),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Cari produk...',
+                    isDense: true,
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: KuwrirColors.textHint,
+                      size: 20,
+                    ),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => _searchCtrl.clear(),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: KuwrirColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: KuwrirColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: KuwrirColors.border),
+                    ),
+                  ),
+                ),
               ),
+              Expanded(child: _buildBody(context, state, categories)),
             ],
           ),
-          body: _buildBody(context, state),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: state is MenuLoading
                 ? null
@@ -51,7 +129,11 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context, MenuState state) {
+  Widget _buildBody(
+    BuildContext context,
+    MenuState state,
+    List<ProductCategory> categories,
+  ) {
     if (state is MenuLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -61,7 +143,10 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
+            Text(
+              state.message,
+              style: TextStyle(color: KuwrirColors.textSecondary),
+            ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<MenuCubit>().load(),
@@ -71,10 +156,6 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       );
     }
-
-    final categories = state is MenuLoaded
-        ? state.categories
-        : (state is MenuSaving ? state.categories : <ProductCategory>[]);
 
     if (categories.isEmpty) {
       return Center(
@@ -90,17 +171,28 @@ class _MenuScreenState extends State<MenuScreen> {
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.inventory_2_outlined, size: 36, color: KuwrirColors.primary),
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  size: 36,
+                  color: KuwrirColors.primary,
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Belum ada menu',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: KuwrirColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 'Tambah kategori dan produk pertama Anda',
-                style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13),
+                style: TextStyle(
+                  color: KuwrirColors.textSecondary,
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -108,16 +200,23 @@ class _MenuScreenState extends State<MenuScreen> {
       );
     }
 
+    Widget body;
+    if (_query.isNotEmpty) {
+      body = _SearchResults(categories: categories, query: _query);
+    } else if (_tabController != null) {
+      body = TabBarView(
+        controller: _tabController,
+        children: [
+          for (final cat in categories) _CategoryProductsList(category: cat),
+        ],
+      );
+    } else {
+      body = const SizedBox.shrink();
+    }
+
     return Stack(
       children: [
-        ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          itemCount: categories.length,
-          itemBuilder: (context, i) {
-            final cat = categories[i];
-            return _CategorySection(category: cat);
-          },
-        ),
+        body,
         if (state is MenuSaving)
           const Positioned.fill(
             child: ColoredBox(
@@ -163,9 +262,12 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 }
 
-class _CategorySection extends StatelessWidget {
+/// One tab page's content — the category name itself now lives in the
+/// TabBar above, so this only needs the add/delete-category actions plus
+/// the product list.
+class _CategoryProductsList extends StatelessWidget {
   final ProductCategory category;
-  const _CategorySection({required this.category});
+  const _CategoryProductsList({required this.category});
 
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -174,9 +276,14 @@ class _CategorySection extends StatelessWidget {
         title: const Text('Hapus Kategori?'),
         content: Text('${category.name} akan dihapus permanen.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: KuwrirColors.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: KuwrirColors.error,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Hapus', style: TextStyle(color: Colors.white)),
           ),
@@ -189,7 +296,11 @@ class _CategorySection extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus kategori')),
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal menghapus kategori',
+            ),
+          ),
         );
       }
     }
@@ -197,56 +308,42 @@ class _CategorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  category.name,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: KuwrirColors.primary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: () =>
+                  _showAddProductDialog(context, category.id, category.name),
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Tambah Produk'),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: KuwrirColors.error,
               ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, size: 20),
-                color: KuwrirColors.primary,
-                onPressed: () =>
-                    _showAddProductDialog(context, category.id, category.name),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, size: 18, color: KuwrirColors.textHint),
-                onSelected: (action) {
-                  if (action == 'delete') _confirmDelete(context);
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'delete', child: Text('Hapus Kategori')),
-                ],
-              ),
-            ],
-          ),
+              tooltip: 'Hapus Kategori',
+              onPressed: () => _confirmDelete(context),
+            ),
+          ],
         ),
         if (category.products.isEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Belum ada produk',
-              style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'Belum ada produk di kategori ini',
+                style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+              ),
             ),
           )
         else
           for (final product in category.products)
             _ProductTile(product: product),
-        const SizedBox(height: 8),
       ],
     );
   }
@@ -420,6 +517,75 @@ class _CategorySection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Flat, cross-category product search — active whenever the search field
+/// has text, replacing the category tabs entirely so results aren't
+/// confined to whichever tab happens to be open.
+class _SearchResults extends StatelessWidget {
+  final List<ProductCategory> categories;
+  final String query;
+  const _SearchResults({required this.categories, required this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    final matches = <(ProductCategory, Product)>[
+      for (final cat in categories)
+        for (final p in cat.products)
+          if (p.name.toLowerCase().contains(query)) (cat, p),
+    ];
+
+    if (matches.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 40, color: KuwrirColors.textHint),
+              const SizedBox(height: 12),
+              Text(
+                'Tidak ada produk yang cocok dengan "$query"',
+                style: TextStyle(
+                  color: KuwrirColors.textSecondary,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+      itemCount: matches.length,
+      itemBuilder: (context, i) {
+        final (cat, product) = matches[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 2),
+                child: Text(
+                  cat.name,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: KuwrirColors.textHint,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              _ProductTile(product: product),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -848,7 +1014,9 @@ class _ProductTile extends StatelessWidget {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: KuwrirColors.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: KuwrirColors.error,
+            ),
             onPressed: () {
               context.read<MenuCubit>().deleteProduct(product.id);
               Navigator.pop(ctx);
