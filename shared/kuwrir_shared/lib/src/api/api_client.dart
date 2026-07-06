@@ -10,6 +10,7 @@ import '../models/user.dart';
 import '../models/product.dart';
 import '../models/product_search_result.dart';
 import '../models/order.dart';
+import '../models/order_quote.dart';
 import '../models/support_message.dart';
 import '../models/food_category.dart';
 import '../models/promotion.dart';
@@ -370,6 +371,14 @@ class ApiClient {
   Future<Order> placeOrder(Map<String, dynamic> body) async {
     final data = await post('/orders', body);
     return Order.fromJson(data['order'] as Map<String, dynamic>);
+  }
+
+  /// Real delivery fee/tax/total for a cart, without creating an order —
+  /// backs the checkout confirmation screen shown after Cart, since Cart
+  /// itself only ever shows a flat delivery-fee estimate.
+  Future<OrderQuote> quoteOrder(Map<String, dynamic> body) async {
+    final data = await post('/orders/quote', body);
+    return OrderQuote.fromJson(data);
   }
 
   Future<List<Order>> getMyOrders({String? status}) async {

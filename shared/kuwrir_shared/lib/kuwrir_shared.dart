@@ -7,6 +7,7 @@ export 'src/api/api_config.dart';
 export 'src/models/user.dart';
 export 'src/models/auth.dart';
 export 'src/models/order.dart';
+export 'src/models/order_quote.dart';
 export 'src/models/merchant.dart';
 export 'src/models/product.dart';
 export 'src/models/product_search_result.dart';

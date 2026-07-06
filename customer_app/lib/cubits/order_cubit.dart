@@ -38,12 +38,14 @@ class OrderCubit extends Cubit<OrderState> {
       final body = {
         'merchant_id': merchantId,
         'items': items
-            .map((i) => {
-                  'product_id': i.product.id,
-                  'quantity': i.quantity,
-                  'notes': i.notes ?? '',
-                  'variant_ids': i.selectedVariants.map((v) => v.id).toList(),
-                })
+            .map(
+              (i) => {
+                'product_id': i.product.id,
+                'quantity': i.quantity,
+                'notes': i.notes ?? '',
+                'variant_ids': i.selectedVariants.map((v) => v.id).toList(),
+              },
+            )
             .toList(),
         'dropoff_address': dropoffAddress,
         'dropoff_lat': dropoffLat,
@@ -60,6 +62,36 @@ class OrderCubit extends Cubit<OrderState> {
     } catch (e) {
       emit(OrderError('Gagal membuat pesanan'));
     }
+  }
+
+  /// Real delivery fee/tax/total for the checkout confirmation screen —
+  /// a plain fetch, not part of the placing/placed/error state machine,
+  /// since it doesn't create anything and the screen manages its own
+  /// loading state around it.
+  Future<OrderQuote> fetchQuote({
+    required String merchantId,
+    required List<CartItem> items,
+    required double dropoffLat,
+    required double dropoffLng,
+    String paymentType = 'cash',
+  }) {
+    final body = {
+      'merchant_id': merchantId,
+      'items': items
+          .map(
+            (i) => {
+              'product_id': i.product.id,
+              'quantity': i.quantity,
+              'notes': i.notes ?? '',
+              'variant_ids': i.selectedVariants.map((v) => v.id).toList(),
+            },
+          )
+          .toList(),
+      'dropoff_lat': dropoffLat,
+      'dropoff_lng': dropoffLng,
+      'payment_type': paymentType,
+    };
+    return _api.quoteOrder(body);
   }
 
   void reset() => emit(OrderIdle());

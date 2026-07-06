@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	orders := r.Group("/orders")
 	{
 		orders.POST("", h.PlaceOrder)
+		orders.POST("/quote", h.QuoteOrder)
 		orders.GET("", h.MyOrders)
 		orders.GET("/:id", h.GetOrder)
 		orders.POST("/:id/cancel", h.CancelOrder)
@@ -233,79 +234,97 @@ type PlaceOrderRequest struct {
 
 // --- Handlers ---
 
-// PlaceOrder creates a new order with full COD pricing calculation
-func (h *Handler) PlaceOrder(c *gin.Context) {
-	userID := c.GetString("user_id")
+// pricingError carries an HTTP status alongside its message so
+// calculateOrderPricing's validation failures (bad product, insufficient
+// stock, min order, COD cap, etc.) map to the same status codes PlaceOrder
+// always returned, even though the check now lives in a shared function.
+type pricingError struct {
+	Status  int
+	Message string
+}
 
-	var req PlaceOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+func (e *pricingError) Error() string { return e.Message }
 
-	// 1. Load system settings
-	settings := h.loadSettings()
-	pricingSettings := pricing.LoadSettings(h.db)
+// stockDeduction defers the actual stock decrement to the caller — only
+// PlaceOrder should ever apply it (after the order row actually exists);
+// QuoteOrder must never mutate stock just because someone previewed a cart.
+type stockDeduction struct {
+	Product  model.Product
+	Quantity int
+}
 
-	// 2. Load merchant
-	var merchant model.Merchant
-	if err := h.db.Where("id = ? AND is_active = ? AND is_verified = ? AND is_open = ?",
-		req.MerchantID, true, true, true).First(&merchant).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant not found or closed"})
-		return
-	}
+type orderPricingResult struct {
+	OrderItems              []model.OrderItem
+	SubtotalWithMarkup      float64
+	TotalBasePrice          float64
+	TotalPlatformMarkup     float64
+	TotalPackagingFee       float64
+	DeliveryFee             float64
+	DeliveryType            string
+	DeliveryCommission      float64
+	DriverEarning           float64
+	AppServiceFee           float64
+	MerchantPayout          float64
+	MerchantDeliveryEarning float64
+	TaxAmount               float64
+	GrandTotal              float64
+	DistanceKm              float64
+	SelectedZone            *model.DeliveryZone
+	StockDeductions         []stockDeduction
+}
 
-	// COD cap guard (checked again after total is computed, but early rough check on payment type)
-	if req.PaymentType == "cash" && settings.MaxCODAmount > 0 {
-		// We'll re-check after calculating total; skip here as total unknown yet
-	}
-
-	// 3. Calculate delivery fee using city zone reference points
-	distanceKm := haversineDistance(
-		merchant.Latitude, merchant.Longitude,
-		req.DropoffLat, req.DropoffLng,
-	)
+// calculateOrderPricing runs the full COD pricing calculation shared by
+// PlaceOrder (which then creates the order) and QuoteOrder (a read-only
+// preview before the customer confirms, since the cart screen only shows a
+// flat delivery-fee estimate) — kept as one function so the two paths can
+// never drift out of sync. Only reads product/settings rows; never
+// mutates stock or creates anything.
+func (h *Handler) calculateOrderPricing(
+	merchant model.Merchant,
+	items []OrderItemRequest,
+	dropoffLat, dropoffLng float64,
+	paymentType string,
+	settings settingsData,
+	pricingSettings pricing.Settings,
+) (*orderPricingResult, *pricingError) {
+	distanceKm := haversineDistance(merchant.Latitude, merchant.Longitude, dropoffLat, dropoffLng)
 
 	selectedZone, zoneBasisFee, zonePerKmFee := h.loadHomeKota(merchant.Latitude, merchant.Longitude, settings)
 
 	var deliveryFee float64
 	if selectedZone != nil {
 		shapes := h.flatZoneShapes(selectedZone)
-		deliveryFee = priceDropoff(shapes, req.DropoffLat, req.DropoffLng, zoneBasisFee, zonePerKmFee)
+		deliveryFee = priceDropoff(shapes, dropoffLat, dropoffLng, zoneBasisFee, zonePerKmFee)
 	} else {
 		// No zones configured at all — fall back to a flat 5km radius
 		// around the merchant using the system default fees.
 		shapes := []pricing.ZoneShape{{Lat: merchant.Latitude, Lng: merchant.Longitude, RadiusKm: 5.0}}
-		deliveryFee = priceDropoff(shapes, req.DropoffLat, req.DropoffLng, zoneBasisFee, zonePerKmFee)
+		deliveryFee = priceDropoff(shapes, dropoffLat, dropoffLng, zoneBasisFee, zonePerKmFee)
 	}
 
-	// 4. Build order items with markup calculation
 	var orderItems []model.OrderItem
 	var subtotalWithMarkup float64
 	var totalBasePrice float64
 	var totalPlatformMarkup float64
 	var totalPackagingFee float64
+	var stockDeductions []stockDeduction
 
-	for _, reqItem := range req.Items {
+	for _, reqItem := range items {
 		var product model.Product
 		if err := h.db.Where("id = ?", reqItem.ProductID).First(&product).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Product %s not found", reqItem.ProductID)})
-			return
+			return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("Product %s not found", reqItem.ProductID)}
 		}
 
 		if !product.IsAvailable {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s is not available", product.Name)})
-			return
+			return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("%s is not available", product.Name)}
 		}
 
 		if !pricing.IsVisibleNow(product.VisibleFromMinute, product.VisibleUntilMinute) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s is not available at this time", product.Name)})
-			return
+			return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("%s is not available at this time", product.Name)}
 		}
 
 		if product.TrackStock && product.StockQuantity < reqItem.Quantity {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Insufficient stock for %s", product.Name)})
-			return
+			return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("Insufficient stock for %s", product.Name)}
 		}
 
 		// Load this product's variant options and validate the customer's
@@ -336,12 +355,10 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		for group, rule := range groupRules {
 			count := groupCounts[group]
 			if count < rule.min {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s: pilih minimal %d untuk %s", product.Name, rule.min, group)})
-				return
+				return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("%s: pilih minimal %d untuk %s", product.Name, rule.min, group)}
 			}
 			if rule.max > 0 && count > rule.max {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s: pilih maksimal %d untuk %s", product.Name, rule.max, group)})
-				return
+				return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("%s: pilih maksimal %d untuk %s", product.Name, rule.max, group)}
 			}
 		}
 
@@ -398,13 +415,12 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		totalPlatformMarkup += itemMarkupAmount * float64(reqItem.Quantity)
 		totalPackagingFee += packagingFeeTotal
 
-		// Deduct stock if tracking
 		if product.TrackStock {
-			h.db.Model(&product).Update("stock_quantity", gorm.Expr("stock_quantity - ?", reqItem.Quantity))
+			stockDeductions = append(stockDeductions, stockDeduction{Product: product, Quantity: reqItem.Quantity})
 		}
 	}
 
-	// 5. Determine delivery type and calculate accordingly
+	// Determine delivery type and calculate accordingly
 	deliveryType := "platform"
 	var deliveryCommission float64
 	var driverEarning float64
@@ -436,7 +452,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	// Merchant receives their base product price only (platform service fee stays with platform)
 	merchantPayout := totalBasePrice
 
-	// 6. Apply tax: use merchant's own rate if set, else platform default; 0 if merchant is non-PKP
+	// Apply tax: use merchant's own rate if set, else platform default; 0 if merchant is non-PKP
 	effectiveTaxRate := 0.0
 	if merchant.TaxEnabled {
 		if merchant.TaxRate != nil {
@@ -447,21 +463,117 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	}
 	taxAmount := subtotalWithMarkup * (effectiveTaxRate / 100.0)
 
-	// 7. Grand total customer pays (app service fee is an explicit charge to
+	// Grand total customer pays (app service fee is an explicit charge to
 	// customer; packaging fee is a pass-through merchant cost, not taxed/marked up)
 	grandTotal := subtotalWithMarkup + taxAmount + deliveryFee + appServiceFee + totalPackagingFee
 
 	// Enforce min order amount
 	if settings.MinOrderAmount > 0 && subtotalWithMarkup < settings.MinOrderAmount {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Minimum order amount is IDR %.0f", settings.MinOrderAmount)})
-		return
+		return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("Minimum order amount is IDR %.0f", settings.MinOrderAmount)}
 	}
 
 	// Enforce COD cap
-	if req.PaymentType == "cash" && settings.MaxCODAmount > 0 && grandTotal > settings.MaxCODAmount {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("COD maximum is IDR %.0f. Please use online payment for larger orders.", settings.MaxCODAmount),
-		})
+	if paymentType == "cash" && settings.MaxCODAmount > 0 && grandTotal > settings.MaxCODAmount {
+		return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("COD maximum is IDR %.0f. Please use online payment for larger orders.", settings.MaxCODAmount)}
+	}
+
+	return &orderPricingResult{
+		OrderItems:              orderItems,
+		SubtotalWithMarkup:      subtotalWithMarkup,
+		TotalBasePrice:          totalBasePrice,
+		TotalPlatformMarkup:     totalPlatformMarkup,
+		TotalPackagingFee:       totalPackagingFee,
+		DeliveryFee:             deliveryFee,
+		DeliveryType:            deliveryType,
+		DeliveryCommission:      deliveryCommission,
+		DriverEarning:           driverEarning,
+		AppServiceFee:           appServiceFee,
+		MerchantPayout:          merchantPayout,
+		MerchantDeliveryEarning: merchantDeliveryEarning,
+		TaxAmount:               taxAmount,
+		GrandTotal:              grandTotal,
+		DistanceKm:              distanceKm,
+		SelectedZone:            selectedZone,
+		StockDeductions:         stockDeductions,
+	}, nil
+}
+
+// QuoteRequest is the same shape as the item/merchant/dropoff portion of
+// PlaceOrderRequest — everything needed to run the pricing calculation
+// except the parts (receiver, notes) that don't affect price.
+type QuoteRequest struct {
+	MerchantID  string             `json:"merchant_id" binding:"required"`
+	Items       []OrderItemRequest `json:"items" binding:"required,min=1"`
+	DropoffLat  float64            `json:"dropoff_lat" binding:"required"`
+	DropoffLng  float64            `json:"dropoff_lng" binding:"required"`
+	PaymentType string             `json:"payment_type"`
+}
+
+// QuoteOrder computes the real delivery fee, tax, and total for the
+// customer app's checkout confirmation screen — without creating an order
+// or touching stock. The cart screen only ever shows a flat delivery-fee
+// estimate; this is what lets the confirmation step show real numbers
+// before the customer commits.
+func (h *Handler) QuoteOrder(c *gin.Context) {
+	var req QuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	settings := h.loadSettings()
+	pricingSettings := pricing.LoadSettings(h.db)
+
+	var merchant model.Merchant
+	if err := h.db.Where("id = ? AND is_active = ? AND is_verified = ? AND is_open = ?",
+		req.MerchantID, true, true, true).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant not found or closed"})
+		return
+	}
+
+	result, perr := h.calculateOrderPricing(
+		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, settings, pricingSettings)
+	if perr != nil {
+		c.JSON(perr.Status, gin.H{"error": perr.Message})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subtotal":        result.SubtotalWithMarkup,
+		"packaging_fee":   result.TotalPackagingFee,
+		"delivery_fee":    result.DeliveryFee,
+		"delivery_type":   result.DeliveryType,
+		"app_service_fee": result.AppServiceFee,
+		"tax_amount":      result.TaxAmount,
+		"total":           result.GrandTotal,
+		"distance_km":     result.DistanceKm,
+	})
+}
+
+// PlaceOrder creates a new order with full COD pricing calculation
+func (h *Handler) PlaceOrder(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req PlaceOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	settings := h.loadSettings()
+	pricingSettings := pricing.LoadSettings(h.db)
+
+	var merchant model.Merchant
+	if err := h.db.Where("id = ? AND is_active = ? AND is_verified = ? AND is_open = ?",
+		req.MerchantID, true, true, true).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant not found or closed"})
+		return
+	}
+
+	result, perr := h.calculateOrderPricing(
+		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, settings, pricingSettings)
+	if perr != nil {
+		c.JSON(perr.Status, gin.H{"error": perr.Message})
 		return
 	}
 
@@ -477,24 +589,24 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	}
 
 	order := model.Order{
-		OrderNumber:        orderNumber,
-		ServiceType:        "ecommerce",
-		CustomerID:         &customerUUID,
-		MerchantID:         &merchantUUID,
-		Status:             model.OrderStatusPending,
-		DeliveryType:       deliveryType,
-		PaymentType:        paymentType,
-		Subtotal:           subtotalWithMarkup,
-		PlatformMarkup:     totalPlatformMarkup,
-		TaxAmount:          taxAmount,
-		AppServiceFee:      appServiceFee,
-		PackagingFee:            totalPackagingFee,
-		DeliveryFee:             deliveryFee,
-		DeliveryCommission:      deliveryCommission,
-		DriverEarning:           driverEarning,
-		MerchantPayout:          merchantPayout,
-		MerchantDeliveryEarning: merchantDeliveryEarning,
-		Total:                   grandTotal,
+		OrderNumber:             orderNumber,
+		ServiceType:             "ecommerce",
+		CustomerID:              &customerUUID,
+		MerchantID:              &merchantUUID,
+		Status:                  model.OrderStatusPending,
+		DeliveryType:            result.DeliveryType,
+		PaymentType:             paymentType,
+		Subtotal:                result.SubtotalWithMarkup,
+		PlatformMarkup:          result.TotalPlatformMarkup,
+		TaxAmount:               result.TaxAmount,
+		AppServiceFee:           result.AppServiceFee,
+		PackagingFee:            result.TotalPackagingFee,
+		DeliveryFee:             result.DeliveryFee,
+		DeliveryCommission:      result.DeliveryCommission,
+		DriverEarning:           result.DriverEarning,
+		MerchantPayout:          result.MerchantPayout,
+		MerchantDeliveryEarning: result.MerchantDeliveryEarning,
+		Total:                   result.GrandTotal,
 
 		PickupAddress: merchant.Address,
 		PickupLat:     merchant.Latitude,
@@ -508,18 +620,24 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		ReceiverName:   req.ReceiverName,
 		ReceiverPhone:  req.ReceiverPhone,
 
-		DistanceKm: distanceKm,
+		DistanceKm: result.DistanceKm,
 		Notes:      req.Notes,
 		PlacedAt:   &now,
-		Items:      orderItems,
+		Items:      result.OrderItems,
 	}
-	if selectedZone != nil {
-		order.ZoneID = &selectedZone.ID
+	if result.SelectedZone != nil {
+		order.ZoneID = &result.SelectedZone.ID
 	}
 
 	if err := h.db.Create(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
 		return
+	}
+
+	// Deduct stock now that the order actually exists.
+	for _, d := range result.StockDeductions {
+		h.db.Model(&model.Product{}).Where("id = ?", d.Product.ID).
+			Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
 	}
 
 	// Notify merchant owner about new order
@@ -535,14 +653,14 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"order": order,
 		"pricing_breakdown": gin.H{
-			"product_subtotal_with_markup": subtotalWithMarkup,
-			"platform_markup_total":        totalPlatformMarkup,
-			"tax_amount":                   taxAmount,
-			"delivery_fee":                 deliveryFee,
-			"app_service_fee":              appServiceFee,
-			"delivery_commission_kuwrir":   deliveryCommission,
-			"driver_earning":               driverEarning,
-			"total_customer_pays":          grandTotal,
+			"product_subtotal_with_markup": result.SubtotalWithMarkup,
+			"platform_markup_total":        result.TotalPlatformMarkup,
+			"tax_amount":                   result.TaxAmount,
+			"delivery_fee":                 result.DeliveryFee,
+			"app_service_fee":              result.AppServiceFee,
+			"delivery_commission_kuwrir":   result.DeliveryCommission,
+			"driver_earning":               result.DriverEarning,
+			"total_customer_pays":          result.GrandTotal,
 		},
 	})
 }
