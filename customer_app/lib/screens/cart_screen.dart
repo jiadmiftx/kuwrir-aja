@@ -6,6 +6,7 @@ import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
 import '../cubits/location_cubit.dart';
 import 'location_picker_screen.dart';
+import '../utils/auth_guard.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -371,7 +372,9 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _submitOrder(BuildContext context, CartState cart) {
+  void _submitOrder(BuildContext context, CartState cart) async {
+    if (!await ensureLoggedIn(context)) return;
+    if (!context.mounted) return;
     if (_addressCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Masukkan alamat pengiriman')));

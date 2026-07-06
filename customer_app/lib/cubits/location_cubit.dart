@@ -32,6 +32,13 @@ class LocationCubit extends Cubit<LocationState> {
   static const _keyLng = 'user_lng';
   static const _keyAddress = 'user_address';
 
+  // Mataram city center — used so nearby merchants still show when GPS
+  // permission is denied or detection fails (e.g. a guest browsing before
+  // ever granting location access), instead of leaving lat/lng null forever.
+  static const _fallbackLat = -8.5833;
+  static const _fallbackLng = 116.1167;
+  static const _fallbackAddress = 'Mataram, NTB (perkiraan)';
+
   LocationCubit() : super(const LocationState(detecting: true));
 
   /// Called once on app start — loads saved location or falls back to GPS
@@ -57,8 +64,8 @@ class LocationCubit extends Cubit<LocationState> {
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.deniedForever) {
-        emit(const LocationState(address: 'Lokasi tidak diizinkan'));
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        _useFallback();
         return;
       }
 
@@ -69,8 +76,14 @@ class LocationCubit extends Cubit<LocationState> {
       await _save(pos.latitude, pos.longitude, address);
       emit(LocationState(lat: pos.latitude, lng: pos.longitude, address: address));
     } catch (_) {
-      emit(const LocationState(address: 'Pilih lokasi'));
+      _useFallback();
     }
+  }
+
+  /// Not persisted to prefs — a real GPS fix or manual pick should still be
+  /// retried on the next app start rather than getting stuck on the default.
+  void _useFallback() {
+    emit(const LocationState(lat: _fallbackLat, lng: _fallbackLng, address: _fallbackAddress));
   }
 
   /// Called after user picks location on map

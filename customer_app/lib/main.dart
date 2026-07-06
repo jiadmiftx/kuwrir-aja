@@ -15,6 +15,8 @@ import 'screens/search_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/support_chat_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/notifications_screen.dart';
+import 'utils/auth_guard.dart';
 import 'cubits/home_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
 import 'cubits/cart_cubit.dart';
@@ -26,6 +28,10 @@ import 'cubits/session_cubit.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final notification = message.notification;
+  if (notification != null) {
+    await NotificationService.persist(notification.title ?? '', notification.body ?? '');
+  }
 }
 
 void main() async {
@@ -101,6 +107,8 @@ class KuwrirCustomerApp extends StatelessWidget {
                 );
               case '/profile':
                 return MaterialPageRoute(builder: (_) => const ProfileScreen());
+              case '/notifications':
+                return MaterialPageRoute(builder: (_) => const NotificationsScreen());
               default:
                 return null;
             }
@@ -130,7 +138,9 @@ class _SplashRouterState extends State<_SplashRouter> {
     final hasToken = await api.isAuthenticated();
     if (!mounted) return;
     if (!hasToken) {
-      Navigator.pushReplacementNamed(context, '/login');
+      // No session yet — browse as guest; login is only required once a
+      // gated action (orders, chat, checkout, profile) is attempted.
+      Navigator.pushReplacementNamed(context, '/home');
       return;
     }
     try {
@@ -191,7 +201,12 @@ class _CustomerHomeState extends State<CustomerHome> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
-        onDestinationSelected: (i) => setState(() => _idx = i),
+        onDestinationSelected: (i) async {
+          // Orders (2) and Chat (3) require a session; Home/Promo stay
+          // browsable for guests.
+          if ((i == 2 || i == 3) && !await ensureLoggedIn(context)) return;
+          if (mounted) setState(() => _idx = i);
+        },
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.home_outlined),

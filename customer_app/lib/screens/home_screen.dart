@@ -9,6 +9,9 @@ import '../cubits/session_cubit.dart';
 import 'location_picker_screen.dart';
 import 'banner_detail_screen.dart';
 import 'phone_verification_gate.dart';
+import 'notifications_screen.dart';
+import '../services/notification_service.dart';
+import '../utils/auth_guard.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,12 +21,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _unreadNotifications = 0;
+
   @override
   void initState() {
     super.initState();
     final loc = context.read<LocationCubit>().state;
     context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkPhoneVerified());
+    _refreshUnreadCount();
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final count = await NotificationService.unreadCount();
+    if (mounted) setState(() => _unreadNotifications = count);
+  }
+
+  Future<void> _openNotifications() async {
+    if (!await ensureLoggedIn(context) || !mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    _refreshUnreadCount();
   }
 
   void _checkPhoneVerified() {
@@ -113,6 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           selectedId: loaded.selectedCategoryId,
                           onSelect: (id) => context.read<HomeCubit>().selectCategory(id),
                         ),
+                      if (loaded.trending.isNotEmpty) ...[
+                        const _SectionHeader(title: 'Sedang Rame Dipesan'),
+                        _TrendingSection(products: loaded.trending),
+                        const SizedBox(height: 8),
+                      ],
                       _SectionHeader(
                         title: 'Warung Terdekat',
                         onSeeAll: () => Navigator.pushNamed(context, '/search'),
@@ -189,7 +211,46 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/profile'),
+                onTap: _openNotifications,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: KuwrirColors.border),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 17,
+                        backgroundColor: KuwrirColors.background,
+                        child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 19),
+                      ),
+                      if (_unreadNotifications > 0)
+                        Positioned(
+                          top: -1,
+                          right: -1,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.error,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: KuwrirColors.surface, width: 1.5),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () async {
+                  if (await ensureLoggedIn(context) && context.mounted) {
+                    Navigator.pushNamed(context, '/profile');
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
@@ -561,6 +622,120 @@ class _PopularSection extends StatelessWidget {
   }
 }
 
+// ── Trending section (horizontal, most-ordered products) ───────────────────
+
+class _TrendingSection extends StatelessWidget {
+  final List<ProductSearchResult> products;
+  const _TrendingSection({required this.products});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 208,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: products.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        itemBuilder: (context, i) => _TrendingProductCard(result: products[i]),
+      ),
+    );
+  }
+}
+
+class _TrendingProductCard extends StatelessWidget {
+  final ProductSearchResult result;
+  const _TrendingProductCard({required this.result});
+
+  String _fmtPrice(double v) => v >= 1000 ? 'Rp ${(v / 1000).toStringAsFixed(0)}rb' : 'Rp ${v.toStringAsFixed(0)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final product = result.product;
+    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/merchant',
+          arguments: {'id': result.merchantId, 'name': result.merchantName}),
+      child: Container(
+        width: 148,
+        decoration: BoxDecoration(
+          color: KuwrirColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: KuwrirColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  height: 100,
+                  width: double.infinity,
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  child: product.imageUrl != null
+                      ? Image.network(product.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Center(child: Icon(Icons.restaurant, color: KuwrirColors.primary)))
+                      : Center(child: Icon(Icons.restaurant, color: KuwrirColors.primary)),
+                ),
+                if (hasDiscount)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.error,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('DISKON',
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(product.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(result.merchantName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (hasDiscount) ...[
+                        Text(_fmtPrice(product.price),
+                            style: TextStyle(
+                                fontSize: 10.5,
+                                color: KuwrirColors.textHint,
+                                decoration: TextDecoration.lineThrough)),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(_fmtPrice(hasDiscount ? product.discountPrice! : product.price),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: KuwrirColors.primary)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Merchant Card (vertical, full width — Nearby) ───────────────────────────
 
 class _MerchantCard extends StatelessWidget {
@@ -589,17 +764,51 @@ class _MerchantCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 130,
-              width: double.infinity,
-              color: KuwrirColors.primary.withValues(alpha: 0.08),
-              child: merchant.logoUrl != null
-                  ? Image.network(merchant.logoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(
-                          child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)))
-                  : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  height: 130,
+                  width: double.infinity,
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  child: (merchant.bannerUrl ?? merchant.logoUrl) != null
+                      ? Image.network((merchant.bannerUrl ?? merchant.logoUrl)!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                              child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)))
+                      : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
+                ),
+                if (merchant.bannerUrl != null)
+                  Positioned(
+                    left: 14,
+                    bottom: -18,
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.surface,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: merchant.logoUrl != null
+                            ? Image.network(merchant.logoUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                    color: KuwrirColors.primary.withValues(alpha: 0.08),
+                                    child: Icon(Icons.store, size: 20, color: KuwrirColors.primary)))
+                            : Container(
+                                color: KuwrirColors.primary.withValues(alpha: 0.08),
+                                child: Icon(Icons.store, size: 20, color: KuwrirColors.primary)),
+                      ),
+                    ),
+                  ),
+              ],
             ),
+            if (merchant.bannerUrl != null) const SizedBox(height: 18),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
