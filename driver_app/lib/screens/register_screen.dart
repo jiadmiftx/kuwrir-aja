@@ -66,7 +66,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      SnackBar(content: Text(msg), backgroundColor: KuwrirColors.error),
     );
   }
 
@@ -80,9 +80,10 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: KuwrirColors.background,
       appBar: AppBar(title: const Text('Daftar sebagai Driver')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -92,24 +93,35 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
               _buildStepIndicator(1),
               const SizedBox(height: 24),
 
-              const Text('Data Diri', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              Text(
+                'DATA DIRI',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: KuwrirColors.textHint,
+                ),
+              ),
+              const SizedBox(height: 12),
 
-              _field(_nameCtrl, 'Nama Lengkap', Icons.person,
+              _field(_nameCtrl, 'Nama Lengkap', Icons.person_outline,
                   validator: (v) => (v?.trim().isEmpty ?? true) ? 'Nama wajib diisi' : null),
               const SizedBox(height: 12),
-              _field(_phoneCtrl, 'Nomor HP', Icons.phone,
+              _field(_phoneCtrl, 'Nomor HP', Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   validator: (v) => (v?.trim().length ?? 0) < 9 ? 'Nomor HP tidak valid' : null),
               const SizedBox(height: 12),
-              _field(_emailCtrl, 'Email', Icons.email,
+              _field(_emailCtrl, 'Email', Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) => (v?.contains('@') ?? false) ? null : 'Email tidak valid'),
               const SizedBox(height: 12),
-              _field(_passwordCtrl, 'Password', Icons.lock,
+              _field(_passwordCtrl, 'Password', Icons.lock_outline,
                   obscure: _obscure,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(
+                      _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: KuwrirColors.textHint,
+                    ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                   validator: (v) => (v?.length ?? 0) < 6 ? 'Minimal 6 karakter' : null),
@@ -120,18 +132,28 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
               const SizedBox(height: 24),
 
               SizedBox(
-                height: 50,
+                height: 52,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: KuwrirColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   onPressed: _loading ? null : _submit,
                   child: _loading
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Lanjut →', style: TextStyle(fontSize: 16)),
+                      : const Text('Lanjut', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Sudah punya akun? Login'),
+                child: Text(
+                  'Sudah punya akun? Login',
+                  style: TextStyle(color: KuwrirColors.primary, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -149,16 +171,29 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      obscureText: obscure,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        suffixIcon: suffixIcon,
-        border: const OutlineInputBorder(),
+    return Container(
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      child: TextFormField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        obscureText: obscure,
+        validator: validator,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: KuwrirColors.textHint),
+          prefixIcon: Icon(icon, color: KuwrirColors.primary),
+          suffixIcon: suffixIcon,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          filled: false,
+        ),
       ),
     );
   }
@@ -175,22 +210,22 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: done || active ? KuwrirColors.primary : Colors.grey.shade300,
+                backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
                 child: done
                     ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : Text('$step', style: TextStyle(color: active ? Colors.white : Colors.grey, fontSize: 12)),
+                    : Text('$step', style: TextStyle(color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),
               ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(steps[i],
                     style: TextStyle(
                       fontSize: 12,
-                      color: active ? KuwrirColors.primary : Colors.grey,
-                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                      color: active ? KuwrirColors.primary : KuwrirColors.textHint,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.normal,
                     )),
               ),
               if (i < steps.length - 1)
-                Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
+                Expanded(child: Container(height: 1, color: KuwrirColors.border)),
             ],
           ),
         );

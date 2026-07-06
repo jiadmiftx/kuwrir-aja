@@ -59,6 +59,7 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: KuwrirColors.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -70,39 +71,44 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
               const SizedBox(height: 32),
               Text(
                 _statusTitle(),
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 _statusBody(),
-                style: const TextStyle(color: Colors.grey, fontSize: 15, height: 1.5),
+                style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 14.5, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               if (_note.isNotEmpty) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: _status == 'rejected' ? Colors.red.shade50 : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _status == 'rejected' ? Colors.red.shade200 : Colors.blue.shade200),
+                    color: (_status == 'rejected' ? KuwrirColors.error : KuwrirColors.info).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: (_status == 'rejected' ? KuwrirColors.error : KuwrirColors.info).withValues(alpha: 0.25)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.comment, size: 16, color: _status == 'rejected' ? Colors.red : Colors.blue),
+                      Icon(Icons.comment_outlined, size: 16, color: _status == 'rejected' ? KuwrirColors.error : KuwrirColors.info),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Catatan admin: $_note',
-                          style: TextStyle(color: _status == 'rejected' ? Colors.red.shade700 : Colors.blue.shade700),
+                          style: TextStyle(
+                            color: _status == 'rejected' ? KuwrirColors.error : KuwrirColors.info,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
               if (_status == 'pending') ...[
                 if (_loading)
                   const CircularProgressIndicator()
@@ -110,20 +116,35 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.refresh),
                     label: const Text('Cek Status'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: KuwrirColors.primary,
+                      side: BorderSide(color: KuwrirColors.primary),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                     onPressed: _checkStatus,
                   ),
               ],
               if (_status == 'rejected') ...[
-                FilledButton.icon(
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Kirim Ulang Dokumen'),
-                  onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                SizedBox(
+                  height: 52,
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: KuwrirColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.upload_file_outlined),
+                    label: const Text('Kirim Ulang Dokumen', style: TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-                child: const Text('Kembali ke Login'),
+                child: Text('Kembali ke Login', style: TextStyle(color: KuwrirColors.textSecondary)),
               ),
             ],
           ),
@@ -136,28 +157,31 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
     switch (_status) {
       case 'approved':
         return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
-          child: const Icon(Icons.check_circle, size: 80, color: Colors.green),
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(color: KuwrirColors.success.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(Icons.check_circle_outline, size: 40, color: KuwrirColors.success),
         );
       case 'rejected':
         return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
-          child: const Icon(Icons.cancel, size: 80, color: Colors.red),
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(color: KuwrirColors.error.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(Icons.cancel_outlined, size: 40, color: KuwrirColors.error),
         );
       default:
         return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.orange.shade50, shape: BoxShape.circle),
-          child: const Icon(Icons.pending_actions, size: 80, color: Colors.orange),
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(color: KuwrirColors.warning.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(Icons.pending_actions_outlined, size: 40, color: KuwrirColors.warning),
         );
     }
   }
 
   String _statusTitle() {
     switch (_status) {
-      case 'approved': return 'Pendaftaran Disetujui! 🎉';
+      case 'approved': return 'Pendaftaran Disetujui!';
       case 'rejected': return 'Pendaftaran Ditolak';
       default:         return 'Sedang Diverifikasi';
     }

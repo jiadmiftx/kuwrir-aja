@@ -55,26 +55,40 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset('assets/images/app_icon.png', width: 88, height: 88),
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset('assets/images/app_icon.png', width: 88, height: 88),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
               const Text(
                 'Cocourir Driver',
                 style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
                   color: KuwrirColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Sign in to start earning',
+              Text(
+                'Masuk untuk mulai menghasilkan',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   color: KuwrirColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,

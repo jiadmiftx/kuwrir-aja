@@ -144,22 +144,26 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     }
   }
 
-  void _showError(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  void _showError(String msg) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: KuwrirColors.error));
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Daftar sebagai Merchant')),
+      backgroundColor: KuwrirColors.background,
+      appBar: AppBar(
+        title: const Text('Daftar sebagai Merchant'),
+        backgroundColor: KuwrirColors.background,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildSteps(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               if (_step == 0) _buildAccountStep(),
               if (_step == 1) _buildStoreStep(),
               if (_step == 2) _buildDocsStep(),
@@ -174,38 +178,67 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Data Pemilik', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _field(_nameCtrl, 'Nama Lengkap', Icons.person,
+        const Text('Data Pemilik',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
+        const SizedBox(height: 18),
+        _field(_nameCtrl, 'Nama Lengkap', Icons.person_outline,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        _field(_phoneCtrl, 'Nomor HP', Icons.phone, keyboardType: TextInputType.phone,
+        _field(_phoneCtrl, 'Nomor HP', Icons.phone_outlined, keyboardType: TextInputType.phone,
             validator: (v) => (v?.length ?? 0) < 9 ? 'Tidak valid' : null),
         const SizedBox(height: 12),
-        _field(_emailCtrl, 'Email', Icons.email, keyboardType: TextInputType.emailAddress,
+        _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress,
             validator: (v) => !(v?.contains('@') ?? false) ? 'Email tidak valid' : null),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _passwordCtrl,
-          obscureText: _obscure,
-          validator: (v) => (v?.length ?? 0) < 6 ? 'Min 6 karakter' : null,
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: const Icon(Icons.lock),
-            border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscure = !_obscure),
+        Container(
+          decoration: BoxDecoration(
+            color: KuwrirColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: KuwrirColors.border),
+          ),
+          child: TextFormField(
+            controller: _passwordCtrl,
+            obscureText: _obscure,
+            validator: (v) => (v?.length ?? 0) < 6 ? 'Min 6 karakter' : null,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: Icon(Icons.lock_outline, color: KuwrirColors.textHint),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    color: KuwrirColors.textHint),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 24),
-        SizedBox(height: 50, child: FilledButton(
-          onPressed: _loading ? null : _registerAccount,
-          child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Lanjut →'),
-        )),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: KuwrirColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: _loading ? null : _registerAccount,
+            child: _loading
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Lanjut', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ),
         const SizedBox(height: 12),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Sudah punya akun? Login')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: KuwrirColors.textSecondary),
+          child: const Text('Sudah punya akun? Login'),
+        ),
       ],
     );
   }
@@ -214,22 +247,28 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Data Toko', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _field(_storeNameCtrl, 'Nama Toko', Icons.store,
+        const Text('Data Toko',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
+        const SizedBox(height: 18),
+        _field(_storeNameCtrl, 'Nama Toko', Icons.storefront_outlined,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        _field(_storeDescCtrl, 'Deskripsi Toko', Icons.description),
+        _field(_storeDescCtrl, 'Deskripsi Toko', Icons.description_outlined),
         const SizedBox(height: 12),
-        _field(_storePhoneCtrl, 'Nomor HP Toko', Icons.phone, keyboardType: TextInputType.phone),
+        _field(_storePhoneCtrl, 'Nomor HP Toko', Icons.phone_outlined, keyboardType: TextInputType.phone),
         const SizedBox(height: 12),
-        _field(_addressCtrl, 'Alamat Lengkap', Icons.location_on,
+        _field(_addressCtrl, 'Alamat Lengkap', Icons.location_on_outlined,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
         // Map location picker
-        Card(
+        Container(
+          decoration: BoxDecoration(
+            color: KuwrirColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: KuwrirColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
             onTap: () async {
               final result = await Navigator.push<LatLng>(
                 context,
@@ -250,49 +289,77 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  const Icon(Icons.map, color: Colors.orange, size: 24),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(Icons.map_outlined, color: KuwrirColors.primary, size: 19),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Lokasi Toko di Peta',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14.5, color: KuwrirColors.textPrimary)),
                         const SizedBox(height: 2),
                         Text(
                           '${_storeLat.toStringAsFixed(5)}, ${_storeLng.toStringAsFixed(5)}',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
+                  Icon(Icons.chevron_right, color: KuwrirColors.textHint),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 4),
-        const Text('Ketuk untuk memilih lokasi toko di peta', style: TextStyle(color: Colors.grey, fontSize: 12)),
+        const SizedBox(height: 6),
+        Text('Ketuk untuk memilih lokasi toko di peta',
+            style: TextStyle(color: KuwrirColors.textHint, fontSize: 12)),
         const SizedBox(height: 24),
-        SizedBox(height: 50, child: FilledButton(
-          onPressed: () {
-            if (_storeNameCtrl.text.trim().isEmpty || _addressCtrl.text.trim().isEmpty) {
-              _showError('Nama toko dan alamat wajib diisi');
-              return;
-            }
-            setState(() => _step = 2);
-          },
-          child: const Text('Lanjut →'),
-        )),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: KuwrirColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () {
+              if (_storeNameCtrl.text.trim().isEmpty || _addressCtrl.text.trim().isEmpty) {
+                _showError('Nama toko dan alamat wajib diisi');
+                return;
+              }
+              setState(() => _step = 2);
+            },
+            child: const Text('Lanjut', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ),
         // No "Kembali" when entering here via OTP (startAtStep > 0)
         // — the account is already created and this screen replaced login
         // in the nav stack, so there's nothing valid to pop back to.
         if (widget.startAtStep == 0) ...[
           const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => setState(() => _step = 0),
-            child: const Text('← Kembali'),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: KuwrirColors.textPrimary,
+                side: BorderSide(color: KuwrirColors.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => setState(() => _step = 0),
+              child: const Text('Kembali', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
           ),
         ],
       ],
@@ -303,50 +370,104 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Dokumen Verifikasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text('Dokumen Verifikasi',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
         const SizedBox(height: 4),
-        const Text('Dokumen diperlukan untuk verifikasi toko oleh admin.', style: TextStyle(color: Colors.grey, fontSize: 13)),
-        const SizedBox(height: 16),
-        _docTile('KTP Pemilik *', 'Foto KTP pemilik toko yang jelas', Icons.badge, _ktpFile, () => _pick('ktp')),
-        _docTile('Izin Usaha (opsional)', 'SIUP / IUMK / NIB jika ada', Icons.business_center, _bizLicenseFile, () => _pick('biz')),
-        _docTile('Foto Toko *', 'Foto tampak depan toko / tempat jualan', Icons.store, _storePhotoFile, () => _pick('store')),
+        Text('Dokumen diperlukan untuk verifikasi toko oleh admin.',
+            style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
+        const SizedBox(height: 18),
+        _docTile('KTP Pemilik *', 'Foto KTP pemilik toko yang jelas', Icons.badge_outlined, _ktpFile, () => _pick('ktp')),
+        _docTile('Izin Usaha (opsional)', 'SIUP / IUMK / NIB jika ada', Icons.business_center_outlined, _bizLicenseFile, () => _pick('biz')),
+        _docTile('Foto Toko *', 'Foto tampak depan toko / tempat jualan', Icons.store_outlined, _storePhotoFile, () => _pick('store')),
         const SizedBox(height: 24),
-        SizedBox(height: 50, child: FilledButton(
-          onPressed: _loading ? null : _submitStore,
-          child: _loading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Kirim Pendaftaran'),
-        )),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: KuwrirColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: _loading ? null : _submitStore,
+            child: _loading
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Kirim Pendaftaran', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ),
         const SizedBox(height: 12),
-        OutlinedButton(onPressed: () => setState(() => _step = 1), child: const Text('← Kembali')),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: KuwrirColors.textPrimary,
+              side: BorderSide(color: KuwrirColors.border),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () => setState(() => _step = 1),
+            child: const Text('Kembali', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ),
       ],
     );
   }
 
   Widget _docTile(String title, String subtitle, IconData icon, File? file, VoidCallback onTap) {
     final uploaded = file != null;
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+      ),
       child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: CircleAvatar(
-          backgroundColor: uploaded ? Colors.green.withOpacity(0.1) : Colors.grey.shade100,
+          backgroundColor: uploaded
+              ? KuwrirColors.success.withValues(alpha: 0.1)
+              : KuwrirColors.primary.withValues(alpha: 0.08),
           backgroundImage: uploaded ? FileImage(file) : null,
-          child: uploaded ? null : Icon(icon, color: Colors.grey),
+          child: uploaded ? null : Icon(icon, color: KuwrirColors.primary),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(uploaded ? '✓ Siap' : subtitle, style: TextStyle(fontSize: 12, color: uploaded ? Colors.green : Colors.grey)),
-        trailing: TextButton(onPressed: onTap, child: Text(uploaded ? 'Ganti' : 'Upload', style: TextStyle(color: uploaded ? Colors.green : KuwrirColors.primary))),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+        subtitle: Text(uploaded ? 'Siap' : subtitle,
+            style: TextStyle(
+                fontSize: 12, color: uploaded ? KuwrirColors.success : KuwrirColors.textSecondary)),
+        trailing: TextButton(
+          onPressed: onTap,
+          child: Text(uploaded ? 'Ganti' : 'Upload',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: uploaded ? KuwrirColors.success : KuwrirColors.primary)),
+        ),
       ),
     );
   }
 
   Widget _field(TextEditingController ctrl, String label, IconData icon,
       {TextInputType? keyboardType, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon), border: const OutlineInputBorder()),
+    return Container(
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      child: TextFormField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: KuwrirColors.textHint),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
     );
   }
 
@@ -359,14 +480,22 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         return Expanded(child: Row(children: [
           CircleAvatar(
             radius: 14,
-            backgroundColor: done || active ? KuwrirColors.primary : Colors.grey.shade300,
+            backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
             child: done
                 ? const Icon(Icons.check, size: 14, color: Colors.white)
-                : Text('${i + 1}', style: TextStyle(color: active ? Colors.white : Colors.grey, fontSize: 12)),
+                : Text('${i + 1}',
+                    style: TextStyle(
+                        color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),
           ),
-          const SizedBox(width: 4),
-          Expanded(child: Text(steps[i], style: TextStyle(fontSize: 12, color: active ? KuwrirColors.primary : Colors.grey, fontWeight: active ? FontWeight.bold : FontWeight.normal))),
-          if (i < steps.length - 1) Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(steps[i],
+                style: TextStyle(
+                    fontSize: 12,
+                    color: active ? KuwrirColors.primary : KuwrirColors.textHint,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500)),
+          ),
+          if (i < steps.length - 1) Expanded(child: Container(height: 1, color: KuwrirColors.border)),
         ]));
       }),
     );

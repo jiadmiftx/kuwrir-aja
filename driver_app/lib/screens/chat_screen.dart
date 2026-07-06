@@ -53,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
+        backgroundColor: KuwrirColors.background,
         appBar: AppBar(title: Text('Chat - #${widget.orderNumber}')),
         body: Column(
           children: [
@@ -61,17 +62,46 @@ class _ChatScreenState extends State<ChatScreen> {
                 bloc: _cubit,
                 builder: (context, state) {
                   if (state is ChatLoading) return const Center(child: CircularProgressIndicator());
-                  if (state is ChatError) return Center(child: Text('Error: ${state.message}'));
+                  if (state is ChatError) {
+                    return Center(
+                      child: Text('Error: ${state.message}', style: TextStyle(color: KuwrirColors.error)),
+                    );
+                  }
                   if (state is ChatLoaded) {
                     if (state.messages.isEmpty) {
-                      return const Center(
-                        child: Text('Belum ada pesan. Chat dengan customer!',
-                            style: TextStyle(color: Colors.grey)),
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.chat_bubble_outline, size: 30, color: KuwrirColors.primary),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Belum ada pesan',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: KuwrirColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Chat dengan customer!',
+                                style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     }
                     return ListView.builder(
                       controller: _scrollCtrl,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       itemCount: state.messages.length,
                       itemBuilder: (_, i) => _MessageBubble(msg: state.messages[i]),
                     );
@@ -102,7 +132,8 @@ class _MessageBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
         decoration: BoxDecoration(
-          color: isMe ? KuwrirColors.primary : Colors.grey.shade200,
+          color: isMe ? KuwrirColors.primary : KuwrirColors.surface,
+          border: isMe ? null : Border.all(color: KuwrirColors.border),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -117,12 +148,12 @@ class _MessageBubble extends StatelessWidget {
               isMe ? 'Kamu' : 'Customer',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isMe ? Colors.white70 : Colors.grey.shade600,
+                fontWeight: FontWeight.w700,
+                color: isMe ? Colors.white70 : KuwrirColors.textHint,
               ),
             ),
             const SizedBox(height: 2),
-            Text(msg.text, style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
+            Text(msg.text, style: TextStyle(color: isMe ? Colors.white : KuwrirColors.textPrimary, fontSize: 14)),
           ],
         ),
       ),
@@ -138,33 +169,48 @@ class _InputBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8)],
+        color: KuwrirColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                hintText: 'Ketik pesan...',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
+            child: Container(
+              decoration: BoxDecoration(
+                color: KuwrirColors.background,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: KuwrirColors.border),
               ),
-              onSubmitted: (_) => onSend(),
+              child: TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Ketik pesan...',
+                  hintStyle: TextStyle(color: KuwrirColors.textHint),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: false,
+                ),
+                onSubmitted: (_) => onSend(),
+              ),
             ),
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: KuwrirColors.primary,
+          Material(
+            color: KuwrirColors.primary,
+            shape: const CircleBorder(),
             child: IconButton(
               icon: const Icon(Icons.send, color: Colors.white, size: 20),
               onPressed: onSend,

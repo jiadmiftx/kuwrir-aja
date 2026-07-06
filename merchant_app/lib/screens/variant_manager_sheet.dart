@@ -167,27 +167,46 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
           expand: false,
           initialChildSize: 0.6,
           maxChildSize: 0.9,
-          builder: (context, scrollController) => Padding(
+          builder: (context, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: KuwrirColors.background,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
             padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
             ),
             child: ListView(
               controller: scrollController,
               children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.border,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text('Varian — ${product.name}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
                     ),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      icon: Icon(Icons.close, color: KuwrirColors.textSecondary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 if (groups.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -204,13 +223,21 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                         context, entry.key, entry.value.first.minSelect, entry.value.first.maxSelect),
                     onDeleteOption: (id) => context.read<MenuCubit>().deleteVariant(id),
                   ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => _addGroup(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Tambah Grup Baru'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _addGroup(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: KuwrirColors.primary,
+                      side: BorderSide(color: KuwrirColors.primary.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Grup Baru', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -240,41 +267,68 @@ class _GroupCard extends StatelessWidget {
         ? (rule.minSelect > 0 ? 'Wajib pilih 1' : 'Pilih 1 (opsional)')
         : 'Pilih ${rule.minSelect}-${rule.maxSelect}';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(groupName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                Text(ruleLabel, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+                Text(groupName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14.5, color: KuwrirColors.textPrimary)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Text(ruleLabel,
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: KuwrirColors.primary)),
+                ),
               ],
             ),
             const SizedBox(height: 6),
-            for (final o in options)
+            for (final o in options) ...[
+              Divider(height: 1, color: KuwrirColors.border),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    Expanded(child: Text(o.name, style: const TextStyle(fontSize: 13))),
+                    Expanded(
+                      child: Text(o.name,
+                          style: const TextStyle(fontSize: 13.5, color: KuwrirColors.textPrimary)),
+                    ),
                     Text('+IDR ${o.price.toStringAsFixed(0)}',
-                        style: TextStyle(fontSize: 12, color: KuwrirColors.primary)),
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: KuwrirColors.primary)),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      color: Colors.red,
+                      icon: Icon(Icons.delete_outline, size: 18, color: KuwrirColors.error),
                       onPressed: () => onDeleteOption(o.id),
                     ),
                   ],
                 ),
               ),
+            ],
             TextButton.icon(
               onPressed: onAddOption,
+              style: TextButton.styleFrom(foregroundColor: KuwrirColors.primary),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Tambah Opsi', style: TextStyle(fontSize: 13)),
+              label: const Text('Tambah Opsi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ],
         ),

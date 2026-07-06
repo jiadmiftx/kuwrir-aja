@@ -42,17 +42,22 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   Future<void> _pick(String docType) async {
     final src = await showModalBottomSheet<ImageSource>(
       context: context,
+      backgroundColor: KuwrirColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.camera_alt),
+              leading: Icon(Icons.camera_alt_outlined, color: KuwrirColors.primary),
               title: const Text('Ambil Foto'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: Icon(Icons.photo_library_outlined, color: KuwrirColors.primary),
               title: const Text('Pilih dari Galeri'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -88,7 +93,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_allDocsPicked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Semua dokumen wajib diupload'), backgroundColor: Colors.orange),
+        SnackBar(content: const Text('Semua dokumen wajib diupload'), backgroundColor: KuwrirColors.warning),
       );
       return;
     }
@@ -128,12 +133,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload gagal: ${res.body}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Upload gagal: ${res.body}'), backgroundColor: KuwrirColors.error),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: KuwrirColors.error),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -150,9 +155,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: KuwrirColors.background,
       appBar: AppBar(title: const Text('Dokumen & Kendaraan')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -162,10 +168,18 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               const SizedBox(height: 24),
 
               // Vehicle info
-              const Text('Informasi Kendaraan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              Text(
+                'INFORMASI KENDARAAN',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: KuwrirColors.textHint,
+                ),
+              ),
+              const SizedBox(height: 12),
 
-              const Text('Jenis Kendaraan', style: TextStyle(fontWeight: FontWeight.w500)),
+              Text('Jenis Kendaraan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: KuwrirColors.textPrimary)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -176,57 +190,65 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                   _vehicleChip('car', Icons.directions_car, 'Mobil'),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              _field(_plateCtrl, 'Nomor Plat (e.g. DR 1234 AB)', Icons.confirmation_number,
+              _field(_plateCtrl, 'Nomor Plat (e.g. DR 1234 AB)', Icons.confirmation_number_outlined,
                   validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(child: _field(_brandCtrl, 'Merek (e.g. Honda)', Icons.info_outline)),
                   const SizedBox(width: 12),
-                  Expanded(child: _field(_colorCtrl, 'Warna', Icons.palette)),
+                  Expanded(child: _field(_colorCtrl, 'Warna', Icons.palette_outlined)),
                 ],
               ),
               const SizedBox(height: 12),
-              _field(_yearCtrl, 'Tahun Kendaraan', Icons.calendar_today,
+              _field(_yearCtrl, 'Tahun Kendaraan', Icons.calendar_today_outlined,
                   keyboardType: TextInputType.number),
               const SizedBox(height: 24),
 
               // Documents
-              const Text('Upload Dokumen', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              const Text(
-                'Semua dokumen wajib. Foto harus jelas dan terbaca.',
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+              Text(
+                'UPLOAD DOKUMEN',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: KuwrirColors.textHint,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
+              Text(
+                'Semua dokumen wajib. Foto harus jelas dan terbaca.',
+                style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 12.5),
+              ),
+              const SizedBox(height: 14),
 
               _docUploadTile(
                 'KTP',
                 'Foto KTP asli — wajah dan data jelas',
-                Icons.badge,
+                Icons.badge_outlined,
                 _ktpFile,
                 () => _pick('ktp'),
               ),
               _docUploadTile(
                 'SIM C / SIM A',
                 'Foto SIM aktif (depan)',
-                Icons.card_membership,
+                Icons.card_membership_outlined,
                 _simFile,
                 () => _pick('sim'),
               ),
               _docUploadTile(
                 'STNK',
                 'Foto STNK kendaraan yang dipakai',
-                Icons.article,
+                Icons.article_outlined,
                 _stnkFile,
                 () => _pick('stnk'),
               ),
               _docUploadTile(
                 'Selfie dengan KTP',
                 'Foto wajah sambil memegang KTP',
-                Icons.face,
+                Icons.face_outlined,
                 _selfieFile,
                 () => _pick('selfie'),
               ),
@@ -237,41 +259,52 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 _vehiclePhotoFile,
                 () => _pick('vehicle_photo'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Progress summary
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _allDocsPicked ? Colors.green.shade50 : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _allDocsPicked ? Colors.green : Colors.orange),
+                  color: (_allDocsPicked ? KuwrirColors.success : KuwrirColors.warning).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: (_allDocsPicked ? KuwrirColors.success : KuwrirColors.warning).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
                     Icon(_allDocsPicked ? Icons.check_circle : Icons.info_outline,
-                        color: _allDocsPicked ? Colors.green : Colors.orange),
-                    const SizedBox(width: 8),
+                        color: _allDocsPicked ? KuwrirColors.success : KuwrirColors.warning),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _allDocsPicked
                             ? 'Semua dokumen siap diupload!'
                             : '${[_ktpFile, _simFile, _stnkFile, _selfieFile, _vehiclePhotoFile].where((f) => f == null).length} dokumen belum diupload',
-                        style: TextStyle(color: _allDocsPicked ? Colors.green.shade700 : Colors.orange.shade700),
+                        style: TextStyle(
+                          color: _allDocsPicked ? KuwrirColors.success : KuwrirColors.warning,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               SizedBox(
-                height: 50,
+                height: 52,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: KuwrirColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   onPressed: _loading ? null : _submit,
                   child: _loading
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Kirim Pendaftaran', style: TextStyle(fontSize: 16)),
+                      : const Text('Kirim Pendaftaran', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
@@ -288,17 +321,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         onTap: () => setState(() => _vehicleType = value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? KuwrirColors.primary.withOpacity(0.1) : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: selected ? KuwrirColors.primary : Colors.transparent, width: 2),
+            color: selected ? KuwrirColors.primary.withValues(alpha: 0.08) : KuwrirColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? KuwrirColors.primary : KuwrirColors.border, width: selected ? 1.5 : 1),
           ),
           child: Column(
             children: [
-              Icon(icon, color: selected ? KuwrirColors.primary : Colors.grey),
+              Icon(icon, color: selected ? KuwrirColors.primary : KuwrirColors.textHint),
               const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 12, color: selected ? KuwrirColors.primary : Colors.grey, fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+              Text(label, style: TextStyle(fontSize: 12, color: selected ? KuwrirColors.primary : KuwrirColors.textSecondary, fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
             ],
           ),
         ),
@@ -308,20 +341,39 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
   Widget _docUploadTile(String title, String subtitle, IconData icon, File? file, VoidCallback onTap) {
     final uploaded = file != null;
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: uploaded ? Colors.green.withOpacity(0.1) : Colors.grey.shade100,
-          backgroundImage: uploaded ? FileImage(file) : null,
-          child: uploaded ? null : Icon(icon, color: Colors.grey),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 44,
+            height: 44,
+            color: uploaded ? KuwrirColors.success.withValues(alpha: 0.1) : KuwrirColors.primary.withValues(alpha: 0.08),
+            child: uploaded
+                ? Image.file(file, fit: BoxFit.cover)
+                : Icon(icon, color: KuwrirColors.primary, size: 20),
+          ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(uploaded ? '✓ Sudah diupload' : subtitle,
-            style: TextStyle(fontSize: 12, color: uploaded ? Colors.green : Colors.grey)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        subtitle: Text(uploaded ? 'Sudah diupload' : subtitle,
+            style: TextStyle(fontSize: 12, color: uploaded ? KuwrirColors.success : KuwrirColors.textHint)),
         trailing: TextButton(
           onPressed: onTap,
-          child: Text(uploaded ? 'Ganti' : 'Upload', style: TextStyle(color: uploaded ? Colors.green : KuwrirColors.primary)),
+          child: Text(uploaded ? 'Ganti' : 'Upload', style: TextStyle(color: uploaded ? KuwrirColors.success : KuwrirColors.primary, fontWeight: FontWeight.w700)),
         ),
       ),
     );
@@ -329,11 +381,28 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
   Widget _field(TextEditingController ctrl, String label, IconData icon,
       {TextInputType? keyboardType, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon), border: const OutlineInputBorder()),
+    return Container(
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      child: TextFormField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: KuwrirColors.textHint),
+          prefixIcon: Icon(icon, color: KuwrirColors.primary),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          filled: false,
+        ),
+      ),
     );
   }
 
@@ -349,14 +418,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: done || active ? KuwrirColors.primary : Colors.grey.shade300,
+                backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
                 child: done
                     ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : Text('$step', style: TextStyle(color: active ? Colors.white : Colors.grey, fontSize: 12)),
+                    : Text('$step', style: TextStyle(color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),
               ),
               const SizedBox(width: 4),
-              Expanded(child: Text(steps[i], style: TextStyle(fontSize: 12, color: active ? KuwrirColors.primary : Colors.grey, fontWeight: active ? FontWeight.bold : FontWeight.normal))),
-              if (i < steps.length - 1) Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
+              Expanded(child: Text(steps[i], style: TextStyle(fontSize: 12, color: active ? KuwrirColors.primary : KuwrirColors.textHint, fontWeight: active ? FontWeight.w700 : FontWeight.normal))),
+              if (i < steps.length - 1) Expanded(child: Container(height: 1, color: KuwrirColors.border)),
             ],
           ),
         );

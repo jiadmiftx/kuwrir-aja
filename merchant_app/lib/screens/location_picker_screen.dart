@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 class LocationPickerScreen extends StatefulWidget {
   final LatLng? initial;
@@ -56,12 +57,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: KuwrirColors.background,
       appBar: AppBar(
         title: const Text('Pilih Lokasi Toko'),
+        backgroundColor: KuwrirColors.background,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, _picked),
-            child: const Text('Pilih', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(foregroundColor: KuwrirColors.primary),
+            child: const Text('Pilih', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -86,8 +90,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     point: _picked,
                     width: 48,
                     height: 48,
-                    child: const Icon(Icons.store_mall_directory,
-                        color: Colors.orange, size: 48),
+                    child: Icon(Icons.store_mall_directory,
+                        color: KuwrirColors.primary, size: 48),
                   ),
                 ],
               ),
@@ -96,37 +100,60 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           Positioned(
             left: 0, right: 0, bottom: 0,
             child: Container(
-              color: Theme.of(context).colorScheme.surface,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              decoration: BoxDecoration(
+                color: KuwrirColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: KuwrirColors.textPrimary.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: Colors.orange, size: 20),
-                      const SizedBox(width: 8),
+                      Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.location_on_outlined, color: KuwrirColors.primary, size: 19),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           '${_picked.latitude.toStringAsFixed(6)}, ${_picked.longitude.toStringAsFixed(6)}',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text('Ketuk peta untuk menandai lokasi toko',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Text('Ketuk peta untuk menandai lokasi toko',
+                      style: TextStyle(fontSize: 12, color: KuwrirColors.textHint)),
                 ],
               ),
             ),
           ),
           Positioned(
             right: 16,
-            bottom: 100,
+            bottom: 128,
             child: FloatingActionButton.small(
               heroTag: 'gps_btn',
               onPressed: _getUserLocation,
+              backgroundColor: KuwrirColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
               child: const Icon(Icons.my_location),
             ),
           ),

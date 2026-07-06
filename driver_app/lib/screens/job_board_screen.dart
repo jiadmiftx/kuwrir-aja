@@ -26,16 +26,25 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         final isOnline = state is JobBoardLoaded && state.isOnline;
 
         return Scaffold(
+            backgroundColor: KuwrirColors.background,
             appBar: AppBar(
               title: const Text('Job Board'),
               actions: [
                 Row(
                   children: [
-                    Text(
-                      isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        color: isOnline ? Colors.green : Colors.grey,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (isOnline ? KuwrirColors.success : KuwrirColors.textHint).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        isOnline ? 'ONLINE' : 'OFFLINE',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: isOnline ? KuwrirColors.success : KuwrirColors.textHint,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     Switch(
@@ -48,13 +57,13 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                           cubit.goOffline();
                         }
                       },
-                      activeTrackColor: Colors.green,
+                      activeTrackColor: KuwrirColors.success,
                     ),
                     const SizedBox(width: 4),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.account_balance_wallet),
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
                   onPressed: () => Navigator.pushNamed(context, '/wallet'),
                 ),
                 IconButton(
@@ -79,7 +88,7 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Keluar'),
           ),
@@ -94,18 +103,34 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
 
   Widget _buildFoodTab(BuildContext context, JobBoardState state) {
     if (state is JobBoardOffline) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.wifi_off, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'Anda sedang Offline.\nAktifkan Online untuk melihat pesanan.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.wifi_off, size: 36, color: KuwrirColors.primary),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Anda sedang offline',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: KuwrirColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Aktifkan Online untuk melihat pesanan.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: KuwrirColors.textHint),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -119,13 +144,35 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         return RefreshIndicator(
           onRefresh: () => context.read<JobBoardCubit>().loadJobs(),
           child: ListView(
-            children: const [
-              SizedBox(height: 200),
+            children: [
+              const SizedBox(height: 140),
               Center(
-                child: Text(
-                  'Belum ada pesanan tersedia.\nTarik ke bawah untuk refresh.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.primary.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.inbox_outlined, size: 36, color: KuwrirColors.primary),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Belum ada pesanan tersedia',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: KuwrirColors.textPrimary),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tarik ke bawah untuk refresh',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: KuwrirColors.textHint),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -136,7 +183,7 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
       return RefreshIndicator(
         onRefresh: () => context.read<JobBoardCubit>().loadJobs(),
         child: ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           itemCount: state.jobs.length,
           itemBuilder: (context, i) {
             return _JobCard(job: state.jobs[i]);
@@ -150,7 +197,7 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: const TextStyle(color: Colors.grey)),
+            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<JobBoardCubit>().loadJobs(),
@@ -189,9 +236,20 @@ class _JobCardState extends State<_JobCard> {
     final paymentType = job['payment_type'] as String? ?? 'cash';
     final total = (job['total'] as num?)?.toDouble() ?? 0;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -204,30 +262,29 @@ class _JobCardState extends State<_JobCard> {
                   'Rp ${_fmt(driverEarning)}',
                   style: const TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: KuwrirColors.primary,
                   ),
                 ),
                 Row(
                   children: [
                     Text('${distanceKm.toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                            color: Colors.grey, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: KuwrirColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 13)),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: paymentType == 'cash'
-                            ? Colors.orange.withValues(alpha: 0.1)
-                            : Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: (paymentType == 'cash' ? KuwrirColors.warning : KuwrirColors.info)
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(7),
                       ),
                       child: Text(
                         paymentType == 'cash' ? 'COD' : 'QRIS',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: paymentType == 'cash' ? Colors.orange : Colors.blue,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: paymentType == 'cash' ? KuwrirColors.warning : KuwrirColors.info,
                         ),
                       ),
                     ),
@@ -237,13 +294,15 @@ class _JobCardState extends State<_JobCard> {
             ),
             const SizedBox(height: 4),
             Text('#$orderNumber',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const Divider(height: 20),
+                style: TextStyle(fontSize: 12, color: KuwrirColors.textHint)),
+            const SizedBox(height: 10),
+            Divider(height: 1, color: KuwrirColors.border),
+            const SizedBox(height: 12),
 
             // Pickup
             _AddressRow(
-              icon: Icons.store,
-              iconColor: Colors.orange,
+              icon: Icons.storefront_outlined,
+              iconColor: KuwrirColors.warning,
               label: 'Ambil di',
               name: merchantName,
               address: pickupAddress,
@@ -252,29 +311,29 @@ class _JobCardState extends State<_JobCard> {
 
             // Dropoff
             _AddressRow(
-              icon: Icons.location_on,
-              iconColor: Colors.red,
+              icon: Icons.location_on_outlined,
+              iconColor: KuwrirColors.error,
               label: 'Antar ke',
               name: '',
               address: dropoffAddress,
             ),
 
             if (paymentType == 'cash') ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  color: KuwrirColors.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.payments_outlined, size: 16, color: Colors.orange),
+                    Icon(Icons.payments_outlined, size: 16, color: KuwrirColors.warning),
                     const SizedBox(width: 6),
                     Text(
                       'Tagih COD: Rp ${_fmt(total)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, color: Colors.orange, fontSize: 13),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: KuwrirColors.warning, fontSize: 13),
                     ),
                   ],
                 ),
@@ -284,13 +343,14 @@ class _JobCardState extends State<_JobCard> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
+              height: 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: KuwrirColors.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _accepting ? null : () => _accept(context, orderId, job),
                 child: _accepting
@@ -299,7 +359,7 @@ class _JobCardState extends State<_JobCard> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
                     : const Text('Ambil Pesanan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -352,19 +412,28 @@ class _AddressRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: iconColor, size: 20),
-        const SizedBox(width: 8),
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 17),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  style: TextStyle(color: KuwrirColors.textHint, fontSize: 11.5)),
               if (name.isNotEmpty)
                 Text(name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
               Text(address,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
             ],
           ),
         ),

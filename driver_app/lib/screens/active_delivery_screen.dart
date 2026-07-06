@@ -24,8 +24,11 @@ class ActiveDeliveryScreen extends StatelessWidget {
       builder: (context, state) {
         if (state is ActiveDeliveryIdle) {
           return Scaffold(
+            backgroundColor: KuwrirColors.background,
             appBar: AppBar(title: const Text('Pengiriman Aktif')),
-            body: const Center(child: Text('Tidak ada pengiriman aktif')),
+            body: Center(
+              child: Text('Tidak ada pengiriman aktif', style: TextStyle(color: KuwrirColors.textSecondary)),
+            ),
           );
         }
 
@@ -43,14 +46,16 @@ class ActiveDeliveryScreen extends StatelessWidget {
         }
         if (state is ActiveDeliveryDone) {
           return Scaffold(
+            backgroundColor: KuwrirColors.background,
             appBar: AppBar(title: const Text('Selesai')),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
 
         if (order == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            backgroundColor: KuwrirColors.background,
+            body: const Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -84,6 +89,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
     final focusLng = isPickedUp ? dropoffLng : pickupLng;
 
     return Scaffold(
+      backgroundColor: KuwrirColors.background,
       appBar: AppBar(
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
         automaticallyImplyLeading: false,
@@ -121,18 +127,18 @@ class ActiveDeliveryScreen extends StatelessWidget {
                       point: LatLng(pickupLat, pickupLng),
                       width: 48,
                       height: 48,
-                      child: const Tooltip(
+                      child: Tooltip(
                         message: 'Merchant (Pickup)',
-                        child: Icon(Icons.store, color: Colors.orange, size: 40),
+                        child: Icon(Icons.storefront, color: KuwrirColors.warning, size: 40),
                       ),
                     ),
                     Marker(
                       point: LatLng(dropoffLat, dropoffLng),
                       width: 48,
                       height: 48,
-                      child: const Tooltip(
+                      child: Tooltip(
                         message: 'Customer (Dropoff)',
-                        child: Icon(Icons.location_pin, color: Colors.red, size: 40),
+                        child: Icon(Icons.location_pin, color: KuwrirColors.error, size: 40),
                       ),
                     ),
                   ],
@@ -156,11 +162,12 @@ class ActiveDeliveryScreen extends StatelessWidget {
 
           // Order details bottom sheet
           Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: KuwrirColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))
+                    color: KuwrirColors.textPrimary.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))
               ],
             ),
             padding: const EdgeInsets.all(20),
@@ -175,63 +182,65 @@ class ActiveDeliveryScreen extends StatelessWidget {
                     Text(
                       isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant',
                       style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
                           color: KuwrirColors.primary),
                     ),
                     Text('#$orderNumber',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        style: TextStyle(color: KuwrirColors.textHint, fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Penghasilan: Rp ${_fmt(driverEarning)}',
                   style: const TextStyle(
-                      color: KuwrirColors.success, fontWeight: FontWeight.w600),
+                      color: KuwrirColors.success, fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
-                const Divider(height: 20),
+                const SizedBox(height: 14),
+                Divider(height: 1, color: KuwrirColors.border),
+                const SizedBox(height: 14),
 
                 // Location info
                 if (!isPickedUp) ...[
                   _InfoRow(
-                    icon: Icons.store,
-                    color: Colors.orange,
+                    icon: Icons.storefront_outlined,
+                    color: KuwrirColors.warning,
                     label: merchantName,
                     sub: pickupAddress,
                   ),
                 ] else ...[
                   _InfoRow(
-                    icon: Icons.person,
-                    color: Colors.blue,
+                    icon: Icons.person_outline,
+                    color: KuwrirColors.info,
                     label: receiverName,
                     sub: receiverPhone,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 10),
                   _InfoRow(
-                    icon: Icons.location_on,
-                    color: Colors.red,
+                    icon: Icons.location_on_outlined,
+                    color: KuwrirColors.error,
                     label: dropoffAddress,
                     sub: '',
                   ),
                 ],
 
                 if (paymentType == 'cash' && isPickedUp) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: KuwrirColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.payments, color: Colors.orange, size: 18),
+                        Icon(Icons.payments_outlined, color: KuwrirColors.warning, size: 18),
                         const SizedBox(width: 8),
                         Text(
                           'Tagih COD: Rp ${_fmt(total)}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: KuwrirColors.warning,
                               fontSize: 14),
                         ),
                       ],
@@ -244,34 +253,40 @@ class ActiveDeliveryScreen extends StatelessWidget {
                 if (isLoading)
                   const Center(child: CircularProgressIndicator())
                 else if (!isPickedUp)
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                  SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: KuwrirColors.warning,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () =>
+                          context.read<ActiveDeliveryCubit>().markPickedUp(orderId),
+                      child: const Text('Sudah Diambil',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
-                    onPressed: () =>
-                        context.read<ActiveDeliveryCubit>().markPickedUp(orderId),
-                    child: const Text('Sudah Diambil',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
                   )
                 else
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      backgroundColor: KuwrirColors.success,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                  SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: KuwrirColors.success,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () =>
+                          context.read<ActiveDeliveryCubit>().markDelivered(orderId),
+                      child: const Text('Selesai Diantarkan',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
-                    onPressed: () =>
-                        context.read<ActiveDeliveryCubit>().markDelivered(orderId),
-                    child: const Text('Selesai Diantarkan',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
               ],
             ),
@@ -289,6 +304,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Pengiriman Selesai!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -296,23 +312,33 @@ class ActiveDeliveryScreen extends StatelessWidget {
           children: [
             if (cashCollected > 0)
               Text('Uang COD diterima: Rp ${_fmt(cashCollected)}',
-                  style: const TextStyle(fontSize: 15)),
-            const SizedBox(height: 4),
+                  style: const TextStyle(fontSize: 14.5)),
+            const SizedBox(height: 6),
             Text('Penghasilan: Rp ${_fmt(driverEarning)}',
                 style: const TextStyle(
                     fontSize: 15,
                     color: KuwrirColors.success,
-                    fontWeight: FontWeight.bold)),
+                    fontWeight: FontWeight.w700)),
           ],
         ),
         actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              context.read<ActiveDeliveryCubit>().reset();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Kembali ke Job Board'),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: KuwrirColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                context.read<ActiveDeliveryCubit>().reset();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Kembali ke Job Board', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
           ),
         ],
       ),
@@ -340,18 +366,27 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 8),
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 17),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14)),
+                      fontWeight: FontWeight.w700, fontSize: 14)),
               if (sub.isNotEmpty)
                 Text(sub,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 12)),
             ],
           ),
         ),

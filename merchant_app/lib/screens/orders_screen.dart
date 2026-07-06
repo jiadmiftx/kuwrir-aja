@@ -133,6 +133,13 @@ class _OrderCard extends StatelessWidget {
         color: KuwrirColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: KuwrirColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -141,14 +148,26 @@ class _OrderCard extends StatelessWidget {
           children: [
             // Header
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(orderNumber,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.receipt_long_outlined, color: KuwrirColors.primary, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(orderNumber,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                ),
                 _StatusBadge(status),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Icon(Icons.person_outline, size: 14, color: KuwrirColors.textSecondary),
@@ -169,6 +188,8 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
+            Divider(height: 1, color: KuwrirColors.border),
+            const SizedBox(height: 10),
 
             // Items
             for (final item in items)
@@ -176,7 +197,7 @@ class _OrderCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   '${item['quantity']}x ${item['item_name']}',
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: 13, color: KuwrirColors.textPrimary),
                 ),
               ),
 
@@ -192,7 +213,8 @@ class _OrderCard extends StatelessWidget {
                     Text('Total', style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
                     Text(
                       'IDR ${_fmt(total)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 15, color: KuwrirColors.primary),
                     ),
                   ],
                 ),
@@ -293,26 +315,26 @@ class _StatusBadge extends StatelessWidget {
     Color color;
     switch (status) {
       case 'pending':
-        color = Colors.orange;
+        color = KuwrirColors.warning;
         break;
       case 'confirmed':
-        color = Colors.blue;
+        color = KuwrirColors.info;
         break;
       case 'preparing':
-        color = Colors.purple;
+        color = KuwrirColors.accent;
         break;
       case 'ready':
-        color = Colors.green;
+        color = KuwrirColors.success;
         break;
       default:
-        color = Colors.grey;
+        color = KuwrirColors.textHint;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(7)),
       child: Text(status.toUpperCase(),
-          style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+          style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w700)),
     );
   }
 }
