@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_cubit.dart';
-import 'kasir_hub_screen.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -81,6 +80,52 @@ class _StoreScreenState extends State<StoreScreen> {
         );
       },
     );
+  }
+
+  Future<void> _editDetail({
+    required String label,
+    required String currentValue,
+    required TextInputType keyboardType,
+    required Future<void> Function(String value) onSave,
+  }) async {
+    final ctrl = TextEditingController(text: currentValue);
+    String? error;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Ubah $label'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: keyboardType,
+            maxLines: keyboardType == TextInputType.multiline ? 3 : 1,
+            autofocus: true,
+            decoration: InputDecoration(labelText: label, errorText: error),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Batal')),
+            FilledButton(
+              onPressed: () async {
+                final value = ctrl.text.trim();
+                if (value.isEmpty) {
+                  setDialogState(() => error = '$label wajib diisi');
+                  return;
+                }
+                try {
+                  await onSave(value);
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (e) {
+                  setDialogState(() => error = e is ApiException ? e.message : '$e');
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) context.read<StoreCubit>().load();
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -171,13 +216,41 @@ class _StoreScreenState extends State<StoreScreen> {
                   _SoftPanel(
                     child: Column(
                       children: [
-                        _InfoRow(icon: Icons.storefront_outlined, label: 'Nama Toko', value: merchant.name),
-                        if (merchant.phone != null) ...[
-                          const _Hairline(),
-                          _InfoRow(icon: Icons.call_outlined, label: 'Telepon', value: merchant.phone!),
-                        ],
+                        _InfoRow(
+                          icon: Icons.storefront_outlined,
+                          label: 'Nama Toko',
+                          value: merchant.name,
+                          onTap: () => _editDetail(
+                            label: 'Nama Toko',
+                            currentValue: merchant.name,
+                            keyboardType: TextInputType.text,
+                            onSave: (v) => context.read<ApiClient>().updateMerchantDetails(name: v),
+                          ),
+                        ),
                         const _Hairline(),
-                        _InfoRow(icon: Icons.location_on_outlined, label: 'Alamat', value: merchant.address),
+                        _InfoRow(
+                          icon: Icons.call_outlined,
+                          label: 'Telepon',
+                          value: merchant.phone ?? 'Belum diisi',
+                          onTap: () => _editDetail(
+                            label: 'Telepon',
+                            currentValue: merchant.phone ?? '',
+                            keyboardType: TextInputType.phone,
+                            onSave: (v) => context.read<ApiClient>().updateMerchantDetails(phone: v),
+                          ),
+                        ),
+                        const _Hairline(),
+                        _InfoRow(
+                          icon: Icons.location_on_outlined,
+                          label: 'Alamat',
+                          value: merchant.address,
+                          onTap: () => _editDetail(
+                            label: 'Alamat',
+                            currentValue: merchant.address,
+                            keyboardType: TextInputType.multiline,
+                            onSave: (v) => context.read<ApiClient>().updateMerchantDetails(address: v),
+                          ),
+                        ),
                         const _Hairline(),
                         _InfoRow(
                           icon: Icons.star_rounded,
@@ -249,19 +322,6 @@ class _StoreScreenState extends State<StoreScreen> {
                           ),
                         ],
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  _SectionLabel('Lainnya'),
-                  _SoftPanel(
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                      leading: Icon(Icons.point_of_sale_outlined, color: KuwrirColors.primary),
-                      title: const Text('Kasir / POS', style: TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text('Transaksi walk-in, laporan, piutang & hutang',
-                          style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
-                      trailing: Icon(Icons.chevron_right, color: KuwrirColors.textHint),
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KasirHub())),
                     ),
                   ),
                 ]),
@@ -376,113 +436,149 @@ class _StoreHero extends StatelessWidget {
     required this.onLogout,
   });
 
+  // Banner height + how far the logo protrudes below it are fixed layout
+  // constants — the hero's overall SizedBox height below is derived from
+  // them so the logo's overflow is actually reserved space, not just
+  // painted on top of whatever sliver comes next (that mismatch is what
+  // used to let the logo visually cover the "Hari Ini" label below it).
+  static const _bannerHeight = 168.0;
+  static const _logoSize = 76.0;
+  static const _logoOverlap = 38.0;
+  static const _heroHeight = _bannerHeight + (_logoSize - _logoOverlap) + 4;
+
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        GestureDetector(
-          onTap: onPickBanner,
-          child: Container(
-            height: 168,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: KuwrirColors.primary.withValues(alpha: 0.08),
-              image: merchant.bannerUrl != null
-                  ? DecorationImage(image: NetworkImage(merchant.bannerUrl!), fit: BoxFit.cover)
-                  : null,
+    return SizedBox(
+      height: _heroHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: onPickBanner,
+              child: Container(
+                height: _bannerHeight,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  image: merchant.bannerUrl != null
+                      ? DecorationImage(image: NetworkImage(merchant.bannerUrl!), fit: BoxFit.cover)
+                      : null,
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (merchant.bannerUrl == null)
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, color: KuwrirColors.primary, size: 28),
+                            const SizedBox(height: 6),
+                            Text('Tambah banner toko',
+                                style: TextStyle(color: KuwrirColors.primary, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    if (uploadingBanner)
+                      Container(
+                        color: Colors.black38,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        ),
+                      ),
+                    if (merchant.bannerUrl != null && !uploadingBanner)
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: _EditChip(),
+                      ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: SafeArea(
+                        bottom: false,
+                        child: IconButton(
+                          onPressed: onLogout,
+                          icon: const Icon(Icons.logout, color: Colors.white),
+                          style: IconButton.styleFrom(backgroundColor: Colors.black26),
+                          tooltip: 'Keluar',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (merchant.bannerUrl == null)
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_photo_alternate_outlined, color: KuwrirColors.primary, size: 28),
-                        const SizedBox(height: 6),
-                        Text('Tambah banner toko',
-                            style: TextStyle(color: KuwrirColors.primary, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          ),
+          Positioned(
+            left: 20,
+            top: _bannerHeight - _logoOverlap,
+            child: GestureDetector(
+              onTap: onPickLogo,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: _logoSize,
+                    height: _logoSize,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: KuwrirColors.surface,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4)),
                       ],
                     ),
-                  ),
-                if (uploadingBanner)
-                  Container(
-                    color: Colors.black38,
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    child: ClipOval(
+                      child: Container(
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        child: uploadingLogo
+                            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                            : merchant.logoUrl != null
+                                ? Image.network(merchant.logoUrl!, fit: BoxFit.cover)
+                                : Icon(Icons.storefront, color: KuwrirColors.primary, size: 30),
+                      ),
                     ),
                   ),
-                if (merchant.bannerUrl != null && !uploadingBanner)
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: _EditChip(),
-                  ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: SafeArea(
-                    bottom: false,
-                    child: IconButton(
-                      onPressed: onLogout,
-                      icon: const Icon(Icons.logout, color: Colors.white),
-                      style: IconButton.styleFrom(backgroundColor: Colors.black26),
-                      tooltip: 'Keluar',
+                  if (!uploadingLogo)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: KuwrirColors.surface, width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          left: 20,
-          bottom: -36,
-          child: GestureDetector(
-            onTap: onPickLogo,
-            child: Container(
-              width: 76,
-              height: 76,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: KuwrirColors.surface,
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4)),
                 ],
               ),
-              child: ClipOval(
-                child: Container(
-                  color: KuwrirColors.primary.withValues(alpha: 0.08),
-                  child: uploadingLogo
-                      ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                      : merchant.logoUrl != null
-                          ? Image.network(merchant.logoUrl!, fit: BoxFit.cover)
-                          : Icon(Icons.storefront, color: KuwrirColors.primary, size: 30),
-                ),
-              ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(108, 12, 20, 0),
-          child: SizedBox(
-            height: 44,
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                merchant.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
-              ),
+          Positioned(
+            left: 108,
+            right: 20,
+            // Vertically centered in the band where the logo protrudes below
+            // the banner (from _bannerHeight to _bannerHeight + _logoOverlap),
+            // so the name reads as part of the same "profile row" as the
+            // logo instead of floating separately over the banner image.
+            top: _bannerHeight + (_logoOverlap - 22) / 2,
+            child: Text(
+              merchant.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
             ),
           ),
-        ),
-        const SizedBox(height: 44),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -558,28 +654,34 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({required this.icon, required this.label, required this.value, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: KuwrirColors.textSecondary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
-                const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
-              ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: KuwrirColors.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
+                  const SizedBox(height: 2),
+                  Text(value, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (onTap != null) Icon(Icons.edit_outlined, size: 16, color: KuwrirColors.textHint),
+          ],
+        ),
       ),
     );
   }

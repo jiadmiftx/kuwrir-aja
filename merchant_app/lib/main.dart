@@ -13,6 +13,7 @@ import 'screens/orders_screen.dart';
 import 'screens/menu_screen.dart';
 import 'screens/store_screen.dart';
 import 'screens/wallet_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'cubits/store_orders_cubit.dart';
 import 'cubits/menu_cubit.dart';
 import 'cubits/store_cubit.dart';
@@ -22,6 +23,10 @@ import 'cubits/wallet_cubit.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final notification = message.notification;
+  if (notification != null) {
+    await NotificationService.persist(notification.title ?? '', notification.body ?? '');
+  }
 }
 
 void main() async {
@@ -62,6 +67,7 @@ class KuwrirMerchantApp extends StatelessWidget {
             '/pending':  (_) => const MerchantPendingScreen(),
             '/home':     (_) => const AppLockGate(child: MerchantHome()),
             '/wallet':   (_) => const WalletScreen(),
+            '/notifications': (_) => const NotificationsScreen(),
           },
         ),
       ),
@@ -168,9 +174,9 @@ class _SplashRouterState extends State<_SplashRouter> {
         return;
       }
 
-      // Account exists (via OTP/Google) but the store form was never
-      // finished — send them back into it instead of a dead end on
-      // Home/Pending, which both assume a store already exists.
+      // Account exists but the store form was never finished — send them
+      // back into it instead of a dead end on Home/Pending, which both
+      // assume a store already exists.
       final hasMerchantProfile = res['has_merchant_profile'] ?? false;
       if (!hasMerchantProfile) {
         Navigator.pushReplacement(

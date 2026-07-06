@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/dashboard_cubit.dart';
+import '../services/notification_service.dart';
 import 'orders_screen.dart';
+import 'notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,10 +14,23 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  int _unreadNotifications = 0;
+
   @override
   void initState() {
     super.initState();
     context.read<DashboardCubit>().load();
+    _refreshUnreadCount();
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final count = await NotificationService.unreadCount();
+    if (mounted) setState(() => _unreadNotifications = count);
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    _refreshUnreadCount();
   }
 
   String _fmt(double v) => v.toStringAsFixed(0)
@@ -28,55 +43,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showNotifications(DashboardLoaded state) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Aktivitas Hari Ini', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              _NotifRow(icon: Icons.fiber_new, label: '${state.newOrders} pesanan baru masuk', color: Colors.orange),
-              _NotifRow(icon: Icons.sync, label: '${state.processingOrders} pesanan sedang diproses', color: Colors.blue),
-              _NotifRow(icon: Icons.delivery_dining, label: '${state.courierEnRoute} kurir dalam perjalanan', color: Colors.purple),
-              _NotifRow(icon: Icons.check_circle, label: '${state.completedOrders} pesanan selesai', color: Colors.green),
-              if (state.cancelledOrders > 0)
-                _NotifRow(icon: Icons.cancel, label: '${state.cancelledOrders} pesanan dibatalkan', color: Colors.red),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<DashboardCubit, DashboardState>(
       builder: (context, state) {
         return Scaffold(
           backgroundColor: KuwrirColors.background,
-          appBar: AppBar(
-            title: const Text('Dashboard'),
-            backgroundColor: KuwrirColors.background,
-            actions: [
-              if (state is DashboardLoaded)
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () => _showNotifications(state),
-                ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => context.read<DashboardCubit>().load(),
-              ),
-            ],
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(child: _buildBody(context, state)),
+              ],
+            ),
           ),
-          body: _buildBody(context, state),
         );
       },
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Dashboard',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text('Pantau performa tokomu hari ini',
+                    style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _openNotifications,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: KuwrirColors.border),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 17,
+                    backgroundColor: KuwrirColors.background,
+                    child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 19),
+                  ),
+                  if (_unreadNotifications > 0)
+                    Positioned(
+                      top: -1,
+                      right: -1,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: KuwrirColors.surface, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -105,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onRefresh: () => context.read<DashboardCubit>().load(),
       color: KuwrirColors.primary,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
         children: [
           Material(
             color: KuwrirColors.primary.withValues(alpha: 0.08),
@@ -135,7 +174,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          Text('HARI INI',
+              style: TextStyle(
+                  fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+          const SizedBox(height: 10),
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -144,40 +187,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisSpacing: 12,
             childAspectRatio: 1.35,
             children: [
-          _StatCard(
-            icon: Icons.fiber_new_outlined,
-            label: 'Order Baru',
-            value: '${s.newOrders}',
-            color: Colors.orange,
-            onTap: () => _openOrders({'pending'}),
-          ),
-          _StatCard(
-            icon: Icons.sync,
-            label: 'Sedang Diproses',
-            value: '${s.processingOrders}',
-            color: Colors.blue,
-            onTap: () => _openOrders({'confirmed', 'preparing'}),
-          ),
-          _StatCard(
-            icon: Icons.delivery_dining_outlined,
-            label: 'Kurir Dalam Perjalanan',
-            value: '${s.courierEnRoute}',
-            color: Colors.purple,
-            onTap: () => _openOrders({'ready', 'picked_up'}),
-          ),
-          _StatCard(
-            icon: Icons.check_circle_outline,
-            label: 'Order Selesai',
-            value: '${s.completedOrders}',
-            color: Colors.green,
-            onTap: () => _openOrders({'delivered'}),
-          ),
-          _StatCard(
-            icon: Icons.payments_outlined,
-            label: 'Pendapatan Hari Ini',
-            value: 'Rp ${_fmt(s.todayRevenue)}',
-            color: KuwrirColors.primary,
-          ),
+              _StatCard(
+                icon: Icons.fiber_new_outlined,
+                label: 'Order Baru',
+                value: '${s.newOrders}',
+                color: Colors.orange,
+                onTap: () => _openOrders({'pending'}),
+              ),
+              _StatCard(
+                icon: Icons.sync,
+                label: 'Sedang Diproses',
+                value: '${s.processingOrders}',
+                color: Colors.blue,
+                onTap: () => _openOrders({'confirmed', 'preparing'}),
+              ),
+              _StatCard(
+                icon: Icons.delivery_dining_outlined,
+                label: 'Kurir Dalam Perjalanan',
+                value: '${s.courierEnRoute}',
+                color: Colors.purple,
+                onTap: () => _openOrders({'ready', 'picked_up'}),
+              ),
+              _StatCard(
+                icon: Icons.check_circle_outline,
+                label: 'Order Selesai',
+                value: '${s.completedOrders}',
+                color: Colors.green,
+                onTap: () => _openOrders({'delivered'}),
+              ),
+              _StatCard(
+                icon: Icons.payments_outlined,
+                label: 'Pendapatan Hari Ini',
+                value: 'Rp ${_fmt(s.todayRevenue)}',
+                color: KuwrirColors.primary,
+              ),
               _StatCard(
                 icon: Icons.star_outline,
                 label: 'Rating Merchant',
@@ -186,6 +229,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+          if (s.topProducts.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            Text('MENU TERLARIS',
+                style: TextStyle(
+                    fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: KuwrirColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: KuwrirColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (var i = 0; i < s.topProducts.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: KuwrirColors.border),
+                    _TopProductRow(product: s.topProducts[i], rank: i + 1),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -244,21 +310,76 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _NotifRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _NotifRow({required this.icon, required this.label, required this.color});
+class _TopProductRow extends StatelessWidget {
+  final TopProduct product;
+  final int rank;
+  const _TopProductRow({required this.product, required this.rank});
+
+  String _fmt(double v) => v.toStringAsFixed(0)
+      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 
   @override
   Widget build(BuildContext context) {
+    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+          SizedBox(
+            width: 20,
+            child: Text('$rank',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: KuwrirColors.textHint)),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: KuwrirColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: product.imageUrl != null
+                ? Image.network(product.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(Icons.fastfood, color: KuwrirColors.primary, size: 20))
+                : Icon(Icons.fastfood, color: KuwrirColors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(product.name,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (hasDiscount) ...[
+                      Text('Rp ${_fmt(product.price)}',
+                          style: TextStyle(
+                              fontSize: 11.5, color: KuwrirColors.textHint, decoration: TextDecoration.lineThrough)),
+                      const SizedBox(width: 5),
+                    ],
+                    Text('Rp ${_fmt(hasDiscount ? product.discountPrice! : product.price)}',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: KuwrirColors.primary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (product.orderCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: KuwrirColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text('${product.orderCount}x terjual',
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: KuwrirColors.success)),
+            ),
         ],
       ),
     );

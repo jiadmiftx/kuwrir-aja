@@ -1,6 +1,36 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
+/// A row in the Dashboard's "Menu Terlaris" rail — ranked by real delivered-
+/// order frequency in the last 30 days, falling back to the merchant's
+/// most recently added products when there's no order history yet.
+class TopProduct {
+  final String id;
+  final String name;
+  final String? imageUrl;
+  final double price;
+  final double? discountPrice;
+  final int orderCount;
+
+  const TopProduct({
+    required this.id,
+    required this.name,
+    this.imageUrl,
+    required this.price,
+    this.discountPrice,
+    this.orderCount = 0,
+  });
+
+  factory TopProduct.fromJson(Map<String, dynamic> json) => TopProduct(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+        imageUrl: json['image_url'] as String?,
+        price: (json['price'] as num?)?.toDouble() ?? 0,
+        discountPrice: (json['discount_price'] as num?)?.toDouble(),
+        orderCount: (json['order_count'] as num?)?.toInt() ?? 0,
+      );
+}
+
 abstract class DashboardState {}
 
 class DashboardLoading extends DashboardState {}
@@ -15,6 +45,7 @@ class DashboardLoaded extends DashboardState {
   final double rating;
   final int totalReviews;
   final double walletBalance;
+  final List<TopProduct> topProducts;
 
   DashboardLoaded({
     this.newOrders = 0,
@@ -26,6 +57,7 @@ class DashboardLoaded extends DashboardState {
     this.rating = 0,
     this.totalReviews = 0,
     this.walletBalance = 0,
+    this.topProducts = const [],
   });
 }
 
@@ -51,6 +83,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         // Wallet is a secondary teaser stat here — don't fail the whole
         // dashboard load if it's unavailable.
       }
+      final topProductsJson = summary['top_products'] as List<dynamic>? ?? [];
       emit(DashboardLoaded(
         newOrders: (summary['new_orders'] as num?)?.toInt() ?? 0,
         processingOrders: (summary['processing_orders'] as num?)?.toInt() ?? 0,
@@ -61,6 +94,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         rating: (summary['rating'] as num?)?.toDouble() ?? 0,
         totalReviews: (summary['total_reviews'] as num?)?.toInt() ?? 0,
         walletBalance: walletBalance,
+        topProducts: topProductsJson.map((p) => TopProduct.fromJson(p as Map<String, dynamic>)).toList(),
       ));
     } on ApiException catch (e) {
       emit(DashboardError(e.message));
