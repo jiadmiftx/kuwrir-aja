@@ -6,6 +6,7 @@ import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
 import '../cubits/location_cubit.dart';
 import 'location_picker_screen.dart';
+import 'addresses_screen.dart';
 import '../utils/auth_guard.dart';
 
 class CartScreen extends StatefulWidget {
@@ -206,34 +207,68 @@ class _CartScreenState extends State<CartScreen> {
                                 maxLines: 2,
                               ),
                               const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  final initial = _dropoffLat != 0
-                                      ? LatLng(_dropoffLat, _dropoffLng)
-                                      : null;
-                                  final result = await Navigator.push<Map<String, dynamic>>(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => LocationPickerScreen(initial: initial),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        if (!await ensureLoggedIn(context) || !mounted) return;
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => AddressesScreen(
+                                              onPick: (a) {
+                                                setState(() {
+                                                  _addressCtrl.text = a.address;
+                                                  _dropoffLat = a.latitude;
+                                                  _dropoffLng = a.longitude;
+                                                });
+                                                context
+                                                    .read<LocationCubit>()
+                                                    .setLocation(a.latitude, a.longitude, a.address);
+                                                Navigator.pop(context);
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.bookmark_border, size: 18),
+                                      label: const Text('Alamat Tersimpan'),
                                     ),
-                                  );
-                                  if (result != null && mounted) {
-                                    final latlng = result['latlng'] as LatLng;
-                                    final addr = result['address'] as String;
-                                    setState(() {
-                                      _dropoffLat = latlng.latitude;
-                                      _dropoffLng = latlng.longitude;
-                                      _addressCtrl.text = addr;
-                                    });
-                                    // Update saved location too
-                                    if (mounted) {
-                                      context.read<LocationCubit>().setLocation(
-                                          latlng.latitude, latlng.longitude, addr);
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.map_outlined, size: 18),
-                                label: const Text('Pilih di Peta'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final initial = _dropoffLat != 0
+                                            ? LatLng(_dropoffLat, _dropoffLng)
+                                            : null;
+                                        final result = await Navigator.push<Map<String, dynamic>>(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => LocationPickerScreen(initial: initial),
+                                          ),
+                                        );
+                                        if (result != null && mounted) {
+                                          final latlng = result['latlng'] as LatLng;
+                                          final addr = result['address'] as String;
+                                          setState(() {
+                                            _dropoffLat = latlng.latitude;
+                                            _dropoffLng = latlng.longitude;
+                                            _addressCtrl.text = addr;
+                                          });
+                                          // Update saved location too
+                                          if (mounted) {
+                                            context.read<LocationCubit>().setLocation(
+                                                latlng.latitude, latlng.longitude, addr);
+                                          }
+                                        }
+                                      },
+                                      icon: const Icon(Icons.map_outlined, size: 18),
+                                      label: const Text('Pilih di Peta'),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               Row(

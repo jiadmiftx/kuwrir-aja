@@ -15,6 +15,7 @@ import '../models/food_category.dart';
 import '../models/promotion.dart';
 import '../models/promo_banner.dart';
 import '../models/wallet.dart';
+import '../models/address.dart';
 
 /// HTTP API client with JWT token management
 class ApiClient {
@@ -688,6 +689,64 @@ class ApiClient {
       if (email != null) 'email': email,
     });
     return User.fromJson(data['user'] as Map<String, dynamic>);
+  }
+
+  // --- Saved Addresses ---
+
+  Future<List<SavedAddress>> getAddresses() async {
+    final data = await get('/addresses');
+    final list = data['addresses'] as List<dynamic>? ?? [];
+    return list.map((a) => SavedAddress.fromJson(a as Map<String, dynamic>)).toList();
+  }
+
+  Future<SavedAddress> createAddress({
+    required String label,
+    required String address,
+    required double lat,
+    required double lng,
+    bool isDefault = false,
+  }) async {
+    final data = await post('/addresses', {
+      'label': label,
+      'address': address,
+      'latitude': lat,
+      'longitude': lng,
+      'is_default': isDefault,
+    });
+    return SavedAddress.fromJson(data['address'] as Map<String, dynamic>);
+  }
+
+  Future<SavedAddress> updateAddress(
+    String id, {
+    required String label,
+    required String address,
+    required double lat,
+    required double lng,
+    bool isDefault = false,
+  }) async {
+    final data = await put('/addresses/$id', {
+      'label': label,
+      'address': address,
+      'latitude': lat,
+      'longitude': lng,
+      'is_default': isDefault,
+    });
+    return SavedAddress.fromJson(data['address'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAddress(String id) async {
+    await _logged(
+      'DELETE',
+      '/addresses/$id',
+      send: () async => _sendWithRetry(
+        (headers) => _client.delete(Uri.parse('$baseUrl/addresses/$id'), headers: headers),
+        auth: true,
+      ),
+    );
+  }
+
+  Future<void> setDefaultAddress(String id) async {
+    await put('/addresses/$id/default', {});
   }
 }
 

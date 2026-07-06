@@ -17,6 +17,7 @@ export 'src/models/cart_item.dart';
 export 'src/models/chat_message.dart';
 export 'src/models/support_message.dart';
 export 'src/models/wallet.dart';
+export 'src/models/address.dart';
 export 'src/theme/kuwrir_theme.dart';
 export 'src/theme/kuwrir_colors.dart';
 export 'src/widgets/otp_flow.dart';
