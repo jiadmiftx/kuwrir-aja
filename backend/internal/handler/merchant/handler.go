@@ -2,6 +2,7 @@ package merchant
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"mime/multipart"
 	"net/http"
@@ -456,11 +457,23 @@ func (h *Handler) GetMyCategories(c *gin.Context) {
 func (h *Handler) CreateMerchant(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	// Check if user already has a merchant
+	// Check if user already has a merchant. Unscoped so a merchant the user
+	// previously had soft-deleted (e.g. by an admin) is still found here —
+	// otherwise it stays invisible to this check but still occupies the
+	// unique index on user_id, and the later db.Create silently 500s.
 	var existing model.Merchant
-	if err := h.db.Where("user_id = ?", userID).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "You already have a store registered"})
-		return
+	err := h.db.Unscoped().Where("user_id = ?", userID).First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt.Valid {
+			if err := h.db.Unscoped().Delete(&existing).Error; err != nil {
+				log.Printf("CreateMerchant: failed to purge soft-deleted merchant %s: %v", existing.ID, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create merchant"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusConflict, gin.H{"error": "You already have a store registered"})
+			return
+		}
 	}
 
 	uid, _ := uuid.Parse(userID)
@@ -504,6 +517,14 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 	storePhotoURL := upload.MustSave(getFile(c, "store_photo"), folder)
 
 	slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+	// The slug column is unique (including soft-deleted rows, since the DB
+	// index doesn't know about deleted_at), so two merchants named the same
+	// thing would otherwise collide and silently 500. Disambiguate here.
+	var slugTaken int64
+	h.db.Unscoped().Model(&model.Merchant{}).Where("slug = ?", slug).Count(&slugTaken)
+	if slugTaken > 0 {
+		slug = slug + "-" + uid.String()[:8]
+	}
 
 	merchant := model.Merchant{
 		UserID:             uid,
@@ -524,6 +545,7 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&merchant).Error; err != nil {
+		log.Printf("CreateMerchant: db.Create failed for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create merchant"})
 		return
 	}
