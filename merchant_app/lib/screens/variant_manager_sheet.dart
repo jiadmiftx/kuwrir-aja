@@ -39,7 +39,7 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Grup Varian Baru'),
+        title: const Text('Grup Topping/Varian Baru'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -47,7 +47,8 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
               TextField(
                 controller: nameCtrl,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nama Grup', hintText: 'Ukuran, Topping...'),
+                decoration: const InputDecoration(
+                    labelText: 'Nama Grup', hintText: 'Level Pedas, Ukuran, Topping...'),
               ),
               const SizedBox(height: 8),
               Row(
@@ -72,7 +73,8 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
               const Divider(height: 24),
               TextField(
                 controller: optionNameCtrl,
-                decoration: const InputDecoration(labelText: 'Opsi Pertama', hintText: 'Large, Pedas...'),
+                decoration: const InputDecoration(
+                    labelText: 'Opsi Pertama', hintText: 'Level Pedas Sedang, Ukuran Large, Extra Keju...'),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -196,7 +198,7 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text('Varian — ${product.name}',
+                      child: Text('Topping/Varian — ${product.name}',
                           style: const TextStyle(
                               fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
                     ),
@@ -211,7 +213,8 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      'Belum ada varian. Tambahkan grup pertama, mis. "Ukuran" atau "Topping".',
+                      'Belum ada topping atau pilihan tambahan. Tambahkan grup pertama, '
+                      'mis. "Level Pedas", "Ukuran", atau "Topping".',
                       style: TextStyle(color: KuwrirColors.textSecondary),
                     ),
                   ),
@@ -234,7 +237,8 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     icon: const Icon(Icons.add),
-                    label: const Text('Tambah Grup Baru', style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text('Tambah Topping/Varian Baru',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(height: 8),

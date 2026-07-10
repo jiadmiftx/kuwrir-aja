@@ -808,7 +808,13 @@ class _ProductTile extends StatelessWidget {
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 const PopupMenuItem(
                   value: 'variants',
-                  child: Text('Kelola Varian'),
+                  child: Row(
+                    children: [
+                      Icon(Icons.tune, size: 18),
+                      SizedBox(width: 10),
+                      Text('Kelola Topping/Varian'),
+                    ],
+                  ),
                 ),
                 const PopupMenuItem(value: 'delete', child: Text('Hapus')),
               ],

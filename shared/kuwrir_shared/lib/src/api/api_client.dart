@@ -735,6 +735,7 @@ class ApiClient {
   Future<SavedAddress> createAddress({
     required String label,
     required String address,
+    String detail = '',
     required double lat,
     required double lng,
     bool isDefault = false,
@@ -742,6 +743,7 @@ class ApiClient {
     final data = await post('/addresses', {
       'label': label,
       'address': address,
+      'detail': detail,
       'latitude': lat,
       'longitude': lng,
       'is_default': isDefault,
@@ -753,6 +755,7 @@ class ApiClient {
     String id, {
     required String label,
     required String address,
+    String detail = '',
     required double lat,
     required double lng,
     bool isDefault = false,
@@ -760,6 +763,7 @@ class ApiClient {
     final data = await put('/addresses/$id', {
       'label': label,
       'address': address,
+      'detail': detail,
       'latitude': lat,
       'longitude': lng,
       'is_default': isDefault,

@@ -38,6 +38,33 @@ interface Merchant {
   zone?: DeliveryZone
   tax_enabled?: boolean
   tax_rate?: number | null
+  owner_ktp_url?: string
+  business_license_url?: string
+  store_photo_url?: string
+}
+
+// Shows a document image or a "no file" placeholder — mirrors
+// DriverApplicationsPage's DocImage so verification docs look consistent
+// across both admin flows.
+function DocImage({ url, label }: { url?: string; label: string }) {
+  if (!url) return (
+    <div className="flex h-32 w-full items-center justify-center rounded border-2 border-dashed text-muted-foreground text-xs">
+      {label} — tidak ada file
+    </div>
+  )
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <a href={url} target="_blank" rel="noreferrer">
+        <img
+          src={url}
+          alt={label}
+          className="h-32 w-full rounded border object-cover cursor-pointer hover:opacity-90 transition-opacity"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      </a>
+    </div>
+  )
 }
 
 export default function MerchantsPage() {
@@ -310,7 +337,7 @@ export default function MerchantsPage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selected?.name}</DialogTitle>
           </DialogHeader>
@@ -332,6 +359,11 @@ export default function MerchantsPage() {
                 <Badge variant={selected.is_verified ? 'secondary' : 'destructive'}>
                   {selected.is_verified ? 'Verified' : 'Pending Verification'}
                 </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <DocImage url={selected.owner_ktp_url} label="KTP Pemilik" />
+                <DocImage url={selected.store_photo_url} label="Foto Toko" />
+                <DocImage url={selected.business_license_url} label="Izin Usaha" />
               </div>
             </div>
           )}

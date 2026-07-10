@@ -103,12 +103,28 @@ type OtpCode struct {
 	Attempts   int        `gorm:"default:0" json:"-"`
 }
 
+// UserRole records that a user account has access to a given role/app.
+// A single phone number's account can hold several of these (e.g. a
+// customer who also drives), letting the same phone log into customer_app,
+// merchant_app, and driver_app instead of needing a separate account per
+// app. User.Role remains the account's original/primary role for display
+// purposes; the JWT issued per login carries whichever role that login was
+// for, and RoleMiddleware authorizes off the token, not this table.
+type UserRole struct {
+	Base
+	UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_user_role"`
+	Role   Role       `gorm:"type:varchar(20);not null;uniqueIndex:idx_user_role"`
+}
+
 // Address for customer delivery addresses
 type Address struct {
 	Base
 	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
 	Label     string    `gorm:"not null" json:"label"` // "Home", "Office", etc.
 	Address   string    `gorm:"not null" json:"address"`
+	// Detail holds a specific note the geocoded/picked Address string can't
+	// carry — unit/floor number, landmark, delivery instructions.
+	Detail    string    `json:"detail"`
 	Latitude  float64   `gorm:"not null" json:"latitude"`
 	Longitude float64   `gorm:"not null" json:"longitude"`
 	IsDefault bool      `gorm:"default:false" json:"is_default"`

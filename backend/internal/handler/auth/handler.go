@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -64,8 +65,9 @@ type RegisterRequest struct {
 }
 
 type LoginRequest struct {
-	Phone    string `json:"phone" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Phone    string     `json:"phone" binding:"required"`
+	Password string     `json:"password" binding:"required"`
+	Role     model.Role `json:"role"` // optional: which app's role this login is for; defaults to the account's primary role
 }
 
 type RequestOTPRequest struct {
@@ -91,18 +93,110 @@ type AuthResponse struct {
 
 // --- Handlers ---
 
-// Register creates a new user account
+// NormalizePhone is the exported form of normalizePhone, used by
+// cmd/server's startup migration to canonicalize phone numbers stored
+// before normalization existed (see normalizePhone doc comment).
+func NormalizePhone(raw string) string { return normalizePhone(raw) }
+
+// normalizePhone converts a user-entered Indonesian phone number into a
+// canonical "+62xxxxxxxxxx" form so the same number typed as "081234...",
+// "81234...", "6281234...", or "+6281234..." all match the same DB row —
+// otherwise a leading-0 vs +62 mismatch between apps/screens would look
+// like two different accounts. An explicit non-Indonesia dial code (e.g.
+// "+60...") is left as typed rather than forced under +62.
+func normalizePhone(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	hasPlus := strings.HasPrefix(trimmed, "+")
+
+	digits := make([]byte, 0, len(trimmed))
+	for i := 0; i < len(trimmed); i++ {
+		if trimmed[i] >= '0' && trimmed[i] <= '9' {
+			digits = append(digits, trimmed[i])
+		}
+	}
+	s := string(digits)
+	if s == "" {
+		return raw
+	}
+
+	if hasPlus && !strings.HasPrefix(s, "62") {
+		return "+" + s
+	}
+
+	switch {
+	case strings.HasPrefix(s, "0"):
+		s = "62" + s[1:]
+	case !strings.HasPrefix(s, "62"):
+		s = "62" + s
+	}
+	return "+" + s
+}
+
+// userHasRole reports whether userID's account already has roleValue
+// attached (see UserRole doc comment for why this exists separately from
+// User.Role).
+func (h *Handler) userHasRole(userID uuid.UUID, roleValue model.Role) bool {
+	var count int64
+	h.db.Model(&model.UserRole{}).Where("user_id = ? AND role = ?", userID, roleValue).Count(&count)
+	return count > 0
+}
+
+// attachRole idempotently grants userID access to roleValue.
+func (h *Handler) attachRole(userID uuid.UUID, roleValue model.Role) error {
+	return h.db.Where(model.UserRole{UserID: userID, Role: roleValue}).
+		FirstOrCreate(&model.UserRole{UserID: userID, Role: roleValue}).Error
+}
+
+// Register creates a new user account, or — if the phone number already
+// belongs to an account (e.g. it was first registered as a customer) —
+// attaches the requested role to that same account instead of rejecting
+// it, as long as the supplied password matches. This is what lets one
+// phone number be used across customer_app, merchant_app, and driver_app:
+// the same identity, multiple app-roles. Accounts created via OTP login
+// have an unguessable random password, so this path safely can't attach a
+// role to those without the real password (OTP login itself is the
+// trusted path for that case — see VerifyOTP).
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = normalizePhone(req.Phone)
 
-	// Check if phone already exists
 	var existingUser model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Phone number already registered"})
+		if err := bcrypt.CompareHashAndPassword([]byte(existingUser.Password), []byte(req.Password)); err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor ini sudah terdaftar. Login dengan OTP di nomor ini untuk menambahkan akun baru."})
+			return
+		}
+		if h.userHasRole(existingUser.ID, req.Role) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Anda sudah memiliki akun " + string(req.Role) + " dengan nomor ini"})
+			return
+		}
+		if err := h.attachRole(existingUser.ID, req.Role); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to attach role"})
+			return
+		}
+
+		token, refreshToken, err := h.generateTokens(existingUser, req.Role)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			return
+		}
+
+		if req.Role == model.RoleDriver || req.Role == model.RoleMerchant {
+			c.JSON(http.StatusCreated, gin.H{
+				"user":          existingUser,
+				"token":         token,
+				"refresh_token": refreshToken,
+				"message":       "Account created. Please complete your application and wait for admin verification.",
+				"status":        "pending_application",
+			})
+			return
+		}
+
+		c.JSON(http.StatusCreated, AuthResponse{Token: token, RefreshToken: refreshToken, User: existingUser})
 		return
 	}
 
@@ -129,8 +223,12 @@ func (h *Handler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
+	if err := h.attachRole(user.ID, req.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to attach role"})
+		return
+	}
 
-	token, refreshToken, err := h.generateTokens(user)
+	token, refreshToken, err := h.generateTokens(user, req.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -164,6 +262,7 @@ func (h *Handler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = normalizePhone(req.Phone)
 
 	var user model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
@@ -181,7 +280,16 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, refreshToken, err := h.generateTokens(user)
+	effectiveRole := user.Role
+	if req.Role != "" {
+		if !h.userHasRole(user.ID, req.Role) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akun ini belum terdaftar sebagai " + string(req.Role) + ", silakan daftar terlebih dahulu"})
+			return
+		}
+		effectiveRole = req.Role
+	}
+
+	token, refreshToken, err := h.generateTokens(user, effectiveRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -224,6 +332,7 @@ func (h *Handler) RequestOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = normalizePhone(req.Phone)
 
 	now := time.Now()
 
@@ -305,6 +414,13 @@ func (h *Handler) validateAndConsumeOTP(phone, code string) (status int, errMsg 
 // account on first successful verify for an unknown phone number (same
 // auto-register shape as GoogleLogin above). Marks the phone verified either
 // way — a successful OTP check is real proof of ownership.
+//
+// If the phone number already belongs to an account under a different role
+// (e.g. it first signed up as a customer), the role the caller passed is
+// attached to that same account rather than being rejected — a successful
+// OTP is strong proof of phone ownership, so this is the trusted path that
+// lets one phone number log into customer_app, merchant_app, and driver_app
+// all as the same underlying identity.
 // POST /auth/otp/verify   Body: {"phone": "...", "code": "..."}
 func (h *Handler) VerifyOTP(c *gin.Context) {
 	var req VerifyOTPRequest
@@ -312,6 +428,7 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = normalizePhone(req.Phone)
 
 	if status, msg := h.validateAndConsumeOTP(req.Phone, req.Code); status != 0 {
 		c.JSON(status, gin.H{"error": msg})
@@ -350,7 +467,16 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		user.PhoneVerifiedAt = &now
 	}
 
-	token, refreshToken, err := h.generateTokens(user)
+	effectiveRole := user.Role
+	if req.Role != "" {
+		effectiveRole = req.Role
+	}
+	if err := h.attachRole(user.ID, effectiveRole); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set up role"})
+		return
+	}
+
+	token, refreshToken, err := h.generateTokens(user, effectiveRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -361,13 +487,13 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		RefreshToken: refreshToken,
 		User:         user,
 	}
-	if user.Role == model.RoleMerchant {
+	if effectiveRole == model.RoleMerchant {
 		var count int64
 		h.db.Model(&model.Merchant{}).Where("user_id = ?", user.ID).Count(&count)
 		hasProfile := count > 0
 		resp.HasMerchantProfile = &hasProfile
 	}
-	if user.Role == model.RoleDriver {
+	if effectiveRole == model.RoleDriver {
 		var count int64
 		h.db.Model(&model.DriverApplication{}).Where("user_id = ?", user.ID).Count(&count)
 		hasProfile := count > 0
@@ -390,6 +516,7 @@ func (h *Handler) VerifyPhone(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Phone = normalizePhone(req.Phone)
 
 	if status, msg := h.validateAndConsumeOTP(req.Phone, req.Code); status != 0 {
 		c.JSON(status, gin.H{"error": msg})
@@ -533,7 +660,16 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	token, refreshToken, err := h.generateTokens(user)
+	// Keep whichever role the original session was for (the role embedded
+	// in this refresh token), not the account's primary role — otherwise a
+	// silent refresh on a multi-role account's merchant session would flip
+	// it back to the account's original customer role mid-session.
+	effectiveRole := model.Role(claims.Role)
+	if effectiveRole == "" || !h.userHasRole(user.ID, effectiveRole) {
+		effectiveRole = user.Role
+	}
+
+	token, refreshToken, err := h.generateTokens(user, effectiveRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -546,11 +682,17 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 	})
 }
 
-func (h *Handler) generateTokens(user model.User) (string, string, error) {
+// generateTokens issues an access/refresh token pair for user, scoped to
+// role — the role this particular session is operating as, which may
+// differ from user.Role (the account's original/primary role) for
+// multi-role accounts. RoleMiddleware authorizes purely off this claim, so
+// the same account can hold a customer-scoped token and a merchant-scoped
+// token at the same time without either session seeing the other's access.
+func (h *Handler) generateTokens(user model.User, role model.Role) (string, string, error) {
 	// Access token
 	claims := &middleware.Claims{
 		UserID:    user.ID.String(),
-		Role:      string(user.Role),
+		Role:      string(role),
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.ExpiryHours) * time.Hour)),
@@ -568,7 +710,7 @@ func (h *Handler) generateTokens(user model.User) (string, string, error) {
 	// Refresh token
 	refreshClaims := &middleware.Claims{
 		UserID:    user.ID.String(),
-		Role:      string(user.Role),
+		Role:      string(role),
 		TokenType: "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.RefreshExpiryHours) * time.Hour)),

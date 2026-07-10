@@ -19,10 +19,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (res['token'] == null) {
       throw res['error'] ?? 'Verifikasi gagal';
     }
-    final role = res['user']?['role'];
-    if (role != 'driver') {
-      throw 'Akun ini bukan akun driver';
-    }
     await client.saveToken(res['token'], res['refresh_token'] ?? '');
     await NotificationService.uploadToken(client);
     if (!mounted) return;

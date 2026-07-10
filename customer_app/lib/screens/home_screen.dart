@@ -5,6 +5,8 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/location_cubit.dart';
 import '../cubits/session_cubit.dart';
+import '../cubits/address_cubit.dart';
+import '../widgets/floating_cart_button.dart';
 import 'addresses_screen.dart';
 import 'banner_detail_screen.dart';
 import 'phone_verification_gate.dart';
@@ -29,6 +31,12 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkPhoneVerified());
     _refreshUnreadCount();
+    // Only logged-in users have saved addresses — this powers the
+    // "Rumah"/"Kantor" label shown in the app bar instead of the raw
+    // geocoded address when the active location matches a saved one.
+    if (context.read<SessionCubit>().state.user != null) {
+      context.read<AddressCubit>().load();
+    }
   }
 
   Future<void> _refreshUnreadCount() async {
@@ -85,6 +93,23 @@ class _HomeScreenState extends State<HomeScreen> {
     await context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng);
   }
 
+  /// Finds the saved address (if any) whose pin matches the currently
+  /// active [LocationCubit] coordinates, within a small tolerance for
+  /// floating point drift — used so the app bar can show "Rumah"/"Kantor"
+  /// instead of the raw geocoded address once that saved place is active.
+  static const _sameLocationEpsilon = 0.0006; // ~ 60m
+
+  SavedAddress? _matchingSavedAddress(List<SavedAddress> addresses, LocationState loc) {
+    if (!loc.hasLocation) return null;
+    for (final a in addresses) {
+      if ((a.latitude - loc.lat!).abs() < _sameLocationEpsilon &&
+          (a.longitude - loc.lng!).abs() < _sameLocationEpsilon) {
+        return a;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<LocationCubit, LocationState>(
@@ -92,11 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
       listener: (context, loc) => context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng),
       child: Scaffold(
         backgroundColor: KuwrirColors.surface,
-        body: RefreshIndicator(
-          onRefresh: _refresh,
-          color: KuwrirColors.primary,
-          child: CustomScrollView(
-            slivers: [
+        body: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: _refresh,
+              color: KuwrirColors.primary,
+              child: CustomScrollView(
+                slivers: [
               SliverToBoxAdapter(child: _buildHeader()),
               BlocBuilder<HomeCubit, HomeState>(
                 builder: (context, state) {
@@ -163,7 +190,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ],
-          ),
+              ),
+            ),
+            const FloatingCartButton(),
+          ],
         ),
       ),
     );
@@ -183,9 +213,21 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Expanded(
-                child: BlocBuilder<LocationCubit, LocationState>(
-                  builder: (context, loc) {
-                    return GestureDetector(
+                child: BlocBuilder<AddressCubit, AddressState>(
+                  builder: (context, addressState) {
+                    final addresses = addressState is AddressLoaded
+                        ? addressState.addresses
+                        : const <SavedAddress>[];
+                    return BlocBuilder<LocationCubit, LocationState>(
+                      builder: (context, loc) {
+                        // Gojek/Grab-style: once the active location matches
+                        // a saved address (picked from the list, or it's the
+                        // default and hasn't been overridden), show its
+                        // short label ("Rumah") instead of the full geocoded
+                        // address string.
+                        final matched = _matchingSavedAddress(addresses, loc);
+                        final displayAddress = matched?.label ?? loc.address;
+                        return GestureDetector(
                       onTap: () => _openLocationPicker(loc),
                       child: Row(
                         children: [
@@ -204,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? Text('Mendeteksi lokasi...',
                                     style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 14))
                                 : Text(
-                                    loc.address,
+                                    displayAddress,
                                     style: const TextStyle(
                                         color: KuwrirColors.textPrimary,
                                         fontSize: 15,
@@ -216,6 +258,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(Icons.keyboard_arrow_down_rounded, color: KuwrirColors.textSecondary),
                         ],
                       ),
+                        );
+                      },
                     );
                   },
                 ),

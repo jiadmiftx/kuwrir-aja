@@ -18,10 +18,12 @@ class _MerchantLoginScreenState extends State<MerchantLoginScreen> {
     if (res['token'] == null) {
       throw res['error'] ?? 'Verifikasi gagal';
     }
-    final role = res['user']?['role'];
-    if (role != 'merchant') {
-      throw 'Akun ini bukan akun merchant';
-    }
+    // Note: res['user']['role'] reflects the account's original/primary
+    // role (e.g. "customer" if this phone first registered as a customer
+    // elsewhere) — the backend auto-attaches the merchant role to whatever
+    // account already owns this phone number, and the JWT in res['token']
+    // is scoped to "merchant" for this session regardless of that field.
+    // No client-side role-equality check needed here.
     await client.saveToken(res['token'], res['refresh_token'] ?? '');
     await NotificationService.uploadToken(client);
     if (!mounted) return;

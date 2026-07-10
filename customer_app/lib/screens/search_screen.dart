@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../cubits/location_cubit.dart';
+import '../widgets/floating_cart_button.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialCategoryId;
@@ -126,44 +127,49 @@ class _SearchScreenState extends State<SearchScreen>
           child: Divider(height: 1, color: KuwrirColors.border),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Delivery address widget
-          _DeliveryAddressBar(),
+          Column(
+            children: [
+              // Delivery address widget
+              _DeliveryAddressBar(),
 
-          _FilterBar(
-            categoryId: _categoryId,
-            discountOnly: _discountOnly,
-            freeDeliveryOnly: _freeDeliveryOnly,
-            onChanged: (categoryId, discount, freeDelivery) => setState(() {
-              _categoryId = categoryId;
-              _discountOnly = discount;
-              _freeDeliveryOnly = freeDelivery;
-            }),
-          ),
+              _FilterBar(
+                categoryId: _categoryId,
+                discountOnly: _discountOnly,
+                freeDeliveryOnly: _freeDeliveryOnly,
+                onChanged: (categoryId, discount, freeDelivery) => setState(() {
+                  _categoryId = categoryId;
+                  _discountOnly = discount;
+                  _freeDeliveryOnly = freeDelivery;
+                }),
+              ),
 
-          // Content
-          Expanded(
-            child: showResults
-                ? _SearchResults(
-                    tabController: _tabController,
-                    query: _controller.text.trim(),
-                    categoryId: _categoryId,
-                    discountOnly: _discountOnly,
-                    freeDeliveryOnly: _freeDeliveryOnly,
-                  )
-                : _EmptyState(
-                    recentSearches: _recentSearches,
-                    onTap: (s) {
-                      _controller.text = s;
-                      _controller.selection = TextSelection.fromPosition(
-                        TextPosition(offset: s.length),
-                      );
-                      _saveSearch(s);
-                    },
-                    onClearRecent: _clearRecentSearches,
-                  ),
+              // Content
+              Expanded(
+                child: showResults
+                    ? _SearchResults(
+                        tabController: _tabController,
+                        query: _controller.text.trim(),
+                        categoryId: _categoryId,
+                        discountOnly: _discountOnly,
+                        freeDeliveryOnly: _freeDeliveryOnly,
+                      )
+                    : _EmptyState(
+                        recentSearches: _recentSearches,
+                        onTap: (s) {
+                          _controller.text = s;
+                          _controller.selection = TextSelection.fromPosition(
+                            TextPosition(offset: s.length),
+                          );
+                          _saveSearch(s);
+                        },
+                        onClearRecent: _clearRecentSearches,
+                      ),
+              ),
+            ],
           ),
+          const FloatingCartButton(),
         ],
       ),
     );

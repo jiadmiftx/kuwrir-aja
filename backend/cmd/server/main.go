@@ -56,6 +56,7 @@ func main() {
 	// Auto-migrate all models
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.UserRole{},
 		&model.OtpCode{},
 		&model.Address{},
 		&model.Merchant{},
@@ -97,6 +98,22 @@ func main() {
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
+
+	// Backfill user_roles for accounts created before multi-role support:
+	// every existing user gets a row for their current primary Role so
+	// role-membership checks (h.userHasRole) work uniformly for old and new
+	// accounts. Idempotent — the unique index on (user_id, role) makes the
+	// insert a no-op on repeat runs.
+	db.Exec(`
+		INSERT INTO user_roles (id, created_at, updated_at, user_id, role)
+		SELECT gen_random_uuid(), now(), now(), u.id, u.role
+		FROM users u
+		WHERE NOT EXISTS (
+			SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = u.role
+		)
+	`)
+
+	normalizeLegacyPhones(db)
 
 	// Initialize Firebase Admin SDK for push notifications
 	service.InitFCM()
@@ -224,6 +241,28 @@ func main() {
 	log.Printf("📦 KUWRIR API server starting on %s", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+// normalizeLegacyPhones canonicalizes phone numbers stored before
+// auth.NormalizePhone existed (e.g. "081234..." instead of "+6281234...")
+// so they keep matching after every auth endpoint started normalizing
+// incoming numbers before lookup. Idempotent — already-canonical numbers
+// are skipped.
+func normalizeLegacyPhones(db *gorm.DB) {
+	var users []model.User
+	if err := db.Select("id", "phone").Find(&users).Error; err != nil {
+		log.Printf("normalizeLegacyPhones: failed to load users: %v", err)
+		return
+	}
+	for _, u := range users {
+		normalized := authHandler.NormalizePhone(u.Phone)
+		if normalized == u.Phone {
+			continue
+		}
+		if err := db.Model(&model.User{}).Where("id = ?", u.ID).Update("phone", normalized).Error; err != nil {
+			log.Printf("normalizeLegacyPhones: failed to update user %s: %v", u.ID, err)
+		}
 	}
 }
 

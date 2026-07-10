@@ -42,11 +42,13 @@ class AddressCubit extends Cubit<AddressState> {
   Future<void> add({
     required String label,
     required String address,
+    String detail = '',
     required double lat,
     required double lng,
     bool isDefault = false,
   }) async {
-    await _api.createAddress(label: label, address: address, lat: lat, lng: lng, isDefault: isDefault);
+    await _api.createAddress(
+        label: label, address: address, detail: detail, lat: lat, lng: lng, isDefault: isDefault);
     await load();
   }
 
@@ -54,11 +56,13 @@ class AddressCubit extends Cubit<AddressState> {
     String id, {
     required String label,
     required String address,
+    String detail = '',
     required double lat,
     required double lng,
     bool isDefault = false,
   }) async {
-    await _api.updateAddress(id, label: label, address: address, lat: lat, lng: lng, isDefault: isDefault);
+    await _api.updateAddress(id,
+        label: label, address: address, detail: detail, lat: lat, lng: lng, isDefault: isDefault);
     await load();
   }
 

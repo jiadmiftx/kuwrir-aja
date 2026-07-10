@@ -265,14 +265,34 @@ class _AddressesScreenState extends State<AddressesScreen> {
                             ],
                           ],
                         ),
-                        subtitle: Text(
-                          a.address,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: KuwrirColors.textSecondary,
-                          ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              a.address,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: KuwrirColors.textSecondary,
+                              ),
+                            ),
+                            if (a.detail.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  a.detail,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: KuwrirColors.textHint,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         trailing: widget.onPick != null
                             ? Icon(

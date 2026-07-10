@@ -32,7 +32,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
       final client = ApiClient();
       final res = await client.post('/auth/register', {
         'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
+        'phone': _normalizedPhone(_phoneCtrl.text),
         'email': _emailCtrl.text.trim(),
         'password': _passwordCtrl.text,
         'role': 'driver',
@@ -62,6 +62,17 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Normalizes an Indonesian phone number to canonical "+62xxxxxxxxxx"
+  /// format: strips all non-digit characters, strips a leading "0", and
+  /// prefixes with "+62".
+  String _normalizedPhone(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return '+62$digits';
   }
 
   void _showError(String msg) {

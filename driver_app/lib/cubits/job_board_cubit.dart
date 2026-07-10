@@ -97,25 +97,33 @@ class JobBoardCubit extends Cubit<JobBoardState> {
     emit(JobBoardAccepting(orderId));
     try {
       final result = await _api.acceptDelivery(orderId);
-      _isOnline = false;
-      // Don't emit JobBoardOffline here — screen handles navigation first,
-      // then calls resetAfterDelivery() when driver returns to job board.
+      // Stay online — accepting a delivery just means the driver is busy
+      // with it, not that they toggled off. Job board polling resumes via
+      // resetAfterDelivery() once they return from the delivery flow. The
+      // backend's online flag is untouched here too, so it stays in sync
+      // with what the switch shows.
       return result;
     } on ApiException catch (e) {
-      _isOnline = true;
-      _startPolling();
+      if (_isOnline) _startPolling();
       emit(JobBoardError(e.message));
       return null;
     } catch (_) {
-      _isOnline = true;
-      _startPolling();
+      if (_isOnline) _startPolling();
       emit(JobBoardError('Gagal mengambil pesanan'));
       return null;
     }
   }
 
+  /// Called when the driver returns to the job board after finishing (or
+  /// dropping) a delivery. Resumes browsing/polling if still online instead
+  /// of forcing the toggle off — going offline is now only ever a deliberate
+  /// tap on the switch.
   void resetAfterDelivery() {
-    _isOnline = false;
-    emit(JobBoardOffline());
+    if (_isOnline) {
+      loadJobs();
+      _startPolling();
+    } else {
+      emit(JobBoardOffline());
+    }
   }
 }

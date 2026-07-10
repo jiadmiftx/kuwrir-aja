@@ -83,7 +83,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
       final client = ApiClient();
       final res = await client.post('/auth/register', {
         'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
+        'phone': _normalizedPhone(_phoneCtrl.text),
         'email': _emailCtrl.text.trim(),
         'password': _passwordCtrl.text,
         'role': 'merchant',
@@ -144,6 +144,22 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     }
   }
 
+  /// Normalizes a raw phone number input to canonical "+62xxxxxxxxxx"
+  /// format: strips all non-digit characters, drops a leading "0" if
+  /// present, and prefixes "+62" (Indonesian numbers only — this is a
+  /// Lombok-based platform). The backend now normalizes phone numbers
+  /// server-side too, but sending a consistent format keeps client-side
+  /// display/logging sane.
+  String _normalizedPhone(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    } else if (digits.startsWith('62')) {
+      digits = digits.substring(2);
+    }
+    return '+62$digits';
+  }
+
   void _showError(String msg) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(msg), backgroundColor: KuwrirColors.error));
 
@@ -185,6 +201,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
         _field(_phoneCtrl, 'Nomor HP', Icons.phone_outlined, keyboardType: TextInputType.phone,
+            hint: 'Boleh format apa saja, mis. 08xxx atau +62 8xxx',
             validator: (v) => (v?.length ?? 0) < 9 ? 'Tidak valid' : null),
         const SizedBox(height: 12),
         _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress,
@@ -448,7 +465,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
   }
 
   Widget _field(TextEditingController ctrl, String label, IconData icon,
-      {TextInputType? keyboardType, String? Function(String?)? validator}) {
+      {TextInputType? keyboardType, String? Function(String?)? validator, String? hint}) {
     return Container(
       decoration: BoxDecoration(
         color: KuwrirColors.surface,
@@ -461,6 +478,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         validator: validator,
         decoration: InputDecoration(
           labelText: label,
+          hintText: hint,
           prefixIcon: Icon(icon, color: KuwrirColors.textHint),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),

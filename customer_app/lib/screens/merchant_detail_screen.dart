@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/merchant_detail_cubit.dart';
 import '../cubits/cart_cubit.dart';
+import '../widgets/floating_cart_button.dart';
 import 'product_variant_sheet.dart';
 
 class MerchantDetailScreen extends StatefulWidget {
@@ -31,37 +32,11 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
     return BlocBuilder<MerchantDetailCubit, MerchantDetailState>(
       builder: (context, state) {
         return Scaffold(
-          body: _buildBody(context, state),
-          bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
-            builder: (context, cart) {
-              if (cart.isEmpty || cart.merchantId != widget.merchantId) {
-                return const SizedBox.shrink();
-              }
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2)),
-                  ],
-                ),
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/cart'),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.shopping_cart_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                          'Lihat Keranjang (${cart.totalQuantity}) · IDR ${_formatPrice(cart.subtotal)}'),
-                    ],
-                  ),
-                ),
-              );
-            },
+          body: Stack(
+            children: [
+              _buildBody(context, state),
+              const FloatingCartButton(),
+            ],
           ),
         );
       },
@@ -233,12 +208,6 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
                                           merchantId: merchant.id,
                                           merchantName: merchant.name,
                                         );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${product.name} ditambahkan ke keranjang'),
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
                                   },
                                   onCustomize: () async {
                                     final result = await showModalBottomSheet<VariantSelectionResult>(
@@ -254,12 +223,6 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
                                           selectedVariants: result.selectedVariants,
                                           quantity: result.quantity,
                                         );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${product.name} ditambahkan ke keranjang'),
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
                                   },
                                 ),
                           ],
@@ -279,11 +242,6 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
     );
   }
 
-  String _formatPrice(double price) {
-    return price
-        .toStringAsFixed(0)
-        .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
-  }
 }
 
 class _ProductCard extends StatelessWidget {
@@ -343,15 +301,16 @@ class _ProductCard extends StatelessWidget {
                       children: [
                         _PriceLabel(product: product),
                         _hasVariants
-                            ? GestureDetector(
-                                onTap: onCustomize,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                      color: KuwrirColors.primary,
-                                      borderRadius: BorderRadius.circular(8)),
-                                  child: const Icon(Icons.add, color: Colors.white, size: 18),
-                                ),
+                            // Purely decorative — the whole card's outer
+                            // InkWell already handles the tap-to-customize
+                            // gesture. A separate tap handler here used to
+                            // fire alongside it, double-adding the item.
+                            ? Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                    color: KuwrirColors.primary,
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: const Icon(Icons.add, color: Colors.white, size: 18),
                               )
                             : BlocBuilder<CartCubit, CartState>(
                                 builder: (context, cart) {

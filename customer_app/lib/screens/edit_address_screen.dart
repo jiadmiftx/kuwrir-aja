@@ -18,6 +18,7 @@ class EditAddressScreen extends StatefulWidget {
 
 class _EditAddressScreenState extends State<EditAddressScreen> {
   late final TextEditingController _customLabelCtrl;
+  late final TextEditingController _detailCtrl;
   String _quickLabel = 'Rumah';
   bool _customLabelSelected = false;
   LatLng? _picked;
@@ -30,6 +31,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
     super.initState();
     final e = widget.existing;
     _customLabelCtrl = TextEditingController();
+    _detailCtrl = TextEditingController(text: e?.detail ?? '');
     if (e != null) {
       _picked = LatLng(e.latitude, e.longitude);
       _address = e.address;
@@ -46,6 +48,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
   @override
   void dispose() {
     _customLabelCtrl.dispose();
+    _detailCtrl.dispose();
     super.dispose();
   }
 
@@ -86,6 +89,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
           widget.existing!.id,
           label: label,
           address: _address,
+          detail: _detailCtrl.text.trim(),
           lat: _picked!.latitude,
           lng: _picked!.longitude,
           isDefault: _isDefault,
@@ -94,6 +98,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
         await cubit.add(
           label: label,
           address: _address,
+          detail: _detailCtrl.text.trim(),
           lat: _picked!.latitude,
           lng: _picked!.longitude,
           isDefault: _isDefault,
@@ -194,6 +199,19 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                   Icon(Icons.chevron_right, color: KuwrirColors.textHint),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('DETAIL ALAMAT',
+              style: TextStyle(
+                  fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _detailCtrl,
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: 'No. rumah, patokan, lantai, dll (opsional)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 20),

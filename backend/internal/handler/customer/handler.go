@@ -54,6 +54,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 type AddressRequest struct {
 	Label     string  `json:"label" binding:"required"`
 	Address   string  `json:"address" binding:"required"`
+	Detail    string  `json:"detail"`
 	Latitude  float64 `json:"latitude" binding:"required"`
 	Longitude float64 `json:"longitude" binding:"required"`
 	IsDefault bool    `json:"is_default"`
@@ -87,6 +88,7 @@ func (h *Handler) CreateAddress(c *gin.Context) {
 		UserID:    uuid.MustParse(userID),
 		Label:     req.Label,
 		Address:   req.Address,
+		Detail:    req.Detail,
 		Latitude:  req.Latitude,
 		Longitude: req.Longitude,
 		IsDefault: isDefault,
@@ -136,6 +138,7 @@ func (h *Handler) UpdateAddress(c *gin.Context) {
 		return tx.Model(&address).Updates(map[string]interface{}{
 			"label":      req.Label,
 			"address":    req.Address,
+			"detail":     req.Detail,
 			"latitude":   req.Latitude,
 			"longitude":  req.Longitude,
 			"is_default": req.IsDefault,

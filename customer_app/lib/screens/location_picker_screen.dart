@@ -66,8 +66,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() =>
-          _address = '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}');
+      // Never show raw lat/lng to the user — fall back to a friendly label.
+      setState(() => _address = 'Lokasi dipilih di peta');
     } finally {
       if (mounted) setState(() => _resolving = false);
     }

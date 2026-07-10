@@ -50,9 +50,10 @@ class OtpFlow extends StatefulWidget {
 
   /// Shows a tappable country-dial-code chip (flag + code) in front of the
   /// phone field, defaulting to Indonesia (+62). The number sent to the
-  /// backend for Indonesia is still composed in the app's original local
-  /// format (leading "0", no "+62") so existing accounts keep matching —
-  /// only non-Indonesia codes are sent with an explicit dial-code prefix.
+  /// backend is always a full dial-code-prefixed number (e.g. "+62812...")
+  /// with any leading "0" stripped, regardless of this flag — the backend
+  /// normalizes to the same canonical form anyway, so this just keeps what
+  /// the app sends and what it displays consistent.
   final bool showCountryCode;
 
   const OtpFlow({
@@ -110,23 +111,21 @@ class _OtpFlowState extends State<OtpFlow> {
     });
   }
 
-  /// Backend phone string. Indonesia keeps the legacy "0-prefixed" local
-  /// format already stored for every existing account; other countries use
-  /// an explicit dial-code prefix (e.g. "+60") since there's no legacy data
-  /// to match.
+  /// Backend phone string: full dial-code prefix + local digits with any
+  /// leading "0" stripped (e.g. "081234" -> "+62 81234" -> "+6281234").
   String _backendPhone() {
     final digits = _phoneCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
-    if (!widget.showCountryCode) return digits;
     final local = digits.startsWith('0') ? digits.substring(1) : digits;
-    return _country.dialCode == '+62' ? '0$local' : '${_country.dialCode}$local';
+    final dialCode = widget.showCountryCode ? _country.dialCode : '+62';
+    return '$dialCode$local';
   }
 
   /// User-facing phone string shown on the code step ("kode dikirim ke...").
   String _displayPhone() {
-    if (!widget.showCountryCode) return _phoneCtrl.text.trim();
     final digits = _phoneCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
     final local = digits.startsWith('0') ? digits.substring(1) : digits;
-    return '${_country.dialCode} $local';
+    final dialCode = widget.showCountryCode ? _country.dialCode : '+62';
+    return '$dialCode $local';
   }
 
   Future<void> _requestOtp() async {
