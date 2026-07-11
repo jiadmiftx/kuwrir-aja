@@ -62,7 +62,8 @@ export default function AuditLogPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const fetchLogs = useCallback(async (targetPage: number, roleFilter: string, append: boolean) => {
-    append ? setIsLoadingMore(true) : setIsLoading(true)
+    if (append) setIsLoadingMore(true)
+    else setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: String(targetPage), limit: String(LIMIT) })
       if (roleFilter !== 'all') params.set('role', roleFilter)
@@ -76,7 +77,8 @@ export default function AuditLogPage() {
         toast.error(data.error ?? 'Gagal memuat audit log')
       }
     } finally {
-      append ? setIsLoadingMore(false) : setIsLoading(false)
+      if (append) setIsLoadingMore(false)
+      else setIsLoading(false)
     }
   }, [])
 

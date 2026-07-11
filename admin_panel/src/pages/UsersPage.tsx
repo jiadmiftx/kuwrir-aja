@@ -118,7 +118,7 @@ export default function UsersPage() {
   useEffect(() => {
     if (isSuperadmin) fetchAdmins()
     else setIsLoading(false)
-  }, [])
+  }, [isSuperadmin])
 
   const submitCreate = async () => {
     if (!newName || !newPhone || !newPassword || !newTier) return
