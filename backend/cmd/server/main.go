@@ -119,6 +119,16 @@ func main() {
 
 	normalizeLegacyPhones(db)
 
+	// AutoMigrate's ADD COLUMN for admin_tier (added after this table
+	// already had rows) leaves existing rows NULL, not "" — and scanning a
+	// NULL SQL value into a plain Go string field errors ("converting NULL
+	// to string is unsupported"), which would break every query that loads
+	// a User row with a NULL admin_tier (login, admin list, phone-conflict
+	// checks, ...). Backfill to "" so those rows scan cleanly; "" is
+	// already the documented default meaning ("legacy admin, treated as
+	// superadmin" — see middleware.SuperadminOnlyMiddleware).
+	db.Exec(`UPDATE users SET admin_tier = '' WHERE admin_tier IS NULL`)
+
 	// Google Sign-In was removed — its unique-indexed column has no
 	// remaining application use and would otherwise sit dead in the schema.
 	db.Exec(`ALTER TABLE users DROP COLUMN IF EXISTS google_id`)

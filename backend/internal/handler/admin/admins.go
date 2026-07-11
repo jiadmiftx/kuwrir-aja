@@ -94,6 +94,7 @@ func (h *Handler) UpdateAdmin(c *gin.Context) {
 	var req struct {
 		AdminTier *string `json:"admin_tier"`
 		IsActive  *bool   `json:"is_active"`
+		Password  *string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -114,6 +115,18 @@ func (h *Handler) UpdateAdmin(c *gin.Context) {
 			return
 		}
 		updates["is_active"] = *req.IsActive
+	}
+	if req.Password != nil && *req.Password != "" {
+		if len(*req.Password) < 6 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Password minimal 6 karakter"})
+			return
+		}
+		hashed, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+		updates["password"] = string(hashed)
 	}
 	if len(updates) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Tidak ada perubahan"})

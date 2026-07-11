@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, Ban, CheckCircle, ShieldAlert, Plus, Pencil } from 'lucide-react'
+import { Loader2, Ban, CheckCircle, ShieldAlert, Plus, Pencil, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
 
@@ -91,12 +91,15 @@ export default function UsersPage() {
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [newShowPassword, setNewShowPassword] = useState(false)
   const [newTier, setNewTier] = useState<string>('admin')
   const [creating, setCreating] = useState(false)
 
-  // Change tier dialog
+  // Edit admin dialog (tier + optional password change)
   const [tierTarget, setTierTarget] = useState<Admin | null>(null)
   const [tierValue, setTierValue] = useState<string>('admin')
+  const [tierNewPassword, setTierNewPassword] = useState('')
+  const [tierShowPassword, setTierShowPassword] = useState(false)
   const [tierSubmitting, setTierSubmitting] = useState(false)
 
   // Deactivate confirm dialog
@@ -128,15 +131,17 @@ export default function UsersPage() {
         method: 'POST',
         body: JSON.stringify({ name: newName, phone: newPhone, password: newPassword, admin_tier: newTier }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setAdmins(prev => [data.admin, ...prev])
         toast.success('Admin baru berhasil dibuat')
         setCreateOpen(false)
-        setNewName(''); setNewPhone(''); setNewPassword(''); setNewTier('admin')
+        setNewName(''); setNewPhone(''); setNewPassword(''); setNewTier('admin'); setNewShowPassword(false)
       } else {
-        toast.error(data.error ?? 'Gagal membuat admin')
+        toast.error(data.error ?? `Gagal membuat admin (${res.status})`)
       }
+    } catch {
+      toast.error('Gagal terhubung ke server, coba lagi')
     } finally {
       setCreating(false)
     }
@@ -145,24 +150,34 @@ export default function UsersPage() {
   const openTierDialog = (admin: Admin) => {
     setTierTarget(admin)
     setTierValue(admin.admin_tier || 'superadmin')
+    setTierNewPassword('')
+    setTierShowPassword(false)
   }
 
   const submitTierChange = async () => {
     if (!tierTarget) return
+    if (tierNewPassword && tierNewPassword.length < 6) {
+      toast.error('Password baru minimal 6 karakter')
+      return
+    }
     setTierSubmitting(true)
     try {
+      const body: Record<string, string> = { admin_tier: tierValue }
+      if (tierNewPassword) body.password = tierNewPassword
       const res = await api(`/api/v1/admin/admins/${tierTarget.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ admin_tier: tierValue }),
+        body: JSON.stringify(body),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setAdmins(prev => prev.map(a => a.id === tierTarget.id ? data.admin : a))
-        toast.success('Tier admin diperbarui')
+        toast.success(tierNewPassword ? 'Tier & password admin diperbarui' : 'Tier admin diperbarui')
         setTierTarget(null)
       } else {
-        toast.error(data.error ?? 'Gagal memperbarui tier')
+        toast.error(data.error ?? `Gagal memperbarui admin (${res.status})`)
       }
+    } catch {
+      toast.error('Gagal terhubung ke server, coba lagi')
     } finally {
       setTierSubmitting(false)
     }
@@ -176,14 +191,16 @@ export default function UsersPage() {
         method: 'PUT',
         body: JSON.stringify({ is_active: !toggleTarget.is_active }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setAdmins(prev => prev.map(a => a.id === toggleTarget.id ? data.admin : a))
         toast.success(data.admin.is_active ? 'Admin diaktifkan' : 'Admin dinonaktifkan')
         setToggleTarget(null)
       } else {
-        toast.error(data.error ?? 'Gagal mengubah status admin')
+        toast.error(data.error ?? `Gagal mengubah status admin (${res.status})`)
       }
+    } catch {
+      toast.error('Gagal terhubung ke server, coba lagi')
     } finally {
       setToggleSubmitting(false)
     }
@@ -276,7 +293,7 @@ export default function UsersPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="outline" size="sm" onClick={() => openTierDialog(a)}>
-                          <Pencil className="h-4 w-4 mr-1" /> Ubah Tier
+                          <Pencil className="h-4 w-4 mr-1" /> Edit Admin
                         </Button>
                         {!isSelf && (
                           <Button
@@ -314,7 +331,23 @@ export default function UsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Password</Label>
-              <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" />
+              <div className="relative">
+                <Input
+                  type={newShowPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setNewShowPassword(v => !v)}
+                  tabIndex={-1}
+                >
+                  {newShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Tier</Label>
@@ -344,11 +377,11 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Change Tier Dialog */}
+      {/* Edit Admin Dialog: tier + optional password change */}
       <Dialog open={!!tierTarget} onOpenChange={v => { if (!v) setTierTarget(null) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ubah Tier — {tierTarget?.name}</DialogTitle>
+            <DialogTitle>Edit Admin — {tierTarget?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -364,6 +397,27 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">{TIER_DESC[tierValue]}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Password Baru (opsional)</Label>
+              <div className="relative">
+                <Input
+                  type={tierShowPassword ? 'text' : 'password'}
+                  value={tierNewPassword}
+                  onChange={e => setTierNewPassword(e.target.value)}
+                  placeholder="Kosongkan jika tidak ingin mengganti password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setTierShowPassword(v => !v)}
+                  tabIndex={-1}
+                >
+                  {tierShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">Minimal 6 karakter jika diisi.</p>
             </div>
           </div>
           <DialogFooter>

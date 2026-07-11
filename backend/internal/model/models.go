@@ -95,7 +95,7 @@ type User struct {
 	// every non-admin account, and for admin accounts created before
 	// tiers existed (AdminTierMiddleware treats an empty tier on an admin
 	// account as full "admin" access, not superadmin).
-	AdminTier string `gorm:"type:varchar(20)" json:"admin_tier,omitempty"`
+	AdminTier string `gorm:"type:varchar(20);default:''" json:"admin_tier,omitempty"`
 
 	// Relations
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
