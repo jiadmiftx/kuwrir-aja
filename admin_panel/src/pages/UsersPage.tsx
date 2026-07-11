@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, Ban, CheckCircle, ShieldAlert, Plus, Pencil, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Ban, CheckCircle, ShieldAlert, Plus, Pencil, Eye, EyeOff, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
 
@@ -24,6 +24,10 @@ interface Admin {
   admin_tier: 'superadmin' | 'admin' | 'cs' | 'developer' | ''
   is_active: boolean
   created_at: string
+  // Backend-computed: this is the platform's protected owner account —
+  // only that account itself can edit/deactivate it, even other
+  // superadmins are blocked (see UpdateAdmin's rootSuperadminPhone check).
+  is_root?: boolean
 }
 
 const TIERS = ['superadmin', 'admin', 'cs', 'developer'] as const
@@ -283,9 +287,19 @@ export default function UsersPage() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada admin</TableCell></TableRow>
               ) : admins.map(a => {
                 const isSelf = a.id === myId
+                const lockedForMe = !!a.is_root && !isSelf
                 return (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-1.5">
+                        {a.name}
+                        {a.is_root && (
+                          <span title="Akun superadmin utama — hanya bisa diubah oleh pemiliknya sendiri">
+                            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                          </span>
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell>{a.phone}</TableCell>
                     <TableCell>
                       <Badge variant={tierBadgeVariant(a.admin_tier)}>{TIER_LABEL[a.admin_tier] ?? a.admin_tier}</Badge>
@@ -299,20 +313,24 @@ export default function UsersPage() {
                       {a.created_at ? new Date(a.created_at).toLocaleDateString('id-ID') : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => openTierDialog(a)}>
-                          <Pencil className="h-4 w-4 mr-1" /> Edit Admin
-                        </Button>
-                        {!isSelf && (
-                          <Button
-                            variant="ghost" size="sm"
-                            className={a.is_active ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
-                            onClick={() => setToggleTarget(a)}
-                          >
-                            {a.is_active ? <><Ban className="h-4 w-4 mr-1" /> Nonaktifkan</> : <><CheckCircle className="h-4 w-4 mr-1" /> Aktifkan</>}
+                      {lockedForMe ? (
+                        <span className="text-xs text-muted-foreground">Dilindungi</span>
+                      ) : (
+                        <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" onClick={() => openTierDialog(a)}>
+                            <Pencil className="h-4 w-4 mr-1" /> Edit Admin
                           </Button>
-                        )}
-                      </div>
+                          {!isSelf && (
+                            <Button
+                              variant="ghost" size="sm"
+                              className={a.is_active ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
+                              onClick={() => setToggleTarget(a)}
+                            >
+                              {a.is_active ? <><Ban className="h-4 w-4 mr-1" /> Nonaktifkan</> : <><CheckCircle className="h-4 w-4 mr-1" /> Aktifkan</>}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 )

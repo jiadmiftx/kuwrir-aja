@@ -23,6 +23,28 @@ var validAdminTiers = map[string]bool{
 	model.AdminTierDeveloper:  true,
 }
 
+// rootSuperadminPhone is the platform's designated primary/owner
+// superadmin account. Account-management actions (tier change,
+// deactivate, phone/name/password change) against this account are
+// blocked from every other admin — including other superadmins — in
+// UpdateAdmin, so platform ownership can't be silently reassigned or the
+// owner locked out by anyone but themselves.
+const rootSuperadminPhone = "+6281907031"
+
+func isRootSuperadmin(phone string) bool { return phone == rootSuperadminPhone }
+
+// adminResponse augments model.User with is_root so the frontend can grey
+// out account-management actions for the protected owner account without
+// needing to hardcode/duplicate the phone number itself.
+type adminResponse struct {
+	model.User
+	IsRoot bool `json:"is_root"`
+}
+
+func toAdminResponse(u model.User) adminResponse {
+	return adminResponse{User: u, IsRoot: isRootSuperadmin(u.Phone)}
+}
+
 // GetAdmins lists every admin-role account.
 func (h *Handler) GetAdmins(c *gin.Context) {
 	var admins []model.User
@@ -30,7 +52,11 @@ func (h *Handler) GetAdmins(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch admins"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"admins": admins})
+	out := make([]adminResponse, len(admins))
+	for i, a := range admins {
+		out[i] = toAdminResponse(a)
+	}
+	c.JSON(http.StatusOK, gin.H{"admins": out})
 }
 
 // CreateAdmin creates a new admin-role account with a given tier.
@@ -78,16 +104,23 @@ func (h *Handler) CreateAdmin(c *gin.Context) {
 	h.db.Where(model.UserRole{UserID: admin.ID, Role: model.RoleAdmin}).
 		FirstOrCreate(&model.UserRole{UserID: admin.ID, Role: model.RoleAdmin})
 
-	c.JSON(http.StatusCreated, gin.H{"admin": admin})
+	c.JSON(http.StatusCreated, gin.H{"admin": toAdminResponse(admin)})
 }
 
-// UpdateAdmin changes an admin account's tier and/or active status.
+// UpdateAdmin changes an admin account's name/phone/tier/password/active
+// status. The designated root superadmin account (rootSuperadminPhone) is
+// off-limits to everyone but itself — see that constant's doc comment.
 func (h *Handler) UpdateAdmin(c *gin.Context) {
 	id := c.Param("id")
 
 	var admin model.User
 	if err := h.db.Where("id = ? AND role = ?", id, model.RoleAdmin).First(&admin).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Admin not found"})
+		return
+	}
+
+	if isRootSuperadmin(admin.Phone) && admin.ID.String() != c.GetString("user_id") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Akun superadmin utama ini dilindungi dan hanya bisa diubah oleh pemiliknya sendiri"})
 		return
 	}
 
@@ -154,5 +187,5 @@ func (h *Handler) UpdateAdmin(c *gin.Context) {
 		return
 	}
 	h.db.First(&admin, "id = ?", id)
-	c.JSON(http.StatusOK, gin.H{"admin": admin})
+	c.JSON(http.StatusOK, gin.H{"admin": toAdminResponse(admin)})
 }
