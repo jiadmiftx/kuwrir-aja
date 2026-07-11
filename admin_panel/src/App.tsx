@@ -22,10 +22,15 @@ import SupportChatsPage from '@/pages/SupportChatsPage'
 import DeliveryZonesPage from '@/pages/DeliveryZonesPage'
 import UsersPage from '@/pages/UsersPage'
 import AuditLogPage from '@/pages/AuditLogPage'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function App() {
   return (
     <BrowserRouter>
+      {/* Mounted once here so every page's toast.success/toast.error calls
+          (sonner) actually render somewhere — without this, every toast()
+          call across the whole admin panel is a silent no-op. */}
+      <Toaster richColors position="top-right" />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
