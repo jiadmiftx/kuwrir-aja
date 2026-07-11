@@ -1,0 +1,92 @@
+name: Deploy to Play Store
+
+# Manual-trigger only, on purpose — this publishes a real release to real
+# users' devices (even "internal" track testers are real people, and
+# "production" ships to the whole install base). Unlike this repo's other
+# deploy-*.yml workflows, this one should never fire automatically just
+# because backend/** or an app's own files changed on push; a human picks
+# the app, the track, and the release notes each time.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app to release'
+        required: true
+        type: choice
+        options: [customer_app, merchant_app, driver_app]
+      track:
+        description: 'Play Console track to upload to'
+        required: true
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+      release_notes:
+        description: 'What''s new in this release (shown to testers/users on this track)'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '%\n ' | base64 -d > ${{ inputs.app }}/android/app/keystore.jks
+
+      - run: flutter pub get
+        working-directory: ${{ inputs.app }}
+
+      # versionCode/versionName come from <app>/pubspec.yaml's `version:
+      # X.Y.Z+N` (the "+N" build number) — bump that manually before
+      # dispatching this workflow. Play Console rejects any upload whose
+      # versionCode isn't strictly higher than the last one already live
+      # on this app, so this build intentionally does NOT auto-increment
+      # anything; whatever's committed in pubspec.yaml is exactly what
+      # ships.
+      - name: Build release AAB
+        run: flutter build appbundle --release
+        working-directory: ${{ inputs.app }}
+        env:
+          KEYSTORE_PATH: keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Resolve package name
+        id: pkg
+        run: |
+          case "${{ inputs.app }}" in
+            customer_app) echo "name=com.kuwrir.customer" >> "$GITHUB_OUTPUT" ;;
+            merchant_app) echo "name=com.kuwrir.merchant" >> "$GITHUB_OUTPUT" ;;
+            driver_app)   echo "name=com.kuwrir.driver" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Write release notes (optional)
+        if: ${{ inputs.release_notes != '' }}
+        run: |
+          mkdir -p whatsnew
+          # Play Console reads whatsnew-<lang> filenames; id-ID covers the
+          # Indonesian listing these apps ship under.
+          printf '%s' "${{ inputs.release_notes }}" > whatsnew/whatsnew-id-ID
+
+      - name: Upload to Play Store
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.pkg.outputs.name }}
+          releaseFiles: ${{ inputs.app }}/build/app/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
+          whatsNewDirectory: ${{ inputs.release_notes != '' && 'whatsnew' || '' }}
