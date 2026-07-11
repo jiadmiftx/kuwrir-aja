@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Search, ShieldAlert, ShieldCheck, Loader2, Users } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Loader2, Users, Eye } from 'lucide-react'
 import { apiFetch as api } from '@/lib/api'
 
 interface Customer {
@@ -21,6 +22,7 @@ interface Customer {
 const fmt = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function CustomersPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -141,22 +143,32 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{fmt(c.created_at)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={c.is_active
-                        ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
-                        : 'text-green-600 hover:text-green-700 hover:bg-green-50'}
-                      disabled={actionLoading === c.id}
-                      onClick={() => toggleActive(c)}
-                      title={c.is_active ? 'Suspend user' : 'Activate user'}
-                    >
-                      {actionLoading === c.id
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : c.is_active
-                          ? <ShieldAlert className="h-4 w-4" />
-                          : <ShieldCheck className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Lihat detail lengkap"
+                        onClick={() => navigate(`/customers/${c.id}`)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={c.is_active
+                          ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
+                          : 'text-green-600 hover:text-green-700 hover:bg-green-50'}
+                        disabled={actionLoading === c.id}
+                        onClick={() => toggleActive(c)}
+                        title={c.is_active ? 'Suspend user' : 'Activate user'}
+                      >
+                        {actionLoading === c.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : c.is_active
+                            ? <ShieldAlert className="h-4 w-4" />
+                            : <ShieldCheck className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

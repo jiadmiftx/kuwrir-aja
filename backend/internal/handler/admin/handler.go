@@ -40,8 +40,11 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 
 	// User management
 	r.GET("/drivers", h.GetDrivers)
+	r.GET("/drivers/:id", h.GetDriverDetail)
 	r.GET("/customers", h.GetCustomers)
+	r.GET("/customers/:id", h.GetCustomerDetail)
 	r.GET("/merchants", h.GetMerchants)
+	r.GET("/merchants/:id", h.GetMerchantDetail)
 	r.PUT("/merchants/:id/verify", h.VerifyMerchant)
 	r.DELETE("/merchants/:id", h.DeleteMerchant)
 	r.PUT("/users/:id/toggle-active", h.ToggleUserActive)
@@ -115,6 +118,22 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/whatsapp/qr", h.WhatsAppQR)
 	r.GET("/whatsapp/logs", h.WhatsAppLogs)
 	r.POST("/whatsapp/send-message", h.WhatsAppSendMessage)
+
+	// Audit trail (read-only for every admin tier, incl. cs/developer)
+	r.GET("/audit-logs", h.GetAuditLogs)
+}
+
+// RegisterSuperadminRoutes registers admin-account-management routes.
+// Mounted separately in cmd/server on a sub-group with an extra
+// SuperadminOnlyMiddleware gate, since RegisterRoutes' group only carries
+// the base RoleMiddleware("admin") + AdminTierMiddleware.
+func (h *Handler) RegisterSuperadminRoutes(r *gin.RouterGroup) {
+	admins := r.Group("/admins")
+	{
+		admins.GET("", h.GetAdmins)
+		admins.POST("", h.CreateAdmin)
+		admins.PUT("/:id", h.UpdateAdmin)
+	}
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────

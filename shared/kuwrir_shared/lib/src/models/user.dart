@@ -12,6 +12,11 @@ class User {
   /// False for any account that has never completed a real OTP check.
   bool get isPhoneVerified => phoneVerifiedAt != null;
 
+  /// False for an account OTP login created with no name/email yet (OTP
+  /// login only asks for a phone number) — used to gate the rest of the app
+  /// until the user fills both in via PUT /auth/me.
+  bool get isProfileComplete => name.trim().isNotEmpty && email.trim().isNotEmpty;
+
   User({
     required this.id,
     required this.name,

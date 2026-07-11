@@ -10,6 +10,7 @@ import '../widgets/floating_cart_button.dart';
 import 'addresses_screen.dart';
 import 'banner_detail_screen.dart';
 import 'phone_verification_gate.dart';
+import 'profile_completion_gate.dart';
 import 'notifications_screen.dart';
 import '../services/notification_service.dart';
 import '../utils/auth_guard.dart';
@@ -29,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     final loc = context.read<LocationCubit>().state;
     context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPhoneVerified());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runOnboardingChecks());
     _refreshUnreadCount();
     // Only logged-in users have saved addresses — this powers the
     // "Rumah"/"Kantor" label shown in the app bar instead of the raw
@@ -50,11 +51,26 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshUnreadCount();
   }
 
-  void _checkPhoneVerified() {
-    final user = context.read<SessionCubit>().state.user;
-    if (user != null && !user.isPhoneVerified) {
-      Navigator.of(context).push(
+  /// Runs mandatory onboarding gates in order: phone verification first
+  /// (identity), then profile completion (name) — each pushed as a
+  /// blocking full-screen route, awaited before checking the next one so a
+  /// freshly-registered user is walked through both in sequence.
+  Future<void> _runOnboardingChecks() async {
+    final session = context.read<SessionCubit>();
+    var user = session.state.user;
+    if (user == null) return;
+
+    if (!user.isPhoneVerified) {
+      await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const PhoneVerificationGate(), fullscreenDialog: true),
+      );
+      if (!mounted) return;
+      user = session.state.user;
+    }
+
+    if (user != null && !user.isProfileComplete) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ProfileCompletionGate(), fullscreenDialog: true),
       );
     }
   }

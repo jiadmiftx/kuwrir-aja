@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2, Trash2 } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Eye, MapPin, Star, Loader2, Trash2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
 
@@ -68,6 +69,7 @@ function DocImage({ url, label }: { url?: string; label: string }) {
 }
 
 export default function MerchantsPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [zones, setZones] = useState<DeliveryZone[]>([])
@@ -75,6 +77,17 @@ export default function MerchantsPage() {
   // `children` — but a merchant's zone_id may point at a kecamatan, so name
   // lookups need the flattened set or they fall back to the raw id.
   const flatZones = useMemo(() => zones.flatMap(z => [z, ...(z.children ?? [])]), [zones])
+  // Base UI's <Select> only resolves the trigger's displayed label from an
+  // item the popup has actually rendered at least once — before that (e.g.
+  // on first page load, before anyone opens the dropdown), it falls back to
+  // showing the raw zone_id (a UUID) instead of the name. Passing `items`
+  // explicitly makes the label resolvable immediately regardless of
+  // whether the popup was ever opened.
+  const zoneItems = useMemo(() => {
+    const map: Record<string, string> = { none: 'Unassigned' }
+    for (const z of flatZones) map[z.id] = z.city_name
+    return map
+  }, [flatZones])
   const [selected, setSelected] = useState<Merchant | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -247,6 +260,7 @@ export default function MerchantsPage() {
                   </TableCell>
                   <TableCell>
                     <Select
+                      items={zoneItems}
                       value={m.zone_id ?? 'none'}
                       onValueChange={val => val !== null && assignZone(m.id, val)}
                     >
@@ -292,8 +306,11 @@ export default function MerchantsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => { setSelected(m); setDetailOpen(true) }}>
+                      <Button variant="ghost" size="sm" title="Quick view" onClick={() => { setSelected(m); setDetailOpen(true) }}>
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" title="Lihat detail lengkap" onClick={() => navigate(`/merchants/${m.id}`)}>
+                        <FileText className="h-4 w-4" />
                       </Button>
                       {!m.is_verified && (
                         <>
@@ -369,6 +386,14 @@ export default function MerchantsPage() {
           )}
           <DialogFooter>
             <div className="flex gap-2 flex-wrap justify-end w-full">
+              {selected && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/merchants/${selected.id}`)}
+                >
+                  <FileText className="mr-2 h-4 w-4" /> Lihat Detail Lengkap
+                </Button>
+              )}
               {selected && !selected.is_verified && (
                 <>
                   <Button

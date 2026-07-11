@@ -18,6 +18,8 @@ import {
   Image,
   MessageCircle,
   Wallet,
+  ShieldCheck,
+  History,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -38,8 +40,21 @@ const navItems = [
   { to: '/support', icon: MessageSquare, label: 'Support Chat' },
   { to: '/whatsapp', icon: MessageCircle, label: 'WhatsApp Gateway' },
   { to: '/delivery-zones', icon: Map, label: 'Delivery Zones' },
+  // Superadmin-only: managing who else has admin access.
+  { to: '/admins', icon: ShieldCheck, label: 'Admin Users', superadminOnly: true },
+  { to: '/audit-logs', icon: History, label: 'Audit Log' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
+
+function currentAdminTier(): string {
+  try {
+    const raw = localStorage.getItem('user')
+    if (!raw) return ''
+    return JSON.parse(raw).admin_tier ?? ''
+  } catch {
+    return ''
+  }
+}
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
@@ -66,7 +81,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => (
+          {navItems.filter((item) => {
+            if (!item.superadminOnly) return true
+            const tier = currentAdminTier()
+            // Empty tier = a legacy admin account predating tiers, treated
+            // as superadmin — mirrors the backend's SuperadminOnlyMiddleware.
+            return tier === '' || tier === 'superadmin'
+          }).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

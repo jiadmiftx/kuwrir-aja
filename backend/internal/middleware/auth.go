@@ -6,6 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
+	"github.com/kuwrir-platform/backend/internal/model"
 )
 
 // Claims represents the JWT token payload. TokenType distinguishes access
@@ -16,6 +20,9 @@ import (
 type Claims struct {
 	UserID    string `json:"user_id"`
 	Role      string `json:"role"`
+	// AdminTier only ever has a value when Role == "admin" — see
+	// model.User.AdminTier and AdminTierMiddleware.
+	AdminTier string `json:"admin_tier,omitempty"`
 	TokenType string `json:"token_type,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -61,6 +68,7 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		// Inject user info into context
 		c.Set("user_id", claims.UserID)
 		c.Set("user_role", claims.Role)
+		c.Set("admin_tier", claims.AdminTier)
 		c.Next()
 	}
 }
@@ -83,6 +91,107 @@ func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
 		}
 
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+	}
+}
+
+// AdminTierMiddleware scopes what an admin-tier account can do beyond the
+// base RoleMiddleware("admin") gate (see model.AdminTier* constants):
+//   - superadmin: unrestricted.
+//   - cs: read-only (GET), plus mutating requests under /admin/support
+//     (replying to customers).
+//   - developer: read-only (GET) everywhere, incl. /admin/audit-logs.
+//   - admin / empty tier (legacy accounts predating tiers): unrestricted,
+//     same as today — this middleware only ever narrows access for the
+//     three newer tiers, never removes what a plain "admin" already had.
+//
+// Superadmin-only actions (e.g. managing other admin accounts) are gated
+// separately by SuperadminOnlyMiddleware on their own route group, not
+// here.
+func AdminTierMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tierVal, _ := c.Get("admin_tier")
+		tier, _ := tierVal.(string)
+
+		if tier == "" || tier == "superadmin" || tier == "admin" {
+			c.Next()
+			return
+		}
+		if c.Request.Method == http.MethodGet {
+			c.Next()
+			return
+		}
+		if tier == "cs" && strings.HasPrefix(c.FullPath(), "/api/v1/admin/support") {
+			c.Next()
+			return
+		}
+
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Tier akun admin ini tidak punya akses untuk aksi ini"})
+	}
+}
+
+// SuperadminOnlyMiddleware gates the admin-account-management routes —
+// only a superadmin can create/edit/deactivate other admin accounts.
+func SuperadminOnlyMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tierVal, _ := c.Get("admin_tier")
+		tier, _ := tierVal.(string)
+		// Empty tier = a legacy admin account predating tiers; treat as
+		// superadmin so the very first bootstrapped admin can still reach
+		// this group to start assigning tiers to everyone else.
+		if tier == "" || tier == "superadmin" {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Hanya superadmin yang bisa mengelola akun admin"})
+	}
+}
+
+// AuditLogMiddleware records every mutating (non-GET) authenticated
+// request — actor, method, path, response status, IP — to the audit_logs
+// table, regardless of which app or role made it. Mounted once on the
+// shared authenticated route group in cmd/server so coverage is automatic
+// for every current and future endpoint, rather than each handler having
+// to remember to log itself. The write happens in a goroutine after the
+// response so it never adds latency to the request it's logging, and a
+// logging failure is silently dropped (this is an audit trail, not a
+// critical-path write — never let it break the actual request).
+func AuditLogMiddleware(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		if c.Request.Method == http.MethodGet {
+			return
+		}
+		userIDVal, ok := c.Get("user_id")
+		if !ok {
+			return
+		}
+		userID, err := uuid.Parse(userIDVal.(string))
+		if err != nil {
+			return
+		}
+		roleVal, _ := c.Get("user_role")
+		role, _ := roleVal.(string)
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+		status := c.Writer.Status()
+		ip := c.ClientIP()
+
+		go func() {
+			var name string
+			db.Model(&model.User{}).Select("name").Where("id = ?", userID).Scan(&name)
+			db.Create(&model.AuditLog{
+				ActorID:    userID,
+				ActorName:  name,
+				ActorRole:  role,
+				Method:     c.Request.Method,
+				Path:       path,
+				StatusCode: status,
+				IPAddress:  ip,
+			})
+		}()
 	}
 }
 

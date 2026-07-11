@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Search, Bike, HandCoins, History, Loader2, Ban, CheckCircle } from 'lucide-react'
+import { Search, Bike, HandCoins, History, Loader2, Ban, CheckCircle, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch as api } from '@/lib/api'
 
@@ -50,6 +51,7 @@ interface Deposit {
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 
 export default function DriversPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [zones, setZones] = useState<DeliveryZone[]>([])
@@ -57,6 +59,17 @@ export default function DriversPage() {
   // `children` — but a driver's zone_id may point at a kecamatan, so name
   // lookups need the flattened set or they fall back to the raw id.
   const flatZones = useMemo(() => zones.flatMap(z => [z, ...(z.children ?? [])]), [zones])
+  // Base UI's <Select> only resolves the trigger's displayed label from an
+  // item the popup has actually rendered at least once — before that (e.g.
+  // on first page load, before anyone opens the dropdown), it falls back to
+  // showing the raw zone_id (a UUID) instead of the name. Passing `items`
+  // explicitly makes the label resolvable immediately regardless of
+  // whether the popup was ever opened.
+  const zoneItems = useMemo(() => {
+    const map: Record<string, string> = { none: 'Semua Wilayah' }
+    for (const z of flatZones) map[z.id] = z.city_name
+    return map
+  }, [flatZones])
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -251,6 +264,7 @@ export default function DriversPage() {
                   </TableCell>
                   <TableCell>
                     <Select
+                      items={zoneItems}
                       value={d.zone_id ?? 'none'}
                       onValueChange={val => val !== null && assignZone(d.id, val)}
                     >
@@ -290,6 +304,10 @@ export default function DriversPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {/* Detail lengkap */}
+                      <Button variant="ghost" size="sm" title="Lihat detail lengkap" onClick={() => navigate(`/drivers/${d.id}`)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {/* Catat setoran */}
                       {d.cash_balance > 0 && (
                         <Button

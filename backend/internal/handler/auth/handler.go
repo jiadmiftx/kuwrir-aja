@@ -77,9 +77,9 @@ type RequestOTPRequest struct {
 type VerifyOTPRequest struct {
 	Phone string `json:"phone" binding:"required"`
 	Code  string `json:"code" binding:"required"`
-	// Role only applies when auto-registering a brand-new phone (mirrors
-	// GoogleLogin's role param) — empty defaults to customer. Ignored for
-	// an already-existing phone, which keeps whatever role it already has.
+	// Role only applies when auto-registering a brand-new phone — empty
+	// defaults to customer. For an already-existing phone, this role is
+	// attached to that account if it doesn't have it yet (see VerifyOTP).
 	Role model.Role `json:"role"`
 }
 
@@ -411,9 +411,9 @@ func (h *Handler) validateAndConsumeOTP(phone, code string) (status int, errMsg 
 }
 
 // VerifyOTP checks the code and logs the user in, auto-creating a customer
-// account on first successful verify for an unknown phone number (same
-// auto-register shape as GoogleLogin above). Marks the phone verified either
-// way — a successful OTP check is real proof of ownership.
+// account on first successful verify for an unknown phone number. Marks the
+// phone verified either way — a successful OTP check is real proof of
+// ownership.
 //
 // If the phone number already belongs to an account under a different role
 // (e.g. it first signed up as a customer), the role the caller passed is
@@ -439,9 +439,9 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 
 	var user model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
-		// Unknown phone — auto-register a bare account, same
-		// placeholder-password pattern GoogleLogin uses for accounts with
-		// no real password. Role comes from the caller (merchant_app/
+		// Unknown phone — auto-register a bare account with a random
+		// unguessable password (there's no real password to set for an
+		// OTP-only account). Role comes from the caller (merchant_app/
 		// driver_app pass their own role; customer_app leaves it empty).
 		role := req.Role
 		if role == "" {
@@ -568,8 +568,11 @@ func (h *Handler) GetMe(c *gin.Context) {
 }
 
 // UpdateMe lets the current user fill in profile fields OTP login never
-// asks for (name/email) — phone is the only required identity, everything
-// else is optional and can be added any time after login.
+// asks for (name/email) — phone is the only identity required at login
+// time. customer_app's ProfileCompletionGate requires both name and email
+// before letting the user past the home screen, but this endpoint itself
+// stays generic (each field only updates if present in the request) so it
+// can also be used for later one-off edits from the profile screen.
 // PUT /auth/me   Body: {"name": "...", "email": "..."}
 func (h *Handler) UpdateMe(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -689,10 +692,18 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 // the same account can hold a customer-scoped token and a merchant-scoped
 // token at the same time without either session seeing the other's access.
 func (h *Handler) generateTokens(user model.User, role model.Role) (string, string, error) {
+	// Only meaningful for an admin-scoped session — AdminTierMiddleware
+	// ignores this claim for every other role.
+	var adminTier string
+	if role == model.RoleAdmin {
+		adminTier = user.AdminTier
+	}
+
 	// Access token
 	claims := &middleware.Claims{
 		UserID:    user.ID.String(),
 		Role:      string(role),
+		AdminTier: adminTier,
 		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.ExpiryHours) * time.Hour)),
@@ -711,6 +722,7 @@ func (h *Handler) generateTokens(user model.User, role model.Role) (string, stri
 	refreshClaims := &middleware.Claims{
 		UserID:    user.ID.String(),
 		Role:      string(role),
+		AdminTier: adminTier,
 		TokenType: "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(h.cfg.JWT.RefreshExpiryHours) * time.Hour)),

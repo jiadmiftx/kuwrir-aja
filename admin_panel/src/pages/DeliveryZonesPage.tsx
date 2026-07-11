@@ -906,7 +906,7 @@ export default function DeliveryZonesPage() {
                           <div className={m.is_open ? 'text-green-600' : 'text-gray-400'}>{m.is_open ? 'Buka' : 'Tutup'}</div>
                           {m.zone_id && (
                             <div className="text-xs text-gray-500">
-                              Zone: {flatZones.find((z) => z.id === m.zone_id)?.city_name ?? m.zone_id}
+                              Zone: {flatZones.find((z) => z.id === m.zone_id)?.city_name ?? 'Wilayah tidak ditemukan'}
                             </div>
                           )}
                         </div>
@@ -923,7 +923,7 @@ export default function DeliveryZonesPage() {
                           <div className={d.is_online ? 'text-blue-600' : 'text-gray-400'}>{d.is_online ? 'Online' : 'Offline'}</div>
                           {d.zone_id && (
                             <div className="text-xs text-gray-500">
-                              Zone: {flatZones.find((z) => z.id === d.zone_id)?.city_name ?? d.zone_id}
+                              Zone: {flatZones.find((z) => z.id === d.zone_id)?.city_name ?? 'Wilayah tidak ditemukan'}
                             </div>
                           )}
                         </div>

@@ -25,6 +25,14 @@ const (
 	RoleAdmin    Role = "admin"
 )
 
+// AdminTier scopes what an admin-role account can do — see User.AdminTier.
+const (
+	AdminTierSuperadmin = "superadmin" // full access, incl. managing other admin accounts
+	AdminTierAdmin      = "admin"      // full business operations, no admin-account management
+	AdminTierCS         = "cs"         // read-only everywhere admin can see, plus support chat replies
+	AdminTierDeveloper  = "developer"  // read-only everywhere admin can see, plus audit log
+)
+
 // OrderStatus enum
 type OrderStatus string
 
@@ -80,9 +88,14 @@ type User struct {
 	// explicitly sets false for pending driver/merchant accounts.
 	IsActive        bool       `json:"is_active"`
 	EmailVerifiedAt *time.Time `json:"email_verified_at,omitempty"`
-	PhoneVerifiedAt *time.Time `json:"phone_verified_at,omitempty"` // set by VerifyOTP / verify-phone; nil for GoogleLogin's placeholder phone
+	PhoneVerifiedAt *time.Time `json:"phone_verified_at,omitempty"` // set by VerifyOTP / verify-phone; nil for accounts that never completed a real OTP check (e.g. password-registered but not yet OTP-verified)
 	FCMToken        string     `gorm:"type:text" json:"-"`
-	GoogleID        *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	// AdminTier only applies when Role == RoleAdmin — one of "superadmin",
+	// "admin", "cs", "developer" (see AdminTier* constants). Empty for
+	// every non-admin account, and for admin accounts created before
+	// tiers existed (AdminTierMiddleware treats an empty tier on an admin
+	// account as full "admin" access, not superadmin).
+	AdminTier string `gorm:"type:varchar(20)" json:"admin_tier,omitempty"`
 
 	// Relations
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
@@ -711,4 +724,22 @@ type SupportMessage struct {
 	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | admin
 	Text       string    `gorm:"type:text;not null" json:"text"`
 	IsRead     bool      `gorm:"default:false" json:"is_read"`
+}
+
+// AuditLog records one mutating (non-GET) request from any authenticated
+// user, across every app/role — written by a global middleware, not by
+// individual handlers, so coverage doesn't depend on each feature
+// remembering to log itself. Only the last 30 days are kept in this table
+// (see cmd/server's purgeOldAuditLogs); a full export is uploaded to R2
+// once a month before older-than-30-day rows are purged, so history isn't
+// lost — see cmd/server's backupAuditLogsIfDue.
+type AuditLog struct {
+	Base
+	ActorID    uuid.UUID `gorm:"type:uuid;index" json:"actor_id"`
+	ActorName  string    `json:"actor_name"` // snapshot at request time, survives the actor being deleted later
+	ActorRole  string    `gorm:"type:varchar(20);index" json:"actor_role"`
+	Method     string    `gorm:"type:varchar(10)" json:"method"`
+	Path       string    `gorm:"type:varchar(255);index" json:"path"`
+	StatusCode int       `json:"status_code"`
+	IPAddress  string    `gorm:"type:varchar(64)" json:"ip_address"`
 }

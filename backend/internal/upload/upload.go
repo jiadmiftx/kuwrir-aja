@@ -140,3 +140,14 @@ func MustSave(fh *multipart.FileHeader, folder string) string {
 	url, _ := Save(fh, folder)
 	return url
 }
+
+// SaveBytes stores server-generated data (not a user upload, so it skips
+// the image/pdf extension allowlist Save enforces) and returns its public
+// URL, same R2-or-disk fallback as Save. Used for things like the audit
+// log's monthly backup export.
+func SaveBytes(data []byte, folder, filename, contentType string) (string, error) {
+	if r2Client != nil {
+		return saveToR2(bytes.NewReader(data), folder, filename, contentType)
+	}
+	return saveToDisk(bytes.NewReader(data), folder, filename)
+}

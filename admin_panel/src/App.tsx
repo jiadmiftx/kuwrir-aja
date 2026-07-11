@@ -4,10 +4,13 @@ import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
 import SettingsPage from '@/pages/SettingsPage'
 import MerchantsPage from '@/pages/MerchantsPage'
+import MerchantDetailPage from '@/pages/MerchantDetailPage'
 import OrdersPage from '@/pages/OrdersPage'
 import DriversPage from '@/pages/DriversPage'
+import DriverDetailPage from '@/pages/DriverDetailPage'
 import DriverApplicationsPage from '@/pages/DriverApplicationsPage'
 import CustomersPage from '@/pages/CustomersPage'
+import CustomerDetailPage from '@/pages/CustomerDetailPage'
 import PromotionsPage from '@/pages/PromotionsPage'
 import FoodCategoriesPage from '@/pages/FoodCategoriesPage'
 import BannersPage from '@/pages/BannersPage'
@@ -17,6 +20,8 @@ import WithdrawalsPage from '@/pages/WithdrawalsPage'
 import RevenuePage from '@/pages/RevenuePage'
 import SupportChatsPage from '@/pages/SupportChatsPage'
 import DeliveryZonesPage from '@/pages/DeliveryZonesPage'
+import UsersPage from '@/pages/UsersPage'
+import AuditLogPage from '@/pages/AuditLogPage'
 
 export default function App() {
   return (
@@ -32,9 +37,12 @@ export default function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/merchants" element={<MerchantsPage />} />
+                <Route path="/merchants/:id" element={<MerchantDetailPage />} />
                 <Route path="/drivers" element={<DriversPage />} />
+                <Route path="/drivers/:id" element={<DriverDetailPage />} />
                 <Route path="/driver-applications" element={<DriverApplicationsPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/customers/:id" element={<CustomerDetailPage />} />
                 <Route path="/promos" element={<PromotionsPage />} />
                 <Route path="/food-categories" element={<FoodCategoriesPage />} />
                 <Route path="/banners" element={<BannersPage />} />
@@ -44,6 +52,8 @@ export default function App() {
                 <Route path="/revenue" element={<RevenuePage />} />
                 <Route path="/support" element={<SupportChatsPage />} />
                 <Route path="/delivery-zones" element={<DeliveryZonesPage />} />
+                <Route path="/admins" element={<UsersPage />} />
+                <Route path="/audit-logs" element={<AuditLogPage />} />
               </Routes>
             </AdminLayout>
           }

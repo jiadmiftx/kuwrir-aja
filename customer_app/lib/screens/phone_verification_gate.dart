@@ -4,9 +4,9 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/session_cubit.dart';
 
 /// Mandatory, non-dismissible phone verification — shown by HomeScreen for
-/// any logged-in user whose account has no verified real phone (e.g. signed
-/// up via Google, which stores a placeholder phone). Blocks the rest of the
-/// app until the user completes a real OTP check.
+/// any logged-in user whose account has no verified real phone (e.g. a
+/// password-registered account that never completed an OTP check). Blocks
+/// the rest of the app until the user completes a real OTP check.
 class PhoneVerificationGate extends StatelessWidget {
   const PhoneVerificationGate({super.key});
 

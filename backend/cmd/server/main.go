@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -95,6 +97,8 @@ func main() {
 		&model.ChatMessage{},
 		// Customer ↔ Admin support chat
 		&model.SupportMessage{},
+		// Audit trail
+		&model.AuditLog{},
 	); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -115,6 +119,10 @@ func main() {
 
 	normalizeLegacyPhones(db)
 
+	// Google Sign-In was removed — its unique-indexed column has no
+	// remaining application use and would otherwise sit dead in the schema.
+	db.Exec(`ALTER TABLE users DROP COLUMN IF EXISTS google_id`)
+
 	// Initialize Firebase Admin SDK for push notifications
 	service.InitFCM()
 
@@ -122,6 +130,11 @@ func main() {
 	seedSettings(db)
 	seedDeliveryZones(db)
 	seedAdminUser(db)
+
+	// Audit log retention: keep a rolling 30 days live, back the full set
+	// up to R2 once a month before anything ages out. No cron library in
+	// this backend — a daily ticker is simple enough for a once-a-day job.
+	go runAuditLogMaintenance(db)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -166,6 +179,9 @@ func main() {
 		// Protected routes (auth required)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+		// Audit trail for every mutating request from any authenticated
+		// role/app — see middleware.AuditLogMiddleware's doc comment.
+		protected.Use(middleware.AuditLogMiddleware(db))
 		{
 			// Support chat handler (used in both admin and customer sections)
 			supportH := supportHandler.NewHandler(db)
@@ -173,10 +189,17 @@ func main() {
 			// Admin routes
 			adminRoutes := protected.Group("/admin")
 			adminRoutes.Use(middleware.RoleMiddleware("admin"))
+			adminRoutes.Use(middleware.AdminTierMiddleware())
 			{
 				adminH.RegisterRoutes(adminRoutes)
 				supportH.RegisterAdminRoutes(adminRoutes)
 			}
+
+			// Admin-account management — superadmin only.
+			superadminRoutes := protected.Group("/admin")
+			superadminRoutes.Use(middleware.RoleMiddleware("admin"))
+			superadminRoutes.Use(middleware.SuperadminOnlyMiddleware())
+			adminH.RegisterSuperadminRoutes(superadminRoutes)
 
 			// Merchant owner routes (auth required)
 			merchOwnerRoutes := protected.Group("")
@@ -309,6 +332,10 @@ func seedAdminUser(db *gorm.DB) {
 	if phone == "" {
 		phone = "08000000000"
 	}
+	// Stored normalized so it matches what Login normalizes incoming
+	// phone numbers to before lookup — otherwise this seeded admin
+	// couldn't log in until the next restart's legacy-phone backfill ran.
+	phone = authHandler.NormalizePhone(phone)
 	password := os.Getenv("ADMIN_PASSWORD")
 	if password == "" {
 		password = "admin123"
@@ -319,11 +346,12 @@ func seedAdminUser(db *gorm.DB) {
 		return
 	}
 	admin := model.User{
-		Name:     "Admin",
-		Phone:    phone,
-		Password: string(hashed),
-		Role:     model.RoleAdmin,
-		IsActive: true,
+		Name:      "Admin",
+		Phone:     phone,
+		Password:  string(hashed),
+		Role:      model.RoleAdmin,
+		AdminTier: model.AdminTierSuperadmin,
+		IsActive:  true,
 	}
 	if err := db.Create(&admin).Error; err != nil {
 		log.Printf("seedAdminUser: failed to create admin: %v", err)
@@ -348,4 +376,85 @@ func seedDeliveryZones(db *gorm.DB) {
 		IsDefault: true,
 		IsActive:  true,
 	})
+}
+
+const auditLogRetentionDays = 30
+
+// auditLogLastBackupSettingKey stores the "YYYY-MM" of the last month a
+// backup was successfully uploaded, so backupAuditLogsIfDue only runs once
+// per calendar month regardless of how many times the daily tick fires.
+const auditLogLastBackupSettingKey = "audit_log_last_backup_month"
+
+// runAuditLogMaintenance is a long-running background loop (call with
+// `go`): once a day it purges audit_logs rows older than
+// auditLogRetentionDays, and — the first time it runs in a new calendar
+// month — exports everything still in the table to R2 before that
+// purge would otherwise start eating into it. Runs once immediately on
+// startup too, so a server that's restarted daily (or was down across a
+// purge window) doesn't silently skip maintenance.
+func runAuditLogMaintenance(db *gorm.DB) {
+	maintain := func() {
+		backupAuditLogsIfDue(db)
+		purgeOldAuditLogs(db)
+	}
+	maintain()
+	ticker := time.NewTicker(24 * time.Hour)
+	for range ticker.C {
+		maintain()
+	}
+}
+
+func purgeOldAuditLogs(db *gorm.DB) {
+	cutoff := time.Now().AddDate(0, 0, -auditLogRetentionDays)
+	result := db.Where("created_at < ?", cutoff).Delete(&model.AuditLog{})
+	if result.Error != nil {
+		log.Printf("purgeOldAuditLogs: %v", result.Error)
+		return
+	}
+	if result.RowsAffected > 0 {
+		log.Printf("purgeOldAuditLogs: removed %d rows older than %s", result.RowsAffected, cutoff.Format("2006-01-02"))
+	}
+}
+
+// backupAuditLogsIfDue exports every audit_logs row currently in the table
+// (up to auditLogRetentionDays of history) to a JSON file uploaded to R2,
+// once per calendar month. Skips silently (retrying on the next daily
+// tick) if R2 isn't configured or the upload fails — this is a
+// best-effort archival step, not something that should crash the server.
+func backupAuditLogsIfDue(db *gorm.DB) {
+	thisMonth := time.Now().Format("2006-01")
+
+	var setting model.SystemSetting
+	if db.Where("key = ?", auditLogLastBackupSettingKey).First(&setting).Error == nil && setting.Value == thisMonth {
+		return
+	}
+
+	var logs []model.AuditLog
+	if err := db.Order("created_at ASC").Find(&logs).Error; err != nil {
+		log.Printf("backupAuditLogsIfDue: failed to load logs: %v", err)
+		return
+	}
+
+	data, err := json.Marshal(logs)
+	if err != nil {
+		log.Printf("backupAuditLogsIfDue: failed to marshal logs: %v", err)
+		return
+	}
+
+	filename := fmt.Sprintf("audit-log-%s.json", thisMonth)
+	url, err := upload.SaveBytes(data, "audit-backups", filename, "application/json")
+	if err != nil {
+		log.Printf("backupAuditLogsIfDue: upload failed (will retry next tick): %v", err)
+		return
+	}
+
+	result := db.Model(&model.SystemSetting{}).Where("key = ?", auditLogLastBackupSettingKey).Update("value", thisMonth)
+	if result.RowsAffected == 0 {
+		db.Create(&model.SystemSetting{
+			Key:   auditLogLastBackupSettingKey,
+			Value: thisMonth,
+			Label: "Audit log: bulan backup terakhir",
+		})
+	}
+	log.Printf("backupAuditLogsIfDue: backed up %d rows to %s", len(logs), url)
 }
