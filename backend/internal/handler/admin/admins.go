@@ -92,6 +92,8 @@ func (h *Handler) UpdateAdmin(c *gin.Context) {
 	}
 
 	var req struct {
+		Name      *string `json:"name"`
+		Phone     *string `json:"phone"`
 		AdminTier *string `json:"admin_tier"`
 		IsActive  *bool   `json:"is_active"`
 		Password  *string `json:"password"`
@@ -102,6 +104,20 @@ func (h *Handler) UpdateAdmin(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
+	if req.Name != nil && *req.Name != "" {
+		updates["name"] = *req.Name
+	}
+	if req.Phone != nil && *req.Phone != "" {
+		phone := authHandler.NormalizePhone(*req.Phone)
+		if phone != admin.Phone {
+			var conflicting model.User
+			if h.db.Where("phone = ? AND id != ?", phone, admin.ID).First(&conflicting).Error == nil {
+				c.JSON(http.StatusConflict, gin.H{"error": "Nomor ini sudah terdaftar di akun lain"})
+				return
+			}
+			updates["phone"] = phone
+		}
+	}
 	if req.AdminTier != nil {
 		if !validAdminTiers[*req.AdminTier] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Tier admin tidak valid"})

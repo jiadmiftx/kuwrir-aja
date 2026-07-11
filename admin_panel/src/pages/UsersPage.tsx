@@ -95,8 +95,10 @@ export default function UsersPage() {
   const [newTier, setNewTier] = useState<string>('admin')
   const [creating, setCreating] = useState(false)
 
-  // Edit admin dialog (tier + optional password change)
+  // Edit admin dialog (name, phone, tier + optional password change)
   const [tierTarget, setTierTarget] = useState<Admin | null>(null)
+  const [tierName, setTierName] = useState('')
+  const [tierPhone, setTierPhone] = useState('')
   const [tierValue, setTierValue] = useState<string>('admin')
   const [tierNewPassword, setTierNewPassword] = useState('')
   const [tierShowPassword, setTierShowPassword] = useState(false)
@@ -149,6 +151,8 @@ export default function UsersPage() {
 
   const openTierDialog = (admin: Admin) => {
     setTierTarget(admin)
+    setTierName(admin.name)
+    setTierPhone(admin.phone)
     setTierValue(admin.admin_tier || 'superadmin')
     setTierNewPassword('')
     setTierShowPassword(false)
@@ -156,13 +160,17 @@ export default function UsersPage() {
 
   const submitTierChange = async () => {
     if (!tierTarget) return
+    if (!tierName || !tierPhone) {
+      toast.error('Nama dan telepon wajib diisi')
+      return
+    }
     if (tierNewPassword && tierNewPassword.length < 6) {
       toast.error('Password baru minimal 6 karakter')
       return
     }
     setTierSubmitting(true)
     try {
-      const body: Record<string, string> = { admin_tier: tierValue }
+      const body: Record<string, string> = { name: tierName, phone: tierPhone, admin_tier: tierValue }
       if (tierNewPassword) body.password = tierNewPassword
       const res = await api(`/api/v1/admin/admins/${tierTarget.id}`, {
         method: 'PUT',
@@ -171,7 +179,7 @@ export default function UsersPage() {
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setAdmins(prev => prev.map(a => a.id === tierTarget.id ? data.admin : a))
-        toast.success(tierNewPassword ? 'Tier & password admin diperbarui' : 'Tier admin diperbarui')
+        toast.success(tierNewPassword ? 'Data & password admin diperbarui' : 'Data admin diperbarui')
         setTierTarget(null)
       } else {
         toast.error(data.error ?? `Gagal memperbarui admin (${res.status})`)
@@ -377,13 +385,21 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Admin Dialog: tier + optional password change */}
+      {/* Edit Admin Dialog: name, phone (login username), tier + optional password change */}
       <Dialog open={!!tierTarget} onOpenChange={v => { if (!v) setTierTarget(null) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Admin — {tierTarget?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama</Label>
+              <Input value={tierName} onChange={e => setTierName(e.target.value)} placeholder="Nama lengkap" />
+            </div>
+            <div className="space-y-2">
+              <Label>Telepon (username login)</Label>
+              <Input value={tierPhone} onChange={e => setTierPhone(e.target.value)} placeholder="08xxxxxxxxxx" />
+            </div>
             <div className="space-y-2">
               <Label>Tier</Label>
               <Select value={tierValue} onValueChange={val => val !== null && setTierValue(val)}>
@@ -422,7 +438,7 @@ export default function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTierTarget(null)}>Batal</Button>
-            <Button disabled={tierSubmitting} onClick={submitTierChange}>
+            <Button disabled={tierSubmitting || !tierName || !tierPhone} onClick={submitTierChange}>
               {tierSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Pencil className="h-4 w-4 mr-2" />}
               Simpan
             </Button>
