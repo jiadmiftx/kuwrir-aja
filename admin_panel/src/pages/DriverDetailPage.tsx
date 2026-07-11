@@ -119,7 +119,11 @@ export default function DriverDetailPage() {
     )
   }
 
-  const { driver: d, wallet, cod_holding, deposits, orders, total_delivered } = data
+  const { driver: d, cod_holding, total_delivered } = data
+  const wallet = data.wallet ?? { balance: 0, total_earned: 0, transactions: [] }
+  const walletTxns = wallet.transactions ?? []
+  const deposits = data.deposits ?? []
+  const orders = data.orders ?? []
 
   return (
     <div className="space-y-6">
@@ -212,7 +216,7 @@ export default function DriverDetailPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">Riwayat Transaksi Wallet</CardTitle></CardHeader>
             <CardContent>
-              {wallet.transactions.length === 0 ? (
+              {walletTxns.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Belum ada transaksi</p>
               ) : (
                 <Table>
@@ -225,7 +229,7 @@ export default function DriverDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {wallet.transactions.map(t => (
+                    {walletTxns.map(t => (
                       <TableRow key={t.id}>
                         <TableCell className="text-sm text-muted-foreground">{fmtDateTime(t.created_at)}</TableCell>
                         <TableCell className="text-sm">{categoryLabel[t.category] ?? t.category}</TableCell>

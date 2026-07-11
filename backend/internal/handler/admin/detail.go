@@ -29,13 +29,13 @@ func (h *Handler) GetMerchantDetail(c *gin.Context) {
 	id := c.Param("id")
 
 	var merchant model.Merchant
-	if err := h.db.Preload("Zone").Preload("User").First(&merchant, "id = ?", id).Error; err != nil {
+	if err := h.db.Preload("Zone").Preload("Owner").First(&merchant, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
 		return
 	}
 
 	var wallet model.Wallet
-	var walletTxns []model.WalletTransaction
+	walletTxns := []model.WalletTransaction{}
 	if h.db.Where("user_id = ?", merchant.UserID).First(&wallet).Error == nil {
 		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
 	}
@@ -51,16 +51,16 @@ func (h *Handler) GetMerchantDetail(c *gin.Context) {
 		Where("merchant_id = ? AND status = ?", id, "delivered").
 		Scan(&pendingPayout)
 
-	var settlements []model.MerchantSettlement
+	settlements := []model.MerchantSettlement{}
 	h.db.Where("merchant_id = ?", id).Order("created_at DESC").Find(&settlements)
 
-	var receivables []model.MerchantReceivable
+	receivables := []model.MerchantReceivable{}
 	h.db.Where("merchant_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&receivables)
 
-	var payables []model.MerchantPayable
+	payables := []model.MerchantPayable{}
 	h.db.Where("merchant_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&payables)
 
-	var orders []model.Order
+	orders := []model.Order{}
 	h.db.Where("merchant_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&orders)
 
 	var totalOrders int64
@@ -96,15 +96,15 @@ func (h *Handler) GetDriverDetail(c *gin.Context) {
 	}
 
 	var wallet model.Wallet
-	var walletTxns []model.WalletTransaction
+	walletTxns := []model.WalletTransaction{}
 	if h.db.Where("user_id = ?", driver.UserID).First(&wallet).Error == nil {
 		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
 	}
 
-	var deposits []model.DriverDeposit
+	deposits := []model.DriverDeposit{}
 	h.db.Where("driver_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&deposits)
 
-	var orders []model.Order
+	orders := []model.Order{}
 	h.db.Where("driver_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&orders)
 
 	var totalDelivered int64
@@ -138,10 +138,10 @@ func (h *Handler) GetCustomerDetail(c *gin.Context) {
 		return
 	}
 
-	var addresses []model.Address
+	addresses := []model.Address{}
 	h.db.Where("user_id = ?", id).Order("is_default DESC, created_at DESC").Find(&addresses)
 
-	var orders []model.Order
+	orders := []model.Order{}
 	h.db.Where("customer_id = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&orders)
 
 	var totalOrders int64
@@ -150,7 +150,7 @@ func (h *Handler) GetCustomerDetail(c *gin.Context) {
 	h.db.Model(&model.Order{}).Where("customer_id = ? AND status = ?", id, "delivered").
 		Select("COALESCE(SUM(total), 0)").Scan(&totalSpent)
 
-	var refunds []model.RefundRequest
+	refunds := []model.RefundRequest{}
 	h.db.Where("requested_by = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&refunds)
 
 	c.JSON(http.StatusOK, gin.H{

@@ -70,7 +70,7 @@ interface Merchant {
   tax_enabled?: boolean
   tax_rate?: number | null
   zone?: { city_name: string } | null
-  user?: { name: string; phone: string; email?: string }
+  owner?: { name: string; phone: string; email?: string }
   owner_ktp_url?: string
   business_license_url?: string
   store_photo_url?: string
@@ -186,7 +186,13 @@ export default function MerchantDetailPage() {
     )
   }
 
-  const { merchant: m, wallet, pending_payout, settlements, receivables, payables, orders, total_orders } = data
+  const { merchant: m, pending_payout, total_orders } = data
+  const wallet = data.wallet ?? { balance: 0, total_earned: 0, transactions: [] }
+  const walletTxns = wallet.transactions ?? []
+  const settlements = data.settlements ?? []
+  const receivables = data.receivables ?? []
+  const payables = data.payables ?? []
+  const orders = data.orders ?? []
 
   return (
     <div className="space-y-6">
@@ -229,7 +235,7 @@ export default function MerchantDetailPage() {
                   <span className="text-muted-foreground">({m.total_reviews})</span>
                 </span>
                 <span className="text-muted-foreground">{m.phone}</span>
-                {m.user?.email && <span className="text-muted-foreground">{m.user.email}</span>}
+                {m.owner?.email && <span className="text-muted-foreground">{m.owner.email}</span>}
               </div>
             </div>
           </div>
@@ -300,7 +306,7 @@ export default function MerchantDetailPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">Riwayat Transaksi Wallet</CardTitle></CardHeader>
             <CardContent>
-              {wallet.transactions.length === 0 ? (
+              {walletTxns.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Belum ada transaksi</p>
               ) : (
                 <Table>
@@ -313,7 +319,7 @@ export default function MerchantDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {wallet.transactions.map(t => (
+                    {walletTxns.map(t => (
                       <TableRow key={t.id}>
                         <TableCell className="text-sm text-muted-foreground">{fmtDateTime(t.created_at)}</TableCell>
                         <TableCell className="text-sm">{categoryLabel[t.category] ?? t.category}</TableCell>

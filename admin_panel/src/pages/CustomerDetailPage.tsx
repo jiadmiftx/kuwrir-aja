@@ -115,7 +115,10 @@ export default function CustomerDetailPage() {
     )
   }
 
-  const { customer: c, addresses, orders, total_orders, total_spent, refunds } = data
+  const { customer: c, total_orders, total_spent } = data
+  const addresses = data.addresses ?? []
+  const orders = data.orders ?? []
+  const refunds = data.refunds ?? []
 
   return (
     <div className="space-y-6">
