@@ -7,6 +7,18 @@ import '../theme/kuwrir_colors.dart';
 
 enum _OtpStep { phone, code }
 
+/// Strips a single leading "0" from typed/pasted digits (e.g. "0812..." ->
+/// "812...") — used when a dial-code chip is already shown beside the
+/// field, so the field's own text never carries a redundant/wrong leading
+/// zero next to the visible "+62". Cursor position is preserved relative to
+/// the removed character.
+TextEditingValue _stripLeadingZero(TextEditingValue oldValue, TextEditingValue newValue) {
+  if (!newValue.text.startsWith('0')) return newValue;
+  final stripped = newValue.text.substring(1);
+  final offset = (newValue.selection.baseOffset - 1).clamp(0, stripped.length);
+  return TextEditingValue(text: stripped, selection: TextSelection.collapsed(offset: offset));
+}
+
 class _Country {
   final String iso;
   final String name;
@@ -287,7 +299,15 @@ class _OtpFlowState extends State<OtpFlow> {
     final phoneField = TextField(
       controller: _phoneCtrl,
       keyboardType: TextInputType.phone,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        // With the dial-code chip visible, a leading "0" is always wrong
+        // (the chip already supplies the "+62"/etc prefix) — strip it live
+        // as it's typed or pasted, rather than only normalizing it silently
+        // once the request is sent. Without the chip, "0" is the expected
+        // first digit of the local format, so leave it alone.
+        if (widget.showCountryCode) TextInputFormatter.withFunction(_stripLeadingZero),
+      ],
       decoration: InputDecoration(
         labelText: 'Nomor HP',
         hintText: widget.showCountryCode ? '812xxxxxxxx' : '08xxxxxxxxxx',
