@@ -260,13 +260,27 @@ class _OrdersScreenState extends State<_OrdersScreen> {
   bool _loading = false;
   bool _loaded = false;
 
+  /// This screen lives inside CustomerHome's IndexedStack, so it's mounted
+  /// (and this fires) from app launch regardless of which tab is active or
+  /// whether the user is logged in — guest browsing is a supported mode.
+  /// Two things matter here:
+  /// 1. Skip the network call entirely for guests (ApiClient.getMyOrders
+  ///    would just 401) rather than firing a request that's guaranteed to
+  ///    fail.
+  /// 2. Always mark `_loaded = true` once this finishes, success or not.
+  ///    build() below reschedules _load() via addPostFrameCallback as long
+  ///    as `!_loaded && !_loading` — previously a failed fetch left
+  ///    `_loaded` false forever, so every rebuild re-scheduled another
+  ///    attempt with no delay, hammering /api/v1/orders in a tight loop.
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiClient>();
-      _orders = await api.getMyOrders();
-      _loaded = true;
+      if (await api.isAuthenticated()) {
+        _orders = await api.getMyOrders();
+      }
     } catch (_) {}
+    _loaded = true;
     if (mounted) setState(() => _loading = false);
   }
 
