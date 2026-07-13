@@ -58,6 +58,8 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/orders/:id/nearby-drivers", h.NearbyDriversForOrder)
 	r.POST("/orders/:id/assign-driver", h.AssignDriverToOrder)
 	r.POST("/orders/:id/admin-cancel", h.AdminCancelOrder)
+	r.DELETE("/orders/:id", h.DeleteOrder)
+	r.POST("/orders/bulk-delete", h.BulkDeleteOrders)
 
 	// Revenue analytics
 	r.GET("/revenue", h.GetRevenue)
@@ -464,6 +466,71 @@ func (h *Handler) GetOrders(c *gin.Context) {
 	}
 	q.Order("created_at DESC").Find(&orders)
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// deleteOrdersHard permanently removes orders and everything scoped to
+// them (items, review, refund requests, chat) — a real hard delete via
+// Unscoped, not the soft-delete Base.DeletedAt gives every other model,
+// because this exists purely to purge test/seed data before a real
+// release, not to hide records that should stay for bookkeeping. Wallet
+// ledger entries (WalletTransaction) are deliberately left alone: they're
+// the source of truth for a wallet's balance, and this endpoint has no
+// safe way to also reverse whatever balance those entries already
+// contributed — only OrderID gets orphaned (nullable, display-only).
+func deleteOrdersHard(db *gorm.DB, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.OrderItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.Review{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.RefundRequest{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Where("id IN ?", ids).Delete(&model.Order{}).Error
+	})
+}
+
+// DeleteOrder permanently deletes a single order — see deleteOrdersHard.
+func (h *Handler) DeleteOrder(c *gin.Context) {
+	id := c.Param("id")
+
+	var order model.Order
+	if err := h.db.First(&order, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	if err := deleteOrdersHard(h.db, []string{id}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete order"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Order deleted"})
+}
+
+// BulkDeleteOrders permanently deletes many orders at once — for clearing
+// out test/seed data before going live, not a routine admin action.
+func (h *Handler) BulkDeleteOrders(c *gin.Context) {
+	var req struct {
+		IDs []string `json:"ids" binding:"required,min=1"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := deleteOrdersHard(h.db, req.IDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete orders"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Orders deleted", "count": len(req.IDs)})
 }
 
 // ─── SETTLEMENTS ─────────────────────────────────────────────────────────────

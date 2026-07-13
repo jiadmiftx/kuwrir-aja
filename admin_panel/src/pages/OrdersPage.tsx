@@ -10,7 +10,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card'
-import { Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck } from 'lucide-react'
+import { Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -106,6 +106,11 @@ export default function OrdersPage() {
   const [selectedDriver, setSelectedDriver] = useState('')
   const [assigning, setAssigning] = useState(false)
 
+  // Delete (single + bulk) — for clearing test/seed data before launch
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleteTarget, setDeleteTarget] = useState<Order | 'bulk' | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   const fetchOrders = async () => {
     setIsLoading(true)
     try {
@@ -165,6 +170,56 @@ export default function OrdersPage() {
       toast.error('Network error')
     } finally {
       setAssigning(false)
+    }
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      if (deleteTarget === 'bulk') {
+        const ids = Array.from(selectedIds)
+        const res = await apiFetch('/api/v1/admin/orders/bulk-delete', {
+          method: 'POST',
+          body: JSON.stringify({ ids }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok) {
+          toast.success(`${ids.length} order dihapus`)
+          setSelectedIds(new Set())
+          fetchOrders()
+        } else {
+          toast.error(data.error ?? `Gagal menghapus order (${res.status})`)
+        }
+      } else {
+        const res = await apiFetch(`/api/v1/admin/orders/${deleteTarget.id}`, { method: 'DELETE' })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok) {
+          toast.success('Order dihapus')
+          setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.delete(deleteTarget.id)
+            return next
+          })
+          fetchOrders()
+        } else {
+          toast.error(data.error ?? `Gagal menghapus order (${res.status})`)
+        }
+      }
+    } catch {
+      toast.error('Gagal terhubung ke server, coba lagi')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -238,6 +293,11 @@ export default function OrdersPage() {
                 className="pl-9"
               />
             </div>
+            {selectedIds.size > 0 && (
+              <Button variant="destructive" size="sm" onClick={() => setDeleteTarget('bulk')}>
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Hapus {selectedIds.size} Order
+              </Button>
+            )}
             <Select value={datePeriod} onValueChange={(v) => setDatePeriod(v as DatePeriod)}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Periode" />
@@ -283,6 +343,21 @@ export default function OrdersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={filtered.length > 0 && filtered.every(o => selectedIds.has(o.id))}
+                        onChange={(e) => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) filtered.forEach(o => next.add(o.id))
+                            else filtered.forEach(o => next.delete(o.id))
+                            return next
+                          })
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Order</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Merchant</TableHead>
@@ -296,14 +371,22 @@ export default function OrdersPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center">Loading...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center">No orders found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center">No orders found</TableCell></TableRow>
                   ) : filtered.map((order) => {
                     const cfg = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100', icon: Clock }
                     const platformCut = (order.platform_markup || 0) + (order.delivery_commission || 0) + (order.app_service_fee || 0)
                     return (
                       <TableRow key={order.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={selectedIds.has(order.id)}
+                            onChange={() => toggleSelected(order.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{order.order_number}</TableCell>
                         <TableCell>
                           {order.merchant?.name ? (
@@ -369,17 +452,27 @@ export default function OrdersPage() {
                           <Badge className={cfg.color}>{cfg.label}</Badge>
                         </TableCell>
                         <TableCell>
-                          {order.status === 'ready' && (
+                          <div className="flex items-center gap-1.5">
+                            {order.status === 'ready' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openAssignDialog(order)}
+                                className="text-xs"
+                              >
+                                <UserCheck className="mr-1 h-3 w-3" />
+                                {order.driver_id ? 'Ganti Driver' : 'Assign Driver'}
+                              </Button>
+                            )}
                             <Button
                               size="sm"
-                              variant="outline"
-                              onClick={() => openAssignDialog(order)}
-                              className="text-xs"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setDeleteTarget(order)}
                             >
-                              <UserCheck className="mr-1 h-3 w-3" />
-                              {order.driver_id ? 'Ganti Driver' : 'Assign Driver'}
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
-                          )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -431,6 +524,30 @@ export default function OrdersPage() {
             <Button variant="outline" onClick={() => setAssignOrder(null)}>Batal</Button>
             <Button onClick={handleAssign} disabled={!selectedDriver || assigning}>
               {assigning ? 'Menyimpan...' : 'Assign Driver Ini'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation (single or bulk) */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {deleteTarget === 'bulk'
+                ? `Hapus ${selectedIds.size} order?`
+                : `Hapus order ${deleteTarget?.order_number ?? ''}?`}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Order beserta item, review, dan permintaan refund terkait akan dihapus permanen dan tidak
+            bisa dipulihkan. Gunakan ini untuk membersihkan data testing, bukan order asli.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              Hapus
             </Button>
           </DialogFooter>
         </DialogContent>
