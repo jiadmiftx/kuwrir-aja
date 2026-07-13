@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
@@ -172,14 +173,12 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                     ScaleTransition(
                       scale: Tween(begin: 1.0, end: 1.035)
                           .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOutSine)),
-                      child: const _AppIconBadge(),
+                      child: SizedBox(
+                        width: 236,
+                        child: SvgPicture.asset('assets/images/cocourir_driver_logo.svg'),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Cocourir Driver',
-                      style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
                     SizedBox(
                       height: 22,
                       child: AnimatedSwitcher(
@@ -225,35 +224,6 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// App icon as a soft squircle tile (rounded-square, not a circle) — the
-/// same shape language as an OS home-screen app icon, so it reads as "this
-/// app" rather than an avatar/profile-photo motif a circle implies.
-class _AppIconBadge extends StatelessWidget {
-  const _AppIconBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 88,
-      height: 88,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
       ),
     );
   }

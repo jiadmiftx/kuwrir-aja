@@ -93,7 +93,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           icon: Icon(Icons.explore_outlined, size: 18, color: KuwrirColors.textSecondary),
-                          label: Text('Jelajahi dulu tanpa akun',
+                          label: Text('Jelajahi dulu restoran sekitarmu',
                               style: TextStyle(color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
                         ),
                       ),
@@ -190,7 +190,7 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                           .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOutSine)),
                       child: SizedBox(
                         width: 236,
-                        child: SvgPicture.asset('assets/images/cocourir_food.svg'),
+                        child: SvgPicture.asset('assets/images/cocourir_food_logo.svg'),
                       ),
                     ),
                     SizedBox(
