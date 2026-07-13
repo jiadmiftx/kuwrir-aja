@@ -630,54 +630,13 @@ func (h *Handler) DeleteMe(c *gin.Context) {
 		return
 	}
 
-	var driver model.Driver
-	if err := h.db.Where("user_id = ?", user.ID).First(&driver).Error; err == nil {
-		if driver.CodHolding > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Masih ada saldo COD di tangan, setor dulu sebelum menghapus akun"})
-			return
-		}
-	}
-
-	var wallet model.Wallet
-	if err := h.db.Where("user_id = ?", user.ID).First(&wallet).Error; err == nil {
-		if wallet.Balance > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Masih ada saldo wallet, tarik dulu sebelum menghapus akun"})
-			return
-		}
-	}
-
-	// Free up the phone/email for reuse — the unique indexes on User.Phone
-	// and User.Email are plain (not scoped to deleted_at), so a soft-deleted
-	// row still blocks a new registration with the same phone/email unless
-	// its identity fields are tombstoned first.
-	tombstone := fmt.Sprintf("deleted-%d-%s", time.Now().UnixNano(), user.ID.String())
-	updates := map[string]interface{}{
-		"is_active": false,
-		"fcm_token": "",
-		"phone":     tombstone,
-	}
-	if user.Email != "" {
-		updates["email"] = tombstone
-	}
-	if err := h.db.Model(&user).Updates(updates).Error; err != nil {
+	blockReason, err := service.DeleteUserAccount(h.db, user)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus akun"})
 		return
 	}
-
-	h.db.Where("user_id = ?", user.ID).Delete(&model.Address{})
-	h.db.Where("user_id = ?", user.ID).Delete(&model.UserRole{})
-
-	var merchant model.Merchant
-	if err := h.db.Where("user_id = ?", user.ID).First(&merchant).Error; err == nil {
-		h.db.Model(&merchant).Update("is_active", false)
-		h.db.Delete(&merchant)
-	}
-	if driver.ID != uuid.Nil {
-		h.db.Delete(&driver)
-	}
-
-	if err := h.db.Delete(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus akun"})
+	if blockReason != "" {
+		c.JSON(http.StatusConflict, gin.H{"error": blockReason})
 		return
 	}
 

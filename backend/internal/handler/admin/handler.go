@@ -136,6 +136,14 @@ func (h *Handler) RegisterSuperadminRoutes(r *gin.RouterGroup) {
 	}
 }
 
+// RegisterRootSuperadminRoutes registers routes limited to the platform's
+// designated owner account — see RequireRootSuperadmin. Mounted on its own
+// sub-group in cmd/server with that extra gate, since RegisterRoutes' group
+// only carries the base RoleMiddleware("admin") + AdminTierMiddleware.
+func (h *Handler) RegisterRootSuperadminRoutes(r *gin.RouterGroup) {
+	r.DELETE("/users/:id", h.DeleteUserAccount)
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 // DashboardStats returns live KPI data for the admin dashboard

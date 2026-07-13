@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, Loader2, Package, MapPin, ShieldCheck, RotateCcw } from 'lucide-react'
 
 import { apiFetch as api } from '@/lib/api'
+import { DeleteUserAccountButton } from '@/components/DeleteUserAccountButton'
 
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
@@ -122,9 +123,12 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-        <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
+        </Button>
+        <DeleteUserAccountButton userId={c.id} userName={c.name} onDeleted={() => navigate('/customers')} />
+      </div>
 
       {/* Header card */}
       <Card>

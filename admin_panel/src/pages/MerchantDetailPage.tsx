@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, MapPin, Star, Loader2, Wallet, Package } from 'lucide-react'
 
 import { apiFetch as api } from '@/lib/api'
+import { DeleteUserAccountButton } from '@/components/DeleteUserAccountButton'
 
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
@@ -70,7 +71,7 @@ interface Merchant {
   tax_enabled?: boolean
   tax_rate?: number | null
   zone?: { city_name: string } | null
-  owner?: { name: string; phone: string; email?: string }
+  owner?: { id: string; name: string; phone: string; email?: string }
   owner_ktp_url?: string
   business_license_url?: string
   store_photo_url?: string
@@ -196,9 +197,14 @@ export default function MerchantDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-        <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
+        </Button>
+        {m.owner?.id && (
+          <DeleteUserAccountButton userId={m.owner.id} userName={m.owner.name} onDeleted={() => navigate('/merchants')} />
+        )}
+      </div>
 
       {/* Header card */}
       <Card>

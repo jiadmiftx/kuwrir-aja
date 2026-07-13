@@ -211,6 +211,12 @@ func main() {
 			superadminRoutes.Use(middleware.SuperadminOnlyMiddleware())
 			adminH.RegisterSuperadminRoutes(superadminRoutes)
 
+			// Customer/driver/merchant account deletion — root superadmin only.
+			rootSuperadminRoutes := protected.Group("/admin")
+			rootSuperadminRoutes.Use(middleware.RoleMiddleware("admin"))
+			rootSuperadminRoutes.Use(adminH.RequireRootSuperadmin())
+			adminH.RegisterRootSuperadminRoutes(rootSuperadminRoutes)
+
 			// Merchant owner routes (auth required)
 			merchOwnerRoutes := protected.Group("")
 			merchOwnerRoutes.Use(middleware.RoleMiddleware("merchant"))

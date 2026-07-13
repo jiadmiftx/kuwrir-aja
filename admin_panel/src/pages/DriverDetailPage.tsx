@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, Bike, Star, Loader2, Wallet, Package, HandCoins } from 'lucide-react'
 
 import { apiFetch as api } from '@/lib/api'
+import { DeleteUserAccountButton } from '@/components/DeleteUserAccountButton'
 
 const fmt = (v: number | undefined) => 'Rp ' + (v ?? 0).toLocaleString('id-ID')
 const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
@@ -44,7 +45,7 @@ interface Driver {
   total_delivered: number
   cod_holding: number
   zone?: { city_name: string } | null
-  user?: { name: string; phone: string; is_active?: boolean }
+  user?: { id: string; name: string; phone: string; is_active?: boolean }
 }
 
 interface WalletTransaction {
@@ -127,9 +128,14 @@ export default function DriverDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-        <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
+        </Button>
+        {d.user?.id && (
+          <DeleteUserAccountButton userId={d.user.id} userName={d.user.name} onDeleted={() => navigate('/drivers')} />
+        )}
+      </div>
 
       {/* Header card */}
       <Card>

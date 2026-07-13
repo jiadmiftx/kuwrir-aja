@@ -2,6 +2,22 @@ export function getToken() {
   return localStorage.getItem('token')
 }
 
+// Mirrors backend/internal/handler/admin/admins.go's rootSuperadminPhone —
+// only this account can delete customer/driver/merchant accounts. The
+// backend re-checks this independently; this is just used to show/hide the
+// delete action in the UI.
+const ROOT_SUPERADMIN_PHONE = '+6281907031'
+
+export function isRootSuperadmin(): boolean {
+  try {
+    const raw = localStorage.getItem('user')
+    if (!raw) return false
+    return JSON.parse(raw).phone === ROOT_SUPERADMIN_PHONE
+  } catch {
+    return false
+  }
+}
+
 function handleUnauthorized() {
   localStorage.removeItem('token')
   if (window.location.pathname !== '/login') {

@@ -8,6 +8,7 @@ import (
 
 	authHandler "github.com/kuwrir-platform/backend/internal/handler/auth"
 	"github.com/kuwrir-platform/backend/internal/model"
+	"github.com/kuwrir-platform/backend/internal/service"
 )
 
 // ─── ADMIN ACCOUNT MANAGEMENT (superadmin only) ────────────────────────────
@@ -32,6 +33,55 @@ var validAdminTiers = map[string]bool{
 const rootSuperadminPhone = "+6281907031"
 
 func isRootSuperadmin(phone string) bool { return phone == rootSuperadminPhone }
+
+// RequireRootSuperadmin gates routes to only the platform's designated
+// owner account (rootSuperadminPhone) — stricter than
+// middleware.SuperadminOnlyMiddleware, which allows any account tiered
+// "superadmin". Deleting a customer/driver/merchant account is
+// irreversible enough that it's scoped to the single owner, not every
+// superadmin.
+func (h *Handler) RequireRootSuperadmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var requester model.User
+		if err := h.db.First(&requester, "id = ?", c.GetString("user_id")).Error; err != nil || !isRootSuperadmin(requester.Phone) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Hanya superadmin utama yang bisa menghapus akun pengguna"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// DeleteUserAccount permanently deactivates and soft-deletes a
+// customer/driver/merchant account from the admin panel — the same
+// underlying operation as the app's own "delete my account" (see
+// service.DeleteUserAccount), just triggered by the root superadmin
+// against someone else's account instead of self-service. Refuses to
+// touch admin-role accounts; use the /admins endpoints for those.
+func (h *Handler) DeleteUserAccount(c *gin.Context) {
+	id := c.Param("id")
+
+	var user model.User
+	if err := h.db.First(&user, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Akun tidak ditemukan"})
+		return
+	}
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gunakan menu Kelola Admin untuk akun admin"})
+		return
+	}
+
+	blockReason, err := service.DeleteUserAccount(h.db, user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus akun"})
+		return
+	}
+	if blockReason != "" {
+		c.JSON(http.StatusConflict, gin.H{"error": blockReason})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Akun berhasil dihapus"})
+}
 
 // adminResponse augments model.User with is_root so the frontend can grey
 // out account-management actions for the protected owner account without
