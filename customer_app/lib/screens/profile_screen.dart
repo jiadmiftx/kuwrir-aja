@@ -50,6 +50,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDeleteAccountDialog(context);
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ApiClient().deleteAccount();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus akun')),
+        );
+      }
+      return;
+    }
+
+    await ApiClient().clearTokens();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+    }
+  }
+
   Future<void> _editField({
     required String label,
     required String? currentValue,
@@ -193,6 +214,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     leading: Icon(Icons.logout, color: KuwrirColors.error),
                     title: Text('Keluar', style: TextStyle(color: KuwrirColors.error, fontWeight: FontWeight.w600)),
                     onTap: _logout,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ProfileSoftPanel(
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    leading: Icon(Icons.delete_forever_outlined, color: KuwrirColors.error),
+                    title: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error, fontWeight: FontWeight.w600)),
+                    onTap: _deleteAccount,
                   ),
                 ),
               ],

@@ -66,10 +66,19 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                   icon: const Icon(Icons.account_balance_wallet_outlined),
                   onPressed: () => Navigator.pushNamed(context, '/wallet'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Keluar',
-                  onPressed: () => _confirmLogout(context),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'logout') _confirmLogout(context);
+                    if (value == 'delete') _deleteAccount(context);
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'logout', child: Text('Keluar')),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -96,6 +105,26 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    final nav = Navigator.of(context);
+    await ApiClient().clearTokens();
+    nav.pushNamedAndRemoveUntil('/login', (_) => false);
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final confirmed = await showDeleteAccountDialog(context);
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ApiClient().deleteAccount();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus akun')),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
     final nav = Navigator.of(context);
     await ApiClient().clearTokens();
     nav.pushNamedAndRemoveUntil('/login', (_) => false);

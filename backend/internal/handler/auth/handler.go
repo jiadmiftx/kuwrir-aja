@@ -49,6 +49,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		authed.GET("/me", h.GetMe)
 		authed.PUT("/me", h.UpdateMe)
+		authed.DELETE("/me", h.DeleteMe)
 		authed.PUT("/device-token", h.SaveDeviceToken)
 		authed.POST("/verify-phone", h.VerifyPhone)
 	}
@@ -612,6 +613,75 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// DeleteMe permanently deactivates and soft-deletes the current account,
+// across whichever app it's called from (customer/driver/merchant all hit
+// this same endpoint — the JWT's role decides which profile row, if any,
+// gets cleaned up alongside the User). Refuses when the account is holding
+// money the platform still owes/is owed, since that must be settled first.
+// DELETE /auth/me
+func (h *Handler) DeleteMe(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var user model.User
+	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Akun tidak ditemukan"})
+		return
+	}
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", user.ID).First(&driver).Error; err == nil {
+		if driver.CodHolding > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Masih ada saldo COD di tangan, setor dulu sebelum menghapus akun"})
+			return
+		}
+	}
+
+	var wallet model.Wallet
+	if err := h.db.Where("user_id = ?", user.ID).First(&wallet).Error; err == nil {
+		if wallet.Balance > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Masih ada saldo wallet, tarik dulu sebelum menghapus akun"})
+			return
+		}
+	}
+
+	// Free up the phone/email for reuse — the unique indexes on User.Phone
+	// and User.Email are plain (not scoped to deleted_at), so a soft-deleted
+	// row still blocks a new registration with the same phone/email unless
+	// its identity fields are tombstoned first.
+	tombstone := fmt.Sprintf("deleted-%d-%s", time.Now().UnixNano(), user.ID.String())
+	updates := map[string]interface{}{
+		"is_active": false,
+		"fcm_token": "",
+		"phone":     tombstone,
+	}
+	if user.Email != "" {
+		updates["email"] = tombstone
+	}
+	if err := h.db.Model(&user).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus akun"})
+		return
+	}
+
+	h.db.Where("user_id = ?", user.ID).Delete(&model.Address{})
+	h.db.Where("user_id = ?", user.ID).Delete(&model.UserRole{})
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", user.ID).First(&merchant).Error; err == nil {
+		h.db.Model(&merchant).Update("is_active", false)
+		h.db.Delete(&merchant)
+	}
+	if driver.ID != uuid.Nil {
+		h.db.Delete(&driver)
+	}
+
+	if err := h.db.Delete(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus akun"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Akun berhasil dihapus"})
 }
 
 func (h *Handler) SaveDeviceToken(c *gin.Context) {

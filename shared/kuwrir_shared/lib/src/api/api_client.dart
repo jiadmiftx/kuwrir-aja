@@ -724,6 +724,22 @@ class ApiClient {
     return User.fromJson(data['user'] as Map<String, dynamic>);
   }
 
+  /// Permanently deactivates and soft-deletes the current account. Throws
+  /// [ApiException] (409) if the account still holds COD cash or wallet
+  /// balance that must be settled first. Callers must clear local tokens
+  /// and navigate to the login screen themselves after this succeeds.
+  Future<void> deleteAccount() async {
+    final response = await _logged(
+      'DELETE',
+      '/auth/me',
+      send: () => _sendWithRetry(
+        (headers) => _client.delete(Uri.parse('$baseUrl/auth/me'), headers: headers),
+        auth: true,
+      ),
+    );
+    _handleResponse(response);
+  }
+
   // --- Saved Addresses ---
 
   Future<List<SavedAddress>> getAddresses() async {

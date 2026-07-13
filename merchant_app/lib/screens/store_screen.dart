@@ -150,6 +150,26 @@ class _StoreScreenState extends State<StoreScreen> {
     nav.pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
+  Future<void> _deleteAccount(BuildContext context) async {
+    final confirmed = await showDeleteAccountDialog(context);
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ApiClient().deleteAccount();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus akun')),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    final nav = Navigator.of(context);
+    await ApiClient().clearTokens();
+    nav.pushNamedAndRemoveUntil('/login', (_) => false);
+  }
+
   Widget _buildBody(BuildContext context, StoreState state) {
     if (state is StoreLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -189,6 +209,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 onPickBanner: () => _pickAndUpload(isBanner: true),
                 onPickLogo: () => _pickAndUpload(isBanner: false),
                 onLogout: () => _confirmLogout(context),
+                onDeleteAccount: () => _deleteAccount(context),
               ),
             ),
             SliverPadding(
@@ -426,6 +447,7 @@ class _StoreHero extends StatelessWidget {
   final VoidCallback onPickBanner;
   final VoidCallback onPickLogo;
   final VoidCallback onLogout;
+  final VoidCallback onDeleteAccount;
 
   const _StoreHero({
     required this.merchant,
@@ -434,6 +456,7 @@ class _StoreHero extends StatelessWidget {
     required this.onPickBanner,
     required this.onPickLogo,
     required this.onLogout,
+    required this.onDeleteAccount,
   });
 
   // Banner height + how far the logo protrudes below it are fixed layout
@@ -501,11 +524,20 @@ class _StoreHero extends StatelessWidget {
                       right: 8,
                       child: SafeArea(
                         bottom: false,
-                        child: IconButton(
-                          onPressed: onLogout,
-                          icon: const Icon(Icons.logout, color: Colors.white),
+                        child: PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, color: Colors.white),
                           style: IconButton.styleFrom(backgroundColor: Colors.black26),
-                          tooltip: 'Keluar',
+                          onSelected: (value) {
+                            if (value == 'logout') onLogout();
+                            if (value == 'delete') onDeleteAccount();
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(value: 'logout', child: Text('Keluar')),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error)),
+                            ),
+                          ],
                         ),
                       ),
                     ),
