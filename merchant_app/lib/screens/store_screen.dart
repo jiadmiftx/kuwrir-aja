@@ -12,6 +12,11 @@ class StoreScreen extends StatefulWidget {
   State<StoreScreen> createState() => _StoreScreenState();
 }
 
+// Delete-account is implemented (see _deleteAccount below) but hidden from
+// the account menu for now, pending review — flip this back on when ready
+// instead of re-implementing.
+const _kShowDeleteAccount = false;
+
 class _StoreScreenState extends State<StoreScreen> {
   final _selfDeliveryFeeCtrl = TextEditingController();
   final _taxRateCtrl = TextEditingController();
@@ -533,10 +538,11 @@ class _StoreHero extends StatelessWidget {
                           },
                           itemBuilder: (ctx) => [
                             const PopupMenuItem(value: 'logout', child: Text('Keluar')),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error)),
-                            ),
+                            if (_kShowDeleteAccount)
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error)),
+                              ),
                           ],
                         ),
                       ),
