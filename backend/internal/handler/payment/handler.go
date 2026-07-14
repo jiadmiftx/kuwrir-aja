@@ -224,7 +224,7 @@ func CreditWalletsForOnlineOrder(db *gorm.DB, order model.Order) error {
 	merchantNote := fmt.Sprintf("Online payment order %s delivered", order.OrderNumber)
 	driverNote := fmt.Sprintf("Online payment earning order %s", order.OrderNumber)
 
-	if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNote); err != nil {
+	if err := service.CreditMerchantWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNote); err != nil {
 		tx.Rollback()
 		return err
 	}

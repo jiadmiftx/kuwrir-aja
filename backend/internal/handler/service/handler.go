@@ -539,7 +539,7 @@ func (h *Handler) MarkReturned(c *gin.Context) {
 	driverNotes := fmt.Sprintf("Earning service order %s", order.OrderNumber)
 
 	if order.PaymentType == "cash" {
-		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+		if err := service.CreditMerchantWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
 			return
@@ -552,7 +552,7 @@ func (h *Handler) MarkReturned(c *gin.Context) {
 		tx.Model(&model.Driver{}).Where("id = ?", driver.ID).
 			UpdateColumn("cod_holding", gorm.Expr("cod_holding + ?", order.Total))
 	} else if order.PaymentStatus == "paid" {
-		if err := service.CreditWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
+		if err := service.CreditMerchantWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNotes); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
 			return

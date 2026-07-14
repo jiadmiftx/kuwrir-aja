@@ -52,6 +52,22 @@ func CreditWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string
 	return tx.Create(&entry).Error
 }
 
+// CreditMerchantWallet credits a merchant's earnings to the wallet of the
+// account that actually owns the store — Order.MerchantID is a Merchant
+// row's own primary key, not the owning User's ID, so crediting it
+// directly (as call sites used to do) silently creates/credits a wallet
+// keyed by the wrong UUID that neither the merchant app nor the admin
+// panel ever reads (both correctly query by Merchant.UserID). Resolving
+// through this helper instead of calling CreditWallet(tx, merchantID, ...)
+// directly is what prevents that mistake from recurring at a new call site.
+func CreditMerchantWallet(tx *gorm.DB, merchantID uuid.UUID, amount float64, category string, orderID *uuid.UUID, notes string) error {
+	var merchant model.Merchant
+	if err := tx.Select("id", "user_id").First(&merchant, "id = ?", merchantID).Error; err != nil {
+		return fmt.Errorf("resolve merchant owner: %w", err)
+	}
+	return CreditWallet(tx, merchant.UserID, amount, category, orderID, notes)
+}
+
 // DebitWallet subtracts amount from a user's wallet balance and records a ledger entry.
 // Returns error if balance is insufficient. Must be called inside a DB transaction.
 func DebitWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string, orderID *uuid.UUID, notes string) error {
@@ -83,4 +99,15 @@ func DebitWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string,
 		Notes:        notes,
 	}
 	return tx.Create(&entry).Error
+}
+
+// DebitMerchantWallet is DebitWallet's counterpart to CreditMerchantWallet —
+// see that function's doc comment for why resolving through Merchant.UserID
+// matters instead of debiting Order.MerchantID directly.
+func DebitMerchantWallet(tx *gorm.DB, merchantID uuid.UUID, amount float64, category string, orderID *uuid.UUID, notes string) error {
+	var merchant model.Merchant
+	if err := tx.Select("id", "user_id").First(&merchant, "id = ?", merchantID).Error; err != nil {
+		return fmt.Errorf("resolve merchant owner: %w", err)
+	}
+	return DebitWallet(tx, merchant.UserID, amount, category, orderID, notes)
 }

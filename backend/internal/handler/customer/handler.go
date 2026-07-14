@@ -1050,7 +1050,7 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	}
 
 	creditWallets := func() error {
-		if err := service.CreditWallet(tx, *order.MerchantID, merchantCredit, "order_earning", &orderUUID, merchantNotes); err != nil {
+		if err := service.CreditMerchantWallet(tx, *order.MerchantID, merchantCredit, "order_earning", &orderUUID, merchantNotes); err != nil {
 			return err
 		}
 		if order.DriverEarning > 0 {

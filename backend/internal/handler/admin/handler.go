@@ -1631,7 +1631,7 @@ func (h *Handler) ProcessRefund(c *gin.Context) {
 				merchantCredit = order.Subtotal - order.PlatformMarkup
 			}
 			if merchantCredit > 0 {
-				_ = service.DebitWallet(tx, *order.MerchantID, merchantCredit, "refund", &orderUUID, "Refund reversal: "+order.OrderNumber)
+				_ = service.DebitMerchantWallet(tx, *order.MerchantID, merchantCredit, "refund", &orderUUID, "Refund reversal: "+order.OrderNumber)
 			}
 		}
 
