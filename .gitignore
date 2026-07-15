@@ -42,3 +42,8 @@ postgres_data/
 redis_data/
 valhalla_data/
 nominatim_data/
+
+## Signing keys
+*.jks
+*.keystore
+key.properties

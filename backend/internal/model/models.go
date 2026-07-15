@@ -97,6 +97,15 @@ type User struct {
 	// account as full "admin" access, not superadmin).
 	AdminTier string `gorm:"type:varchar(20);default:''" json:"admin_tier,omitempty"`
 
+	// NIK is the personal ID number (Kartu Tanda Penduduk) — shared identity
+	// data reused across whichever roles (driver/merchant) this account has,
+	// since it belongs to the person, not to a specific role.
+	NIK string `json:"nik,omitempty"`
+
+	// Customer Terms & Conditions acceptance, recorded at registration.
+	TermsAcceptedAt *time.Time `json:"terms_accepted_at,omitempty"`
+	TermsVersion    string     `json:"terms_version,omitempty"`
+
 	// Relations
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
 	Merchant  *Merchant `gorm:"foreignKey:UserID" json:"merchant,omitempty"`
@@ -189,6 +198,13 @@ type Merchant struct {
 	VerificationNote   string     `json:"verification_note,omitempty"`
 	VerifiedByID       *uuid.UUID `gorm:"type:uuid" json:"verified_by_id,omitempty"`
 	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
+
+	// Partnership agreement acceptance — snapshot of the exact rendered
+	// contract text the merchant agreed to, so admin can review precisely
+	// what was accepted even if the template is edited later.
+	AgreementAcceptedAt *time.Time `json:"agreement_accepted_at,omitempty"`
+	AgreementVersion    string     `json:"agreement_version,omitempty"`
+	AgreementSnapshot   string     `gorm:"type:text" json:"agreement_snapshot,omitempty"`
 
 	// Relations
 	Owner      User              `gorm:"foreignKey:UserID" json:"owner,omitempty"`
@@ -295,7 +311,8 @@ type Driver struct {
 	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
 	VehicleType    string    `gorm:"not null" json:"vehicle_type"` // "motorcycle", "bicycle"
 	VehiclePlate   string    `gorm:"not null" json:"vehicle_plate"`
-	LicenseNumber  string    `json:"license_number"`
+	LicenseNumber  string    `json:"license_number"` // Nomor SIM
+	Address        string    `json:"address,omitempty"`
 	Latitude       float64   `json:"latitude"`
 	Longitude      float64   `json:"longitude"`
 	IsOnline       bool      `gorm:"default:false" json:"is_online"`
@@ -303,6 +320,13 @@ type Driver struct {
 	Rating         float64   `gorm:"default:5.0" json:"rating"`
 	TotalDelivered int       `gorm:"default:0" json:"total_delivered"`
 	CodHolding     float64   `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
+
+	// Partnership agreement acceptance — snapshot of the exact rendered
+	// contract text the driver agreed to, so admin can review precisely
+	// what was accepted even if the template is edited later.
+	AgreementAcceptedAt *time.Time `json:"agreement_accepted_at,omitempty"`
+	AgreementVersion    string     `json:"agreement_version,omitempty"`
+	AgreementSnapshot   string     `gorm:"type:text" json:"agreement_snapshot,omitempty"`
 
 	ZoneID *uuid.UUID    `gorm:"type:uuid" json:"zone_id,omitempty"`
 	Zone   *DeliveryZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
@@ -488,12 +512,26 @@ type DriverApplication struct {
 	VehicleColor string `json:"vehicle_color"`
 	VehicleBrand string `json:"vehicle_brand"`
 
+	// Personal data needed to render the partnership agreement (Pasal
+	// PARA PIHAK) — collected as text here (not just KTP/SIM photos) so it
+	// can be filled into the contract shown before submission.
+	NIK           string `json:"nik,omitempty"`
+	LicenseNumber string `json:"license_number,omitempty"` // Nomor SIM
+	Address       string `json:"address,omitempty"`
+
 	// Document URLs (placeholder: local /uploads/, later: R2)
 	KtpURL          string `json:"ktp_url,omitempty"`           // foto KTP
 	SimURL          string `json:"sim_url,omitempty"`           // foto SIM (C/A)
 	StnkURL         string `json:"stnk_url,omitempty"`          // foto STNK
 	SelfieURL       string `json:"selfie_url,omitempty"`        // foto wajah / selfie with KTP
 	VehiclePhotoURL string `json:"vehicle_photo_url,omitempty"` // foto kendaraan
+
+	// Partnership agreement acceptance, given at the end of the onboarding
+	// wizard before submitting the application for admin review. Copied
+	// onto the created model.Driver when the application is approved.
+	AgreementAcceptedAt *time.Time `json:"agreement_accepted_at,omitempty"`
+	AgreementVersion    string     `json:"agreement_version,omitempty"`
+	AgreementSnapshot   string     `gorm:"type:text" json:"agreement_snapshot,omitempty"`
 
 	// Admin review
 	Status       string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending, approved, rejected

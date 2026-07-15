@@ -1,8 +1,7 @@
 name: kuwrir_driver
 description: KUWRIR Driver App — Deliver food and earn money
 publish_to: 'none'
-version: 1.0.0+2
-
+version: 1.0.0+4
 environment:
   sdk: ^3.11.1
 

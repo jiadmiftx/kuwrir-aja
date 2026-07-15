@@ -24,3 +24,4 @@ export 'src/theme/kuwrir_colors.dart';
 export 'src/widgets/otp_flow.dart';
 export 'src/widgets/app_lock_gate.dart';
 export 'src/widgets/delete_account_dialog.dart';
+export 'src/widgets/agreement_review_screen.dart';

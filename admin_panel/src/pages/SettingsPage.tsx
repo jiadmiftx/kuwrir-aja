@@ -38,8 +38,18 @@ const defaultSettings: Setting[] = [
   { key: 'max_cod_amount', value: '500000', label: 'Maximum COD Order Amount (IDR)' },
 ]
 
+// Shown in Syarat & Ketentuan customer dan halaman support — bukan angka,
+// jadi dirender terpisah dari Financial Configuration di atas (yang semua
+// inputnya type="number").
+const CONTACT_SETTING_KEYS = ['support_whatsapp', 'support_email', 'support_hours']
+const defaultContactSettings: Setting[] = [
+  { key: 'support_whatsapp', value: '', label: 'Nomor WhatsApp CS (mis. +6281234567890)' },
+  { key: 'support_email', value: '', label: 'Email CS Resmi' },
+  { key: 'support_hours', value: '', label: 'Jam Layanan CS' },
+]
+
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Setting[]>(defaultSettings)
+  const [settings, setSettings] = useState<Setting[]>([...defaultSettings, ...defaultContactSettings])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -131,7 +141,7 @@ export default function SettingsPage() {
                 <CardDescription>Changes apply to all new orders immediately.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {settings.map((setting) => {
+                {settings.filter((s) => !CONTACT_SETTING_KEYS.includes(s.key)).map((setting) => {
                   const isPctInput = setting.key === 'platform_markup_percentage'
                   const isFixedInput = setting.key === 'product_markup_fixed_amount'
                   const isInactive =
@@ -168,6 +178,31 @@ export default function SettingsPage() {
                     </div>
                   )
                 })}
+                <Separator />
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Kontak Layanan Pelanggan</CardTitle>
+                <CardDescription>Ditampilkan di Syarat & Ketentuan customer dan halaman support aplikasi.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {settings.filter((s) => CONTACT_SETTING_KEYS.includes(s.key)).map((setting) => (
+                  <div key={setting.key} className="space-y-2">
+                    <Label htmlFor={setting.key}>{setting.label}</Label>
+                    <Input
+                      id={setting.key}
+                      type="text"
+                      value={setting.value}
+                      onChange={(e) => updateValue(setting.key, e.target.value)}
+                    />
+                  </div>
+                ))}
                 <Separator />
                 <Button onClick={handleSave} disabled={saving} className="w-full">
                   <Save className="mr-2 h-4 w-4" />

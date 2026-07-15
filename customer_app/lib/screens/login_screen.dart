@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -13,9 +14,14 @@ class CustomerLoginScreen extends StatefulWidget {
 }
 
 class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
+  bool _agreedToTerms = false;
+
   Future<void> _handleOtpVerify(String phone, String code) async {
+    if (!_agreedToTerms) {
+      throw 'Kamu harus menyetujui Syarat & Ketentuan terlebih dahulu';
+    }
     final client = ApiClient();
-    final res = await client.verifyOtp(phone, code);
+    final res = await client.verifyOtp(phone, code, agreeTerms: true);
     if (!mounted) return;
     if (res['token'] == null) {
       throw res['error'] ?? 'Verifikasi gagal';
@@ -97,11 +103,55 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                               style: TextStyle(color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Dengan melanjutkan, kamu setuju dengan Syarat & Ketentuan serta Kebijakan Privasi Cocourir',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint, height: 1.4),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: _agreedToTerms,
+                                activeColor: KuwrirColors.primary,
+                                onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
+                              ),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(fontSize: 12, color: KuwrirColors.textHint, height: 1.4),
+                                    children: [
+                                      const TextSpan(text: 'Saya menyetujui '),
+                                      TextSpan(
+                                        text: 'Syarat & Ketentuan',
+                                        style: TextStyle(color: KuwrirColors.primary, fontWeight: FontWeight.w700),
+                                        recognizer: TapGestureRecognizer()
+                                          ..onTap = () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => AgreementReviewScreen(
+                                                    title: 'Syarat & Ketentuan',
+                                                    fetchContent: () async {
+                                                      final r = await ApiClient().get('/legal/customer-terms', auth: false);
+                                                      return r['content'] as String;
+                                                    },
+                                                    agreeButtonLabel: 'Saya Menyetujui',
+                                                    onAgree: () async {
+                                                      setState(() => _agreedToTerms = true);
+                                                      if (mounted) Navigator.pop(context);
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                      ),
+                                      const TextSpan(text: ' Cocourir'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),

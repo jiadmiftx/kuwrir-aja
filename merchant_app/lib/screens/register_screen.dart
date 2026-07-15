@@ -46,6 +46,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
   double _storeLng = 116.2833;
 
   // Dokumen
+  final _nikCtrl = TextEditingController();
   File? _ktpFile;
   File? _bizLicenseFile;
   File? _storePhotoFile;
@@ -120,7 +121,9 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         ..fields['phone'] = _storePhoneCtrl.text.trim()
         ..fields['address'] = _addressCtrl.text.trim()
         ..fields['latitude'] = _storeLat.toString()
-        ..fields['longitude'] = _storeLng.toString();
+        ..fields['longitude'] = _storeLng.toString()
+        ..fields['nik'] = _nikCtrl.text.trim()
+        ..fields['agree_terms'] = 'true';
 
       req.files.add(await http.MultipartFile.fromPath('owner_ktp', _ktpFile!.path));
       req.files.add(await http.MultipartFile.fromPath('store_photo', _storePhotoFile!.path));
@@ -158,6 +161,36 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
       digits = digits.substring(2);
     }
     return '+62$digits';
+  }
+
+  void _goToAgreement() {
+    if (_ktpFile == null || _storePhotoFile == null) {
+      _showError('KTP dan foto toko wajib diupload');
+      return;
+    }
+    if (_nikCtrl.text.trim().isEmpty) {
+      _showError('NIK wajib diisi');
+      return;
+    }
+    final query = Uri(queryParameters: {
+      'nik': _nikCtrl.text.trim(),
+      'store_name': _storeNameCtrl.text.trim(),
+      'phone': _storePhoneCtrl.text.trim(),
+      'address': _addressCtrl.text.trim(),
+    }).query;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AgreementReviewScreen(
+          title: 'Perjanjian Kemitraan Merchant',
+          fetchContent: () async {
+            final r = await ApiClient().get('/my-store/agreement/preview?$query');
+            return r['content'] as String;
+          },
+          onAgree: _submitStore,
+        ),
+      ),
+    );
   }
 
   void _showError(String msg) => ScaffoldMessenger.of(context)
@@ -393,6 +426,10 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         Text('Dokumen diperlukan untuk verifikasi toko oleh admin.',
             style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
         const SizedBox(height: 18),
+        _field(_nikCtrl, 'NIK Pemilik (sesuai KTP)', Icons.badge_outlined,
+            keyboardType: TextInputType.number,
+            validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+        const SizedBox(height: 12),
         _docTile('KTP Pemilik *', 'Foto KTP pemilik toko yang jelas', Icons.badge_outlined, _ktpFile, () => _pick('ktp')),
         _docTile('Izin Usaha (opsional)', 'SIUP / IUMK / NIB jika ada', Icons.business_center_outlined, _bizLicenseFile, () => _pick('biz')),
         _docTile('Foto Toko *', 'Foto tampak depan toko / tempat jualan', Icons.store_outlined, _storePhotoFile, () => _pick('store')),
@@ -406,7 +443,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            onPressed: _loading ? null : _submitStore,
+            onPressed: _loading ? null : _goToAgreement,
             child: _loading
                 ? const SizedBox(
                     width: 20, height: 20,

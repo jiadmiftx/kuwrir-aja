@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	customerHandler "github.com/kuwrir-platform/backend/internal/handler/customer"
 	driverregHandler "github.com/kuwrir-platform/backend/internal/handler/driverreg"
 	kasirHandler "github.com/kuwrir-platform/backend/internal/handler/kasir"
+	"github.com/kuwrir-platform/backend/internal/legal"
 	merchantHandler "github.com/kuwrir-platform/backend/internal/handler/merchant"
 	paymentHandler "github.com/kuwrir-platform/backend/internal/handler/payment"
 	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
@@ -185,6 +187,7 @@ func main() {
 		adminH := adminHandler.NewHandler(db, cfg)
 		v1.GET("/promotions/active", adminH.PublicActivePromotions)
 		v1.GET("/banners/active", adminH.PublicActiveBanners)
+		v1.GET("/legal/customer-terms", getCustomerTerms(db))
 
 		// Protected routes (auth required)
 		protected := v1.Group("")
@@ -305,6 +308,26 @@ func normalizeLegacyPhones(db *gorm.DB) {
 	}
 }
 
+// getCustomerTerms renders the customer Syarat & Ketentuan with the
+// admin-configured support contact (support_whatsapp/support_email/support_hours
+// SystemSetting rows) filled in — public, no auth, so it can be shown before
+// registration and linked from the landing page.
+func getCustomerTerms(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		settingValue := func(key string) string {
+			var s model.SystemSetting
+			db.Where("key = ?", key).First(&s)
+			return s.Value
+		}
+		content := legal.RenderCustomerTerms(legal.ContactInfo{
+			WhatsApp: settingValue("support_whatsapp"),
+			Email:    settingValue("support_email"),
+			Hours:    settingValue("support_hours"),
+		})
+		c.JSON(http.StatusOK, gin.H{"content": content, "version": legal.CurrentVersion})
+	}
+}
+
 // seedSettings inserts default configurable settings if they don't exist
 func seedSettings(db *gorm.DB) {
 	defaults := []model.SystemSetting{
@@ -327,6 +350,10 @@ func seedSettings(db *gorm.DB) {
 		// Order guardrails
 		{Key: "min_order_amount", Value: "0", Label: "Minimum Order Amount (IDR, 0 = no minimum)"},
 		{Key: "max_cod_amount", Value: "500000", Label: "Maximum COD Order Amount (IDR)"},
+		// Customer support contact — shown in Syarat & Ketentuan and app support screens
+		{Key: "support_whatsapp", Value: "", Label: "Nomor WhatsApp CS (mis. +6281234567890)"},
+		{Key: "support_email", Value: "", Label: "Email CS Resmi"},
+		{Key: "support_hours", Value: "Setiap hari, 08.00–21.00 WIB", Label: "Jam Layanan CS"},
 	}
 
 	for _, setting := range defaults {

@@ -691,12 +691,15 @@ class ApiClient {
 
   /// [role] only matters for auto-registering a brand-new phone number
   /// (merchant_app/driver_app pass their own role; customer_app leaves it
-  /// null and defaults to customer).
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code, {String? role}) async {
+  /// null and defaults to customer). [agreeTerms] is required when this call
+  /// ends up auto-registering a brand-new customer account — the backend
+  /// rejects with `requires_terms: true` otherwise.
+  Future<Map<String, dynamic>> verifyOtp(String phone, String code, {String? role, bool agreeTerms = false}) async {
     return await post('/auth/otp/verify', {
       'phone': phone,
       'code': code,
       if (role != null) 'role': role,
+      'agree_terms': agreeTerms,
     });
   }
 

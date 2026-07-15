@@ -26,6 +26,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   final _yearCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
   final _brandCtrl = TextEditingController();
+  final _nikCtrl = TextEditingController();
+  final _simNumberCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
 
   String _vehicleType = 'motorcycle';
   bool _loading = false;
@@ -108,7 +111,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         ..fields['vehicle_plate'] = _plateCtrl.text.trim().toUpperCase()
         ..fields['vehicle_year'] = _yearCtrl.text.trim()
         ..fields['vehicle_color'] = _colorCtrl.text.trim()
-        ..fields['vehicle_brand'] = _brandCtrl.text.trim();
+        ..fields['vehicle_brand'] = _brandCtrl.text.trim()
+        ..fields['nik'] = _nikCtrl.text.trim()
+        ..fields['license_number'] = _simNumberCtrl.text.trim()
+        ..fields['address'] = _addressCtrl.text.trim();
 
       final docs = {
         'ktp': _ktpFile!,
@@ -129,7 +135,23 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       if (res.statusCode == 200 || res.statusCode == 201) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const DriverPendingScreen()),
+          MaterialPageRoute(
+            builder: (_) => AgreementReviewScreen(
+              title: 'Perjanjian Kemitraan Driver',
+              fetchContent: () async {
+                final r = await ApiClient().get('/driver/agreement/preview');
+                return r['content'] as String;
+              },
+              onAgree: () async {
+                await ApiClient().post('/driver/agreement/accept', {});
+                if (!mounted) return;
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverPendingScreen()),
+                );
+              },
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -149,6 +171,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   void dispose() {
     _plateCtrl.dispose(); _yearCtrl.dispose();
     _colorCtrl.dispose(); _brandCtrl.dispose();
+    _nikCtrl.dispose(); _simNumberCtrl.dispose(); _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -205,6 +228,29 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               const SizedBox(height: 12),
               _field(_yearCtrl, 'Tahun Kendaraan', Icons.calendar_today_outlined,
                   keyboardType: TextInputType.number),
+              const SizedBox(height: 24),
+
+              // Personal data — needed to fill in the partnership agreement shown
+              // at the end of this wizard.
+              Text(
+                'DATA DIRI (UNTUK PERJANJIAN KEMITRAAN)',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: KuwrirColors.textHint,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _field(_nikCtrl, 'NIK (sesuai KTP)', Icons.badge_outlined,
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              const SizedBox(height: 12),
+              _field(_simNumberCtrl, 'Nomor SIM', Icons.card_membership_outlined,
+                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              const SizedBox(height: 12),
+              _field(_addressCtrl, 'Alamat Domisili', Icons.home_outlined,
+                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
               const SizedBox(height: 24),
 
               // Documents

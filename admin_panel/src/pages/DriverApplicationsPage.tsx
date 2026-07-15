@@ -30,6 +30,11 @@ interface Application {
   stnk_url: string
   selfie_url: string
   vehicle_photo_url: string
+  nik?: string
+  license_number?: string
+  address?: string
+  agreement_accepted_at?: string | null
+  agreement_snapshot?: string
   review_note: string
   reviewed_at: string | null
   created_at: string
@@ -74,6 +79,7 @@ export default function DriverApplicationsPage() {
   const [selected, setSelected] = useState<Application | null>(null)
   const [reviewNote, setReviewNote] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [showAgreement, setShowAgreement] = useState(false)
 
   const fetchApplications = async (status: string) => {
     setLoading(true)
@@ -253,6 +259,9 @@ export default function DriverApplicationsPage() {
                 <div><span className="text-muted-foreground">Plat: </span><strong>{selected.vehicle_plate}</strong></div>
                 <div><span className="text-muted-foreground">Jenis: </span><span className="capitalize">{selected.vehicle_type}</span></div>
                 <div><span className="text-muted-foreground">Kendaraan: </span>{selected.vehicle_brand} {selected.vehicle_color} {selected.vehicle_year > 0 ? selected.vehicle_year : ''}</div>
+                <div><span className="text-muted-foreground">NIK: </span>{selected.nik || '-'}</div>
+                <div><span className="text-muted-foreground">No. SIM: </span>{selected.license_number || '-'}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Alamat: </span>{selected.address || '-'}</div>
               </div>
 
               {/* Documents */}
@@ -265,6 +274,25 @@ export default function DriverApplicationsPage() {
                   <DocImage url={selected.selfie_url} label="Selfie + KTP" />
                   <DocImage url={selected.vehicle_photo_url} label="Foto Kendaraan" />
                 </div>
+              </div>
+
+              {/* Partnership agreement */}
+              <div className="space-y-1">
+                <p className="text-sm font-semibold">Perjanjian Kemitraan</p>
+                {selected.agreement_accepted_at ? (
+                  <div className="flex items-center justify-between rounded border bg-green-50 px-3 py-2">
+                    <span className="text-xs text-green-800">
+                      Disetujui pada {fmtDate(selected.agreement_accepted_at)}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setShowAgreement(true)}>
+                      <FileText className="h-3.5 w-3.5 mr-1.5" /> Lihat Dokumen
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded border-2 border-dashed px-3 py-2 text-xs text-muted-foreground">
+                    Belum menyetujui perjanjian kemitraan
+                  </div>
+                )}
               </div>
 
               {/* Review note */}
@@ -314,6 +342,18 @@ export default function DriverApplicationsPage() {
               </>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Signed agreement snapshot */}
+      <Dialog open={showAgreement} onOpenChange={setShowAgreement}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Perjanjian Kemitraan Driver — {selected?.user?.name}</DialogTitle>
+          </DialogHeader>
+          <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans">
+            {selected?.agreement_snapshot || 'Dokumen tidak tersedia'}
+          </pre>
         </DialogContent>
       </Dialog>
     </div>

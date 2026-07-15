@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/kuwrir-platform/backend/internal/config"
+	"github.com/kuwrir-platform/backend/internal/legal"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/service"
@@ -58,11 +59,12 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 // --- Request / Response DTOs ---
 
 type RegisterRequest struct {
-	Name     string     `json:"name" binding:"required"`
-	Email    string     `json:"email" binding:"required,email"`
-	Phone    string     `json:"phone" binding:"required"`
-	Password string     `json:"password" binding:"required,min=6"`
-	Role     model.Role `json:"role" binding:"required,oneof=customer driver merchant"`
+	Name       string     `json:"name" binding:"required"`
+	Email      string     `json:"email" binding:"required,email"`
+	Phone      string     `json:"phone" binding:"required"`
+	Password   string     `json:"password" binding:"required,min=6"`
+	Role       model.Role `json:"role" binding:"required,oneof=customer driver merchant"`
+	AgreeTerms bool       `json:"agree_terms"` // customer role only — driver/merchant agree to their own partnership agreement during onboarding instead
 }
 
 type LoginRequest struct {
@@ -82,6 +84,11 @@ type VerifyOTPRequest struct {
 	// defaults to customer. For an already-existing phone, this role is
 	// attached to that account if it doesn't have it yet (see VerifyOTP).
 	Role model.Role `json:"role"`
+	// AgreeTerms is required when this OTP verify auto-registers a brand-new
+	// customer account (unknown phone, role empty/customer) — customer_app's
+	// only account-creation path is OTP, so this is where T&C consent has to
+	// be captured, not a separate /auth/register call.
+	AgreeTerms bool `json:"agree_terms"`
 }
 
 type AuthResponse struct {
@@ -165,6 +172,11 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 	req.Phone = normalizePhone(req.Phone)
 
+	if req.Role == model.RoleCustomer && !req.AgreeTerms {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Anda harus menyetujui Syarat & Ketentuan"})
+		return
+	}
+
 	var existingUser model.User
 	if err := h.db.Where("phone = ?", req.Phone).First(&existingUser).Error; err == nil {
 		if err := bcrypt.CompareHashAndPassword([]byte(existingUser.Password), []byte(req.Password)); err != nil {
@@ -178,6 +190,13 @@ func (h *Handler) Register(c *gin.Context) {
 		if err := h.attachRole(existingUser.ID, req.Role); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to attach role"})
 			return
+		}
+		if req.Role == model.RoleCustomer {
+			now := time.Now()
+			h.db.Model(&existingUser).Updates(map[string]interface{}{
+				"terms_accepted_at": now,
+				"terms_version":     legal.CurrentVersion,
+			})
 		}
 
 		token, refreshToken, err := h.generateTokens(existingUser, req.Role)
@@ -218,6 +237,11 @@ func (h *Handler) Register(c *gin.Context) {
 		Password: string(hashedPassword),
 		Role:     req.Role,
 		IsActive: isActive,
+	}
+	if req.Role == model.RoleCustomer {
+		now := time.Now()
+		user.TermsAcceptedAt = &now
+		user.TermsVersion = legal.CurrentVersion
 	}
 
 	if err := h.db.Create(&user).Error; err != nil {
@@ -448,6 +472,10 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		if role == "" {
 			role = model.RoleCustomer
 		}
+		if role == model.RoleCustomer && !req.AgreeTerms {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Anda harus menyetujui Syarat & Ketentuan", "requires_terms": true})
+			return
+		}
 		fakePassword, _ := bcrypt.GenerateFromPassword([]byte(uuid.New().String()), bcrypt.DefaultCost)
 		user = model.User{
 			Phone:           req.Phone,
@@ -455,6 +483,10 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 			Role:            role,
 			IsActive:        true,
 			PhoneVerifiedAt: &now,
+		}
+		if role == model.RoleCustomer {
+			user.TermsAcceptedAt = &now
+			user.TermsVersion = legal.CurrentVersion
 		}
 		if err := h.db.Create(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create account"})

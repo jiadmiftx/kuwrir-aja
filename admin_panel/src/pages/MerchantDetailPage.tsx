@@ -7,7 +7,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, MapPin, Star, Loader2, Wallet, Package } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ArrowLeft, MapPin, Star, Loader2, Wallet, Package, FileText } from 'lucide-react'
 
 import { apiFetch as api } from '@/lib/api'
 import { DeleteUserAccountButton } from '@/components/DeleteUserAccountButton'
@@ -75,6 +76,8 @@ interface Merchant {
   owner_ktp_url?: string
   business_license_url?: string
   store_photo_url?: string
+  agreement_accepted_at?: string | null
+  agreement_snapshot?: string
 }
 
 interface WalletTransaction {
@@ -159,6 +162,7 @@ export default function MerchantDetailPage() {
   const [data, setData] = useState<MerchantDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showAgreement, setShowAgreement] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -251,8 +255,37 @@ export default function MerchantDetailPage() {
             <DocImage url={m.store_photo_url} label="Foto Toko" />
             <DocImage url={m.business_license_url} label="Izin Usaha" />
           </div>
+
+          <div className="mt-4 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Perjanjian Kemitraan</p>
+            {m.agreement_accepted_at ? (
+              <div className="flex items-center justify-between rounded border bg-green-50 px-3 py-2">
+                <span className="text-xs text-green-800">
+                  Disetujui pada {fmtDateTime(m.agreement_accepted_at)}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setShowAgreement(true)}>
+                  <FileText className="h-3.5 w-3.5 mr-1.5" /> Lihat Dokumen
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded border-2 border-dashed px-3 py-2 text-xs text-muted-foreground">
+                Belum menyetujui perjanjian kemitraan
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showAgreement} onOpenChange={setShowAgreement}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Perjanjian Kemitraan Merchant — {m.name}</DialogTitle>
+          </DialogHeader>
+          <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans">
+            {m.agreement_snapshot || 'Dokumen tidak tersedia'}
+          </pre>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="ringkasan">
         <TabsList>

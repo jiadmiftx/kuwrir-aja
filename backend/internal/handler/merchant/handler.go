@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/kuwrir-platform/backend/internal/legal"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/pricing"
 	"github.com/kuwrir-platform/backend/internal/upload"
@@ -89,6 +90,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 	owner := protected.Group("/my-store")
 	{
 		owner.POST("", h.CreateMerchant)          // register + submit docs (multipart)
+		owner.GET("/agreement/preview", h.PreviewAgreement)
 		owner.GET("/status", h.GetMerchantStatus) // cek status verifikasi
 		owner.GET("", h.GetMyMerchant)
 		owner.PUT("", h.UpdateMyMerchant)
@@ -135,6 +137,8 @@ type CreateMerchantRequest struct {
 	Address     string  `json:"address" binding:"required"`
 	Latitude    float64 `json:"latitude" binding:"required"`
 	Longitude   float64 `json:"longitude" binding:"required"`
+	NIK         string  `json:"nik"`
+	AgreeTerms  bool    `json:"agree_terms"`
 }
 
 type UpdateMerchantRequest struct {
@@ -479,8 +483,9 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 	uid, _ := uuid.Parse(userID)
 
 	// Support both multipart and JSON
-	var name, description, phone, address string
+	var name, description, phone, address, nik string
 	var lat, lng float64
+	agreeTerms := false
 
 	ct := c.ContentType()
 	if strings.Contains(ct, "multipart") {
@@ -491,6 +496,8 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		address = c.PostForm("address")
 		lat = parseFloat(c.PostForm("latitude"))
 		lng = parseFloat(c.PostForm("longitude"))
+		nik = c.PostForm("nik")
+		agreeTerms = c.PostForm("agree_terms") == "true"
 	} else {
 		var req CreateMerchantRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -503,10 +510,16 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		address = req.Address
 		lat = req.Latitude
 		lng = req.Longitude
+		nik = req.NIK
+		agreeTerms = req.AgreeTerms
 	}
 
 	if name == "" || phone == "" || address == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name, phone, and address are required"})
+		return
+	}
+	if !agreeTerms {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Anda harus menyetujui Perjanjian Kemitraan Merchant"})
 		return
 	}
 
@@ -526,28 +539,45 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		slug = slug + "-" + uid.String()[:8]
 	}
 
+	var owner model.User
+	h.db.Select("name").First(&owner, "id = ?", userID)
+	agreementText := legal.RenderMerchantAgreement(legal.MerchantSignerData{
+		OwnerName: owner.Name,
+		NIK:       nik,
+		StoreName: name,
+		Phone:     phone,
+		Address:   address,
+	})
+	now := time.Now()
+
 	merchant := model.Merchant{
-		UserID:             uid,
-		Name:               name,
-		Slug:               slug,
-		Description:        description,
-		Phone:              phone,
-		Address:            address,
-		Latitude:           lat,
-		Longitude:          lng,
-		IsActive:           false, // inactive until admin approves
-		IsVerified:         false,
-		IsOpen:             false,
-		OwnerKtpURL:        ownerKtpURL,
-		BusinessLicenseURL: bizLicenseURL,
-		StorePhotoURL:      storePhotoURL,
-		VerificationStatus: "pending",
+		UserID:              uid,
+		Name:                name,
+		Slug:                slug,
+		Description:         description,
+		Phone:               phone,
+		Address:             address,
+		Latitude:            lat,
+		Longitude:           lng,
+		IsActive:            false, // inactive until admin approves
+		IsVerified:          false,
+		IsOpen:              false,
+		OwnerKtpURL:         ownerKtpURL,
+		BusinessLicenseURL:  bizLicenseURL,
+		StorePhotoURL:       storePhotoURL,
+		VerificationStatus:  "pending",
+		AgreementAcceptedAt: &now,
+		AgreementVersion:    legal.CurrentVersion,
+		AgreementSnapshot:   agreementText,
 	}
 
 	if err := h.db.Create(&merchant).Error; err != nil {
 		log.Printf("CreateMerchant: db.Create failed for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create merchant"})
 		return
+	}
+	if nik != "" {
+		h.db.Model(&model.User{}).Where("id = ?", userID).Update("nik", nik)
 	}
 
 	h.autoAssignZone(&merchant)
@@ -556,6 +586,25 @@ func (h *Handler) CreateMerchant(c *gin.Context) {
 		"merchant": merchant,
 		"message":  "Store registered. Admin will review within 1-2 business days.",
 	})
+}
+
+// PreviewAgreement renders the partnership agreement with the not-yet-submitted
+// registration data the user has entered so far, so the app can show a finished
+// contract before the "Setuju & Daftar" step. Query params: nik, store_name,
+// phone, address (owner name is read from the account).
+func (h *Handler) PreviewAgreement(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var owner model.User
+	h.db.Select("name").First(&owner, "id = ?", userID)
+
+	content := legal.RenderMerchantAgreement(legal.MerchantSignerData{
+		OwnerName: owner.Name,
+		NIK:       c.Query("nik"),
+		StoreName: c.Query("store_name"),
+		Phone:     c.Query("phone"),
+		Address:   c.Query("address"),
+	})
+	c.JSON(http.StatusOK, gin.H{"content": content, "version": legal.CurrentVersion})
 }
 
 // GetMerchantStatus returns merchant verification status for the pending screen.

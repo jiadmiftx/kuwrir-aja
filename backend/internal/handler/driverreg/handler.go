@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/kuwrir-platform/backend/internal/legal"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/upload"
 )
@@ -30,6 +31,8 @@ func (h *Handler) RegisterPublicRoutes(_ *gin.RouterGroup) {}
 func (h *Handler) RegisterProtectedRoutes(r *gin.RouterGroup) {
 	r.POST("/driver/apply", h.SubmitApplication)
 	r.GET("/driver/application", h.GetApplicationStatus)
+	r.GET("/driver/agreement/preview", h.PreviewAgreement)
+	r.POST("/driver/agreement/accept", h.AcceptAgreement)
 }
 
 // ─── Driver application endpoints ────────────────────────────────────────────
@@ -85,6 +88,9 @@ func (h *Handler) SubmitApplication(c *gin.Context) {
 			VehicleYear:     vehicleYear,
 			VehicleColor:    c.PostForm("vehicle_color"),
 			VehicleBrand:    c.PostForm("vehicle_brand"),
+			NIK:             c.PostForm("nik"),
+			LicenseNumber:   c.PostForm("license_number"),
+			Address:         c.PostForm("address"),
 			KtpURL:          ktpURL,
 			SimURL:          simURL,
 			StnkURL:         stnkURL,
@@ -110,6 +116,9 @@ func (h *Handler) SubmitApplication(c *gin.Context) {
 		"vehicle_year":   vehicleYear,
 		"vehicle_color":  c.PostForm("vehicle_color"),
 		"vehicle_brand":  c.PostForm("vehicle_brand"),
+		"nik":            c.PostForm("nik"),
+		"license_number": c.PostForm("license_number"),
+		"address":        c.PostForm("address"),
 		"status":         "pending",
 		"review_note":    "",
 		"reviewed_by_id": nil,
@@ -158,6 +167,65 @@ func (h *Handler) GetApplicationStatus(c *gin.Context) {
 		"application": app,
 		"is_active":   user.IsActive,
 	})
+}
+
+// PreviewAgreement renders the partnership agreement with the driver's own
+// application data filled in, so the app can show it before the final
+// "Saya Menyetujui" step.
+func (h *Handler) PreviewAgreement(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var app model.DriverApplication
+	if h.db.Where("user_id = ?", userID).First(&app).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lengkapi data kendaraan & dokumen terlebih dahulu"})
+		return
+	}
+	var user model.User
+	h.db.Select("name", "phone").First(&user, "id = ?", userID)
+
+	content := legal.RenderDriverAgreement(legal.DriverSignerData{
+		FullName:     user.Name,
+		NIK:          app.NIK,
+		LicenseNo:    app.LicenseNumber,
+		VehiclePlate: app.VehiclePlate,
+		Phone:        user.Phone,
+		Address:      app.Address,
+	})
+	c.JSON(http.StatusOK, gin.H{"content": content, "version": legal.CurrentVersion})
+}
+
+// AcceptAgreement records the driver's consent to the partnership agreement,
+// snapshotting the exact rendered text so admin can review precisely what
+// was agreed even if the template is edited later.
+func (h *Handler) AcceptAgreement(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var app model.DriverApplication
+	if h.db.Where("user_id = ?", userID).First(&app).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lengkapi data kendaraan & dokumen terlebih dahulu"})
+		return
+	}
+	var user model.User
+	h.db.Select("id", "name", "phone").First(&user, "id = ?", userID)
+
+	content := legal.RenderDriverAgreement(legal.DriverSignerData{
+		FullName:     user.Name,
+		NIK:          app.NIK,
+		LicenseNo:    app.LicenseNumber,
+		VehiclePlate: app.VehiclePlate,
+		Phone:        user.Phone,
+		Address:      app.Address,
+	})
+	now := time.Now()
+	h.db.Model(&app).Updates(map[string]interface{}{
+		"agreement_accepted_at": now,
+		"agreement_version":     legal.CurrentVersion,
+		"agreement_snapshot":    content,
+	})
+	if app.NIK != "" {
+		h.db.Model(&model.User{}).Where("id = ?", userID).Update("nik", app.NIK)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Persetujuan tersimpan", "accepted_at": now})
 }
 
 // ─── Admin review handlers (registered via admin handler) ────────────────────
@@ -222,14 +290,22 @@ func ReviewDriverApplication(db *gorm.DB) gin.HandlerFunc {
 			var existing model.Driver
 			if tx.Where("user_id = ?", app.UserID).First(&existing).Error != nil {
 				driver := model.Driver{
-					UserID:       app.UserID,
-					VehicleType:  app.VehicleType,
-					VehiclePlate: app.VehiclePlate,
-					IsOnline:     false,
-					IsAvailable:  true,
-					Rating:       5.0,
+					UserID:              app.UserID,
+					VehicleType:         app.VehicleType,
+					VehiclePlate:        app.VehiclePlate,
+					LicenseNumber:       app.LicenseNumber,
+					Address:             app.Address,
+					IsOnline:            false,
+					IsAvailable:         true,
+					Rating:              5.0,
+					AgreementAcceptedAt: app.AgreementAcceptedAt,
+					AgreementVersion:    app.AgreementVersion,
+					AgreementSnapshot:   app.AgreementSnapshot,
 				}
 				tx.Create(&driver)
+			}
+			if app.NIK != "" {
+				tx.Model(&model.User{}).Where("id = ?", app.UserID).Update("nik", app.NIK)
 			}
 		}
 
