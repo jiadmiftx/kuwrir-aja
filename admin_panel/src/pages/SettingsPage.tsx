@@ -209,57 +209,6 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Kontak Layanan Pelanggan</CardTitle>
-                <CardDescription>Ditampilkan di Syarat & Ketentuan customer dan halaman support aplikasi.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {settings.filter((s) => CONTACT_SETTING_KEYS.includes(s.key)).map((setting) => (
-                  <div key={setting.key} className="space-y-2">
-                    <Label htmlFor={setting.key}>{setting.label}</Label>
-                    <Input
-                      id={setting.key}
-                      type="text"
-                      value={setting.value}
-                      onChange={(e) => updateValue(setting.key, e.target.value)}
-                    />
-                  </div>
-                ))}
-                <Separator />
-                <Button onClick={handleSave} disabled={saving} className="w-full">
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? 'Saving...' : 'Save Settings'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Gateway (Duitku)</CardTitle>
-                <CardDescription>Override env-var defaults tanpa redeploy. Kosongkan field untuk memakai nilai default.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {settings.filter((s) => PAYMENT_SETTING_KEYS.includes(s.key)).map((setting) => (
-                  <div key={setting.key} className="space-y-2">
-                    <Label htmlFor={setting.key}>{setting.label}</Label>
-                    <Input
-                      id={setting.key}
-                      type={setting.key === 'duitku_api_key' ? 'password' : 'text'}
-                      placeholder={setting.key === 'duitku_api_key' ? apiKeyPlaceholder : undefined}
-                      value={setting.value}
-                      onChange={(e) => updateValue(setting.key, e.target.value)}
-                    />
-                  </div>
-                ))}
-                <Separator />
-                <Button onClick={handleSave} disabled={saving} className="w-full">
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? 'Saving...' : 'Save Settings'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
                 <CardTitle>Live Calculation Preview</CardTitle>
                 <CardDescription>Example: food base IDR 50,000 inside zone</CardDescription>
               </CardHeader>
@@ -323,6 +272,57 @@ export default function SettingsPage() {
                   <span>→ Platform Ujrah Delivery ({selfDeliverComm}%)</span>
                   <span>IDR {selfDeliverCommAmt.toLocaleString('id-ID')}</span>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Kontak Layanan Pelanggan</CardTitle>
+                <CardDescription>Ditampilkan di Syarat & Ketentuan customer dan halaman support aplikasi.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {settings.filter((s) => CONTACT_SETTING_KEYS.includes(s.key)).map((setting) => (
+                  <div key={setting.key} className="space-y-2">
+                    <Label htmlFor={setting.key}>{setting.label}</Label>
+                    <Input
+                      id={setting.key}
+                      type="text"
+                      value={setting.value}
+                      onChange={(e) => updateValue(setting.key, e.target.value)}
+                    />
+                  </div>
+                ))}
+                <Separator />
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Gateway (Duitku)</CardTitle>
+                <CardDescription>Override env-var defaults tanpa redeploy. Kosongkan field untuk memakai nilai default.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {settings.filter((s) => PAYMENT_SETTING_KEYS.includes(s.key)).map((setting) => (
+                  <div key={setting.key} className="space-y-2">
+                    <Label htmlFor={setting.key}>{setting.label}</Label>
+                    <Input
+                      id={setting.key}
+                      type={setting.key === 'duitku_api_key' ? 'password' : 'text'}
+                      placeholder={setting.key === 'duitku_api_key' ? apiKeyPlaceholder : undefined}
+                      value={setting.value}
+                      onChange={(e) => updateValue(setting.key, e.target.value)}
+                    />
+                  </div>
+                ))}
+                <Separator />
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
               </CardContent>
             </Card>
           </div>
