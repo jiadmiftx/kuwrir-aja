@@ -778,6 +778,7 @@ type AuditLog struct {
 	ActorRole  string    `gorm:"type:varchar(20);index" json:"actor_role"`
 	Method     string    `gorm:"type:varchar(10)" json:"method"`
 	Path       string    `gorm:"type:varchar(255);index" json:"path"`
+	Fitur      string    `gorm:"type:varchar(100);index" json:"fitur"` // derived from Path by middleware.DeriveFeature, e.g. "Produk", "Pesanan"
 	StatusCode int       `json:"status_code"`
 	IPAddress  string    `gorm:"type:varchar(64)" json:"ip_address"`
 }

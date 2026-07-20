@@ -188,6 +188,7 @@ func AuditLogMiddleware(db *gorm.DB) gin.HandlerFunc {
 				ActorRole:  role,
 				Method:     c.Request.Method,
 				Path:       path,
+				Fitur:      DeriveFeature(path),
 				StatusCode: status,
 				IPAddress:  ip,
 			})

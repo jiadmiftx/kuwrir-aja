@@ -32,6 +32,9 @@ func (h *Handler) GetAuditLogs(c *gin.Context) {
 	if actorID := c.Query("actor_id"); actorID != "" {
 		q = q.Where("actor_id = ?", actorID)
 	}
+	if fitur := c.Query("fitur"); fitur != "" {
+		q = q.Where("fitur = ?", fitur)
+	}
 
 	var total int64
 	q.Count(&total)

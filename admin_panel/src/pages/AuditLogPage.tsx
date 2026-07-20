@@ -20,6 +20,7 @@ interface AuditLog {
   actor_role: string
   method: string
   path: string
+  fitur: string
   status_code: number
   ip_address: string
 }
@@ -30,6 +31,53 @@ const ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: 'merchant', label: 'Merchant' },
   { value: 'driver', label: 'Driver' },
   { value: 'admin', label: 'Admin' },
+]
+
+// Mirrors the labels produced by backend middleware.DeriveFeature
+// (internal/middleware/audit_feature.go) — kept in sync manually since the
+// set of features changes rarely.
+const FITUR_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'Semua Fitur' },
+  { value: 'Akun Pengguna', label: 'Akun Pengguna' },
+  { value: 'Alamat', label: 'Alamat' },
+  { value: 'Admin', label: 'Admin' },
+  { value: 'Audit Log', label: 'Audit Log' },
+  { value: 'Autentikasi', label: 'Autentikasi' },
+  { value: 'Banner', label: 'Banner' },
+  { value: 'Banner Toko', label: 'Banner Toko' },
+  { value: 'Customer', label: 'Customer' },
+  { value: 'Dashboard', label: 'Dashboard' },
+  { value: 'Dashboard Toko', label: 'Dashboard Toko' },
+  { value: 'Dompet', label: 'Dompet' },
+  { value: 'Driver', label: 'Driver' },
+  { value: 'Kasir (POS)', label: 'Kasir (POS)' },
+  { value: 'Kategori Makanan', label: 'Kategori Makanan' },
+  { value: 'Kategori Toko', label: 'Kategori Toko' },
+  { value: 'Laporan Pendapatan', label: 'Laporan Pendapatan' },
+  { value: 'Logo Toko', label: 'Logo Toko' },
+  { value: 'Merchant', label: 'Merchant' },
+  { value: 'Operasional Toko', label: 'Operasional Toko' },
+  { value: 'Order Jasa', label: 'Order Jasa' },
+  { value: 'Pembayaran', label: 'Pembayaran' },
+  { value: 'Pendaftaran Driver', label: 'Pendaftaran Driver' },
+  { value: 'Pengajuan Driver', label: 'Pengajuan Driver' },
+  { value: 'Pengaturan', label: 'Pengaturan' },
+  { value: 'Pengiriman Toko', label: 'Pengiriman Toko' },
+  { value: 'Penarikan Dana', label: 'Penarikan Dana' },
+  { value: 'Perjanjian Kemitraan', label: 'Perjanjian Kemitraan' },
+  { value: 'Pesanan', label: 'Pesanan' },
+  { value: 'Pesanan Driver', label: 'Pesanan Driver' },
+  { value: 'Pesanan Toko', label: 'Pesanan Toko' },
+  { value: 'Produk', label: 'Produk' },
+  { value: 'Promosi', label: 'Promosi' },
+  { value: 'Refund', label: 'Refund' },
+  { value: 'Setoran COD', label: 'Setoran COD' },
+  { value: 'Settlement', label: 'Settlement' },
+  { value: 'Status Driver', label: 'Status Driver' },
+  { value: 'Support / CS', label: 'Support / CS' },
+  { value: 'Varian Produk', label: 'Varian Produk' },
+  { value: 'WhatsApp Gateway', label: 'WhatsApp Gateway' },
+  { value: 'Zona Pengiriman', label: 'Zona Pengiriman' },
 ]
 
 const LIMIT = 50
@@ -56,17 +104,19 @@ function statusBadgeClass(status: number): string {
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [role, setRole] = useState('all')
+  const [fitur, setFitur] = useState('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
-  const fetchLogs = useCallback(async (targetPage: number, roleFilter: string, append: boolean) => {
+  const fetchLogs = useCallback(async (targetPage: number, roleFilter: string, fiturFilter: string, append: boolean) => {
     if (append) setIsLoadingMore(true)
     else setIsLoading(true)
     try {
       const params = new URLSearchParams({ page: String(targetPage), limit: String(LIMIT) })
       if (roleFilter !== 'all') params.set('role', roleFilter)
+      if (fiturFilter !== 'all') params.set('fitur', fiturFilter)
       const res = await api(`/api/v1/admin/audit-logs?${params.toString()}`)
       const data = await res.json()
       if (res.ok) {
@@ -83,16 +133,21 @@ export default function AuditLogPage() {
   }, [])
 
   useEffect(() => {
-    fetchLogs(1, role, false)
-  }, [role, fetchLogs])
+    fetchLogs(1, role, fitur, false)
+  }, [role, fitur, fetchLogs])
 
   const handleRoleChange = (val: string | null) => {
     if (val === null) return
     setRole(val)
   }
 
+  const handleFiturChange = (val: string | null) => {
+    if (val === null) return
+    setFitur(val)
+  }
+
   const loadMore = () => {
-    fetchLogs(page + 1, role, true)
+    fetchLogs(page + 1, role, fitur, true)
   }
 
   const hasMore = logs.length < total
@@ -115,16 +170,28 @@ export default function AuditLogPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle>Riwayat Aktivitas</CardTitle>
-            <Select items={Object.fromEntries(ROLE_OPTIONS.map(o => [o.value, o.label]))} value={role} onValueChange={handleRoleChange}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Filter role" />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLE_OPTIONS.map(o => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select items={Object.fromEntries(FITUR_OPTIONS.map(o => [o.value, o.label]))} value={fitur} onValueChange={handleFiturChange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter fitur" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FITUR_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select items={Object.fromEntries(ROLE_OPTIONS.map(o => [o.value, o.label]))} value={role} onValueChange={handleRoleChange}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Filter role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -133,6 +200,7 @@ export default function AuditLogPage() {
               <TableRow>
                 <TableHead>Waktu</TableHead>
                 <TableHead>Actor</TableHead>
+                <TableHead>Fitur</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Path</TableHead>
                 <TableHead>Status</TableHead>
@@ -141,11 +209,11 @@ export default function AuditLogPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8">
+                <TableRow><TableCell colSpan={7} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                 </TableCell></TableRow>
               ) : logs.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada aktivitas tercatat</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada aktivitas tercatat</TableCell></TableRow>
               ) : logs.map(log => (
                 <TableRow key={log.id}>
                   <TableCell className="text-sm whitespace-nowrap">
@@ -154,6 +222,9 @@ export default function AuditLogPage() {
                   <TableCell>
                     <div className="font-medium">{log.actor_name || '-'}</div>
                     <Badge variant="outline" className="text-xs mt-0.5">{log.actor_role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">{log.fitur || '-'}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={methodBadgeClass(log.method)}>{log.method}</Badge>
