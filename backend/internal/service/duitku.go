@@ -152,3 +152,37 @@ func (d *DuitkuClient) Disburse(ref, bankCode, accountNumber, accountName string
 	}
 	return &result, nil
 }
+
+// CheckDisbursementStatus polls Duitku for the current state of a
+// disbursement that was previously reported as PENDING/processing, so a
+// "processing" WithdrawalRequest can eventually be resolved to
+// success/failed instead of sitting undebited forever. There is no
+// disbursement webhook wired into this integration, so this is called
+// either by an admin action or by the periodic reconciliation sweeper
+// (see cmd/server's runWithdrawalReconciliation).
+func (d *DuitkuClient) CheckDisbursementStatus(ref string) (*DuitkuDisbursementResponse, error) {
+	timestamp := fmt.Sprintf("%d", time.Now().UnixMilli())
+	raw := fmt.Sprintf("%s%s%s%s", d.MerchantCode, ref, timestamp, d.APIKey)
+	sig := fmt.Sprintf("%x", md5.Sum([]byte(raw)))
+
+	payload := map[string]string{
+		"userId":          d.MerchantCode,
+		"disbursementRef": ref,
+		"timestamp":       timestamp,
+		"signature":       sig,
+	}
+
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(d.BaseURL+"/api/merchant/v2/disbursement/status", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("duitku disbursement status request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+	var result DuitkuDisbursementResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("duitku disbursement status parse: %w", err)
+	}
+	return &result, nil
+}

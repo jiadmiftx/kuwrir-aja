@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../cubits/wallet_cubit.dart';
 
 const _bankCodes = ['BCA', 'BNI', 'BRI', 'MANDIRI', 'CIMB', 'PERMATA'];
+const _topupMethods = {'VC': 'Virtual Account', 'QRIS': 'QRIS', 'OV': 'OVO'};
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -13,15 +14,118 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    context.read<MerchantWalletCubit>().load();
+    WidgetsBinding.instance.addObserver(this);
+    context.read<CustomerWalletCubit>().load();
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0)
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh when the customer comes back from paying (browser/app switch)
+    // after a top-up — the wallet only updates once Duitku's webhook lands.
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<CustomerWalletCubit>().load();
+    }
+  }
+
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
       .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+
+  Future<void> _openTopupSheet() async {
+    final amountCtrl = TextEditingController();
+    String method = _topupMethods.keys.first;
+    String? error;
+    bool submitting = false;
+
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20, right: 20, top: 20,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Top Up Wallet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Jumlah (Rp)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: method,
+                decoration: const InputDecoration(labelText: 'Metode Pembayaran', border: OutlineInputBorder()),
+                items: _topupMethods.entries
+                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => setSheetState(() => method = v ?? method),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!, style: TextStyle(color: KuwrirColors.error, fontSize: 13)),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 50,
+                child: FilledButton(
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                          if (amount <= 0) {
+                            setSheetState(() => error = 'Jumlah tidak valid');
+                            return;
+                          }
+                          setSheetState(() {
+                            submitting = true;
+                            error = null;
+                          });
+                          try {
+                            final url = await context
+                                .read<CustomerWalletCubit>()
+                                .topup(amount: amount, paymentMethod: method);
+                            final uri = Uri.parse(url);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                            if (sheetContext.mounted) Navigator.pop(sheetContext);
+                          } catch (e) {
+                            setSheetState(() {
+                              submitting = false;
+                              error = e is ApiException ? e.message : '$e';
+                            });
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Lanjutkan Pembayaran'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _openBankAccountSheet(Map<String, dynamic>? existing) async {
     final numberCtrl = TextEditingController(text: existing?['account_number'] as String? ?? '');
@@ -83,7 +187,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             error = null;
                           });
                           try {
-                            await context.read<MerchantWalletCubit>().saveBankAccount(
+                            await context.read<CustomerWalletCubit>().saveBankAccount(
                                   bankCode: bankCode,
                                   accountNumber: numberCtrl.text.trim(),
                                   accountName: nameCtrl.text.trim(),
@@ -111,14 +215,11 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _openWithdrawSheet(double balance) async {
-    final saved = context.read<MerchantWalletCubit>().bankAccount;
-    final prefs = await SharedPreferences.getInstance();
+    final saved = context.read<CustomerWalletCubit>().bankAccount;
     final amountCtrl = TextEditingController();
-    final accountNumberCtrl = TextEditingController(
-        text: saved?['account_number'] as String? ?? prefs.getString('wd_account_number'));
-    final accountNameCtrl = TextEditingController(
-        text: saved?['account_name'] as String? ?? prefs.getString('wd_account_name'));
-    String bankCode = (saved?['bank_code'] as String?) ?? prefs.getString('wd_bank_code') ?? _bankCodes.first;
+    final accountNumberCtrl = TextEditingController(text: saved?['account_number'] as String? ?? '');
+    final accountNameCtrl = TextEditingController(text: saved?['account_name'] as String? ?? '');
+    String bankCode = (saved?['bank_code'] as String?) ?? _bankCodes.first;
     String? error;
     bool submitting = false;
 
@@ -192,15 +293,12 @@ class _WalletScreenState extends State<WalletScreen> {
                             error = null;
                           });
                           try {
-                            await context.read<MerchantWalletCubit>().withdraw(
+                            await context.read<CustomerWalletCubit>().withdraw(
                                   amount: amount,
                                   bankCode: bankCode,
                                   bankAccountNumber: accountNumberCtrl.text.trim(),
                                   bankAccountName: accountNameCtrl.text.trim(),
                                 );
-                            await prefs.setString('wd_bank_code', bankCode);
-                            await prefs.setString('wd_account_number', accountNumberCtrl.text.trim());
-                            await prefs.setString('wd_account_name', accountNameCtrl.text.trim());
                             if (sheetContext.mounted) Navigator.pop(sheetContext);
                           } catch (e) {
                             setSheetState(() {
@@ -225,25 +323,22 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<MerchantWalletCubit, MerchantWalletState>(
+    return BlocBuilder<CustomerWalletCubit, CustomerWalletState>(
       builder: (context, state) {
         return Scaffold(
           backgroundColor: KuwrirColors.background,
-          appBar: AppBar(
-            title: const Text('Keuangan'),
-            backgroundColor: KuwrirColors.background,
-          ),
+          appBar: AppBar(title: const Text('Wallet Kuwrir'), backgroundColor: KuwrirColors.background),
           body: _buildBody(context, state),
         );
       },
     );
   }
 
-  Widget _buildBody(BuildContext context, MerchantWalletState state) {
-    if (state is MerchantWalletLoading) {
+  Widget _buildBody(BuildContext context, CustomerWalletState state) {
+    if (state is CustomerWalletLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (state is MerchantWalletError) {
+    if (state is CustomerWalletError) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -251,7 +346,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
             const SizedBox(height: 12),
             TextButton(
-              onPressed: () => context.read<MerchantWalletCubit>().load(),
+              onPressed: () => context.read<CustomerWalletCubit>().load(),
               child: const Text('Coba lagi'),
             ),
           ],
@@ -259,9 +354,9 @@ class _WalletScreenState extends State<WalletScreen> {
       );
     }
 
-    final s = state as MerchantWalletLoaded;
+    final s = state as CustomerWalletLoaded;
     return RefreshIndicator(
-      onRefresh: () => context.read<MerchantWalletCubit>().load(),
+      onRefresh: () => context.read<CustomerWalletCubit>().load(),
       color: KuwrirColors.primary,
       child: ListView(
         padding: const EdgeInsets.all(20),
@@ -275,7 +370,7 @@ class _WalletScreenState extends State<WalletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Saldo Tersedia', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const Text('Saldo Wallet', style: TextStyle(color: Colors.white70, fontSize: 13)),
                 const SizedBox(height: 4),
                 Text('Rp ${_fmt(s.wallet.balance)}',
                     style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
@@ -283,44 +378,34 @@ class _WalletScreenState extends State<WalletScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Total Pendapatan', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                          Text('Rp ${_fmt(s.wallet.totalEarned)}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                        ],
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: KuwrirColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _openTopupSheet,
+                        child: const Text('Top Up'),
                       ),
                     ),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Total Ditarik', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                          Text('Rp ${_fmt(s.wallet.totalWithdrawn)}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                        ],
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: s.wallet.balance > 0 ? () => _openWithdrawSheet(s.wallet.balance) : null,
+                        child: const Text('Tarik Dana'),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: KuwrirColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: s.wallet.balance > 0 ? () => _openWithdrawSheet(s.wallet.balance) : null,
-                    child: const Text('Tarik Dana'),
-                  ),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -337,8 +422,8 @@ class _WalletScreenState extends State<WalletScreen> {
                       Text('Rekening Bank', style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
                       const SizedBox(height: 4),
                       Text(
-                        context.read<MerchantWalletCubit>().bankAccount != null
-                            ? '${context.read<MerchantWalletCubit>().bankAccount!['bank_code']} — ${context.read<MerchantWalletCubit>().bankAccount!['account_number']}'
+                        context.read<CustomerWalletCubit>().bankAccount != null
+                            ? '${context.read<CustomerWalletCubit>().bankAccount!['bank_code']} — ${context.read<CustomerWalletCubit>().bankAccount!['account_number']}'
                             : 'Belum ada rekening tersimpan',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                       ),
@@ -346,13 +431,13 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _openBankAccountSheet(context.read<MerchantWalletCubit>().bankAccount),
+                  onPressed: () => _openBankAccountSheet(context.read<CustomerWalletCubit>().bankAccount),
                   child: const Text('Edit'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
           Text('RIWAYAT TRANSAKSI',
               style: TextStyle(
                   fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
@@ -377,16 +462,16 @@ class _TransactionTile extends StatelessWidget {
 
   String _categoryLabel(String category) {
     switch (category) {
-      case 'order_earning':
-        return 'Pendapatan Pesanan';
+      case 'order_payment':
+        return 'Bayar Pesanan';
+      case 'topup':
+        return 'Top Up';
       case 'withdrawal':
         return 'Penarikan Dana';
       case 'refund':
         return 'Refund';
       case 'adjustment':
         return 'Penyesuaian';
-      case 'cod_deposit':
-        return 'Setoran COD';
       default:
         return category;
     }

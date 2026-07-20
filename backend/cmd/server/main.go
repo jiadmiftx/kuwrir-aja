@@ -27,6 +27,8 @@ import (
 	paymentHandler "github.com/kuwrir-platform/backend/internal/handler/payment"
 	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
 	supportHandler "github.com/kuwrir-platform/backend/internal/handler/support"
+	bankaccountHandler "github.com/kuwrir-platform/backend/internal/handler/bankaccount"
+	customerwalletHandler "github.com/kuwrir-platform/backend/internal/handler/customerwallet"
 	walletHandler "github.com/kuwrir-platform/backend/internal/handler/wallet"
 	"github.com/kuwrir-platform/backend/internal/middleware"
 	"github.com/kuwrir-platform/backend/internal/model"
@@ -91,6 +93,8 @@ func main() {
 		&model.Wallet{},
 		&model.WalletTransaction{},
 		&model.WithdrawalRequest{},
+		&model.BankAccount{},
+		&model.WalletTopupRequest{},
 		// Delivery zones (city reference points for pricing)
 		&model.DeliveryZone{},
 		// Refund requests
@@ -147,6 +151,14 @@ func main() {
 	// up to R2 once a month before anything ages out. No cron library in
 	// this backend — a daily ticker is simple enough for a once-a-day job.
 	go runAuditLogMaintenance(db)
+
+	// Auto-cancel + refund paid online orders the merchant never
+	// accepted/rejected within their confirmation SLA.
+	go service.RunOrderSLASweeper(db)
+
+	// Resolve withdrawals Duitku left in "processing" (no disbursement
+	// webhook exists — see service.RunWithdrawalReconciliation).
+	go service.RunWithdrawalReconciliation(db, cfg)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -275,6 +287,16 @@ func main() {
 			wH := walletHandler.NewHandler(db, cfg)
 			wH.RegisterDriverRoutes(driverRoutes)
 			wH.RegisterMerchantRoutes(merchOwnerRoutes)
+
+			// Wallet — customer (balance, transactions, withdraw, top-up)
+			custWalletH := customerwalletHandler.NewHandler(db, cfg)
+			custWalletH.RegisterRoutes(custRoutes)
+
+			// Saved bank account (payout destination) — role-agnostic
+			bankH := bankaccountHandler.NewHandler(db)
+			bankH.RegisterRoutes(custRoutes)
+			bankH.RegisterRoutes(driverRoutes)
+			bankH.RegisterRoutes(merchOwnerRoutes)
 		}
 	}
 
@@ -354,6 +376,13 @@ func seedSettings(db *gorm.DB) {
 		{Key: "support_whatsapp", Value: "", Label: "Nomor WhatsApp CS (mis. +6281234567890)"},
 		{Key: "support_email", Value: "", Label: "Email CS Resmi"},
 		{Key: "support_hours", Value: "Setiap hari, 08.00–21.00 WIB", Label: "Jam Layanan CS"},
+		// Duitku payment gateway — blank means "use env var default" (see
+		// service.LoadDuitkuClient). Set here to override without a redeploy.
+		{Key: "duitku_merchant_code", Value: "", Label: "Duitku Merchant Code"},
+		{Key: "duitku_api_key", Value: "", Label: "Duitku API Key"},
+		{Key: "duitku_base_url", Value: "", Label: "Duitku Base URL (kosongkan untuk default sandbox)"},
+		{Key: "duitku_callback_url", Value: "", Label: "Duitku Callback URL"},
+		{Key: "duitku_return_url", Value: "", Label: "Duitku Return URL"},
 	}
 
 	for _, setting := range defaults {

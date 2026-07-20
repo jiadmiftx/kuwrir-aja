@@ -626,6 +626,100 @@ class ApiClient {
     return await get('/my-store/dashboard-summary');
   }
 
+  // --- Driver wallet ---
+
+  Future<List<WalletTransaction>> getDriverWalletTransactions() async {
+    final data = await get('/driver/wallet/transactions');
+    final list = data['transactions'] as List<dynamic>? ?? [];
+    return list.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+  }
+
+  Future<Map<String, dynamic>> withdrawDriver({
+    required double amount,
+    String bankCode = '',
+    String bankAccountNumber = '',
+    String bankAccountName = '',
+  }) async {
+    return await post('/driver/wallet/withdraw', {
+      'amount': amount,
+      'bank_code': bankCode,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
+    });
+  }
+
+  Future<Map<String, dynamic>> depositDriverCOD({
+    required double amount,
+    String method = 'cash',
+    String reference = '',
+  }) async {
+    return await post('/driver/cod/deposit', {
+      'amount': amount,
+      'method': method,
+      'reference': reference,
+    });
+  }
+
+  // --- Customer wallet ---
+
+  Future<Wallet> getCustomerWallet() async {
+    final data = await get('/customer/wallet');
+    return Wallet.fromJson(data['wallet'] as Map<String, dynamic>);
+  }
+
+  Future<List<WalletTransaction>> getCustomerWalletTransactions() async {
+    final data = await get('/customer/wallet/transactions');
+    final list = data['transactions'] as List<dynamic>? ?? [];
+    return list.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+  }
+
+  Future<Map<String, dynamic>> withdrawCustomer({
+    required double amount,
+    String bankCode = '',
+    String bankAccountNumber = '',
+    String bankAccountName = '',
+  }) async {
+    return await post('/customer/wallet/withdraw', {
+      'amount': amount,
+      'bank_code': bankCode,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
+    });
+  }
+
+  Future<Map<String, dynamic>> topupCustomerWallet({
+    required double amount,
+    required String paymentMethod,
+  }) async {
+    return await post('/customer/wallet/topup', {
+      'amount': amount,
+      'payment_method': paymentMethod,
+    });
+  }
+
+  // --- Saved bank account (customer/driver/merchant, role-agnostic) ---
+
+  Future<Map<String, dynamic>?> getBankAccount() async {
+    try {
+      return await get('/me/bank-account');
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> saveBankAccount({
+    required String bankCode,
+    required String accountNumber,
+    required String accountName,
+  }) async {
+    return await put('/me/bank-account', {
+      'bank_code': bankCode,
+      'account_number': accountNumber,
+      'account_name': accountName,
+    });
+  }
+
   // --- Chat ---
 
   Future<List<Map<String, dynamic>>> getOrderChat(String orderId) async {

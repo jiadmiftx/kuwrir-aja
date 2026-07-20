@@ -153,6 +153,15 @@ func (h *Handler) GetCustomerDetail(c *gin.Context) {
 	refunds := []model.RefundRequest{}
 	h.db.Where("requested_by = ?", id).Order("created_at DESC").Limit(detailRecentLimit).Find(&refunds)
 
+	var wallet model.Wallet
+	walletTxns := []model.WalletTransaction{}
+	if h.db.Where("user_id = ?", id).First(&wallet).Error == nil {
+		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
+	}
+
+	var bankAccount model.BankAccount
+	hasBankAccount := h.db.Where("user_id = ?", id).First(&bankAccount).Error == nil
+
 	c.JSON(http.StatusOK, gin.H{
 		"customer":     customer,
 		"addresses":    addresses,
@@ -160,5 +169,16 @@ func (h *Handler) GetCustomerDetail(c *gin.Context) {
 		"total_orders": totalOrders,
 		"total_spent":  totalSpent,
 		"refunds":      refunds,
+		"wallet": gin.H{
+			"balance":      wallet.Balance,
+			"total_earned": wallet.TotalEarned,
+			"transactions": walletTxns,
+		},
+		"bank_account": func() interface{} {
+			if hasBankAccount {
+				return bankAccount
+			}
+			return nil
+		}(),
 	})
 }

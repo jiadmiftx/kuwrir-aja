@@ -10,6 +10,7 @@ import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
 import 'cubits/job_board_cubit.dart';
 import 'cubits/active_delivery_cubit.dart';
+import 'cubits/wallet_cubit.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/pending_screen.dart';
@@ -39,6 +40,7 @@ void main() async {
           providers: [
             BlocProvider(create: (_) => JobBoardCubit(apiClient)),
             BlocProvider(create: (_) => ActiveDeliveryCubit(apiClient)),
+            BlocProvider(create: (_) => DriverWalletCubit(apiClient)),
           ],
           child: const KuwrirDriverApp(),
         ),

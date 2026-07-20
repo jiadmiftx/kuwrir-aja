@@ -39,11 +39,23 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   OrderQuote? _quote;
   String? _quoteError;
   bool _loadingQuote = true;
+  String _paymentType = 'cash';
+  double? _walletBalance;
 
   @override
   void initState() {
     super.initState();
     _loadQuote();
+    _loadWalletBalance();
+  }
+
+  Future<void> _loadWalletBalance() async {
+    try {
+      final wallet = await context.read<ApiClient>().getCustomerWallet();
+      if (mounted) setState(() => _walletBalance = wallet.balance);
+    } catch (_) {
+      // Wallet balance is a nice-to-have on this screen — silently skip.
+    }
   }
 
   Future<void> _loadQuote() async {
@@ -72,7 +84,13 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     }
   }
 
+  bool get _walletInsufficient =>
+      _paymentType == 'wallet' &&
+      _quote != null &&
+      (_walletBalance ?? 0) < _quote!.total;
+
   void _confirmOrder() {
+    if (_walletInsufficient) return;
     context.read<OrderCubit>().placeOrder(
       merchantId: widget.merchantId,
       items: widget.items,
@@ -81,7 +99,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       dropoffLng: widget.dropoffLng,
       receiverName: widget.receiverName,
       receiverPhone: widget.receiverPhone,
-      paymentType: 'cash',
+      paymentType: _paymentType,
       notes: widget.notes,
     );
   }
@@ -198,34 +216,23 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             const SizedBox(height: 24),
             _SectionLabel('Metode Pembayaran'),
             const SizedBox(height: 10),
-            _SoftPanel(
-              child: Row(
-                children: [
-                  const _PanelIcon(Icons.payments_outlined),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Cash (COD)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14.5,
-                          ),
-                        ),
-                        Text(
-                          'Bayar tunai ke driver saat pesanan tiba',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: KuwrirColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            _PaymentMethodOption(
+              icon: Icons.payments_outlined,
+              title: 'Cash (COD)',
+              subtitle: 'Bayar tunai ke driver saat pesanan tiba',
+              selected: _paymentType == 'cash',
+              onTap: () => setState(() => _paymentType = 'cash'),
+            ),
+            const SizedBox(height: 10),
+            _PaymentMethodOption(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Wallet Kuwrir',
+              subtitle: _walletBalance != null
+                  ? 'Saldo: Rp ${_fmt(_walletBalance!)}'
+                  : 'Memuat saldo...',
+              selected: _paymentType == 'wallet',
+              onTap: () => setState(() => _paymentType = 'wallet'),
+              error: _walletInsufficient ? 'Saldo wallet tidak cukup' : null,
             ),
             const SizedBox(height: 24),
             _SectionLabel('Rincian Biaya'),
@@ -303,7 +310,8 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         bottomNavigationBar: BlocBuilder<OrderCubit, OrderState>(
           builder: (context, state) {
             final placing = state is OrderPlacing;
-            final canConfirm = !_loadingQuote && _quote != null && !placing;
+            final canConfirm =
+                !_loadingQuote && _quote != null && !placing && !_walletInsufficient;
             return Container(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -373,6 +381,78 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
         color: KuwrirColors.textHint,
+      ),
+    );
+  }
+}
+
+class _PaymentMethodOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+  final String? error;
+
+  const _PaymentMethodOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+    this.error,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: KuwrirColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? KuwrirColors.primary : KuwrirColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            _PanelIcon(icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                  Text(
+                    error ?? subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: error != null
+                          ? KuwrirColors.error
+                          : KuwrirColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected ? KuwrirColors.primary : KuwrirColors.textHint,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }

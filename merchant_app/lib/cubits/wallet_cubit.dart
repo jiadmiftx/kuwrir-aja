@@ -18,6 +18,7 @@ class MerchantWalletError extends MerchantWalletState {
 
 class MerchantWalletCubit extends Cubit<MerchantWalletState> {
   final ApiClient _api;
+  Map<String, dynamic>? bankAccount;
 
   MerchantWalletCubit(this._api) : super(MerchantWalletLoading());
 
@@ -26,12 +27,27 @@ class MerchantWalletCubit extends Cubit<MerchantWalletState> {
     try {
       final wallet = await _api.getMerchantWallet();
       final transactions = await _api.getMerchantWalletTransactions();
+      bankAccount = await _api.getBankAccount();
       emit(MerchantWalletLoaded(wallet, transactions));
     } on ApiException catch (e) {
       emit(MerchantWalletError(e.message));
     } catch (_) {
       emit(MerchantWalletError('Gagal memuat saldo'));
     }
+  }
+
+  Future<void> saveBankAccount({
+    required String bankCode,
+    required String accountNumber,
+    required String accountName,
+  }) async {
+    bankAccount = await _api.saveBankAccount(
+      bankCode: bankCode,
+      accountNumber: accountNumber,
+      accountName: accountName,
+    );
+    final current = state;
+    if (current is MerchantWalletLoaded) emit(MerchantWalletLoaded(current.wallet, current.transactions));
   }
 
   /// Throws ApiException on failure so the calling form can show the exact

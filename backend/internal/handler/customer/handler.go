@@ -636,15 +636,37 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		order.ZoneID = &result.SelectedZone.ID
 	}
 
-	if err := h.db.Create(&order).Error; err != nil {
+	if paymentType == "wallet" {
+		deadline := now.Add(5 * time.Minute)
+		order.PaymentStatus = "paid"
+		order.ConfirmationDeadline = &deadline
+	}
+
+	tx := h.db.Begin()
+	if err := tx.Create(&order).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
 		return
 	}
 
 	// Deduct stock now that the order actually exists.
 	for _, d := range result.StockDeductions {
-		h.db.Model(&model.Product{}).Where("id = ?", d.Product.ID).
+		tx.Model(&model.Product{}).Where("id = ?", d.Product.ID).
 			Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
+	}
+
+	if paymentType == "wallet" {
+		notes := fmt.Sprintf("Payment for order %s", order.OrderNumber)
+		if err := service.DebitWallet(tx, customerUUID, order.Total, "order_payment", &order.ID, notes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient wallet balance"})
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		return
 	}
 
 	// Notify merchant owner about new order
@@ -728,11 +750,11 @@ func (h *Handler) CancelOrder(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
-	h.db.Model(&order).Updates(map[string]interface{}{
-		"status":       model.OrderStatusCancelled,
-		"cancelled_at": &now,
-	})
+	reason := fmt.Sprintf("Order cancelled by customer: %s", order.OrderNumber)
+	if err := service.CancelOrderAndRefund(h.db, &order, reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order cancelled"})
 }
@@ -752,6 +774,7 @@ func (h *RestaurantOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		orders.GET("", h.ActiveOrders)
 		orders.POST("/:id/accept", h.AcceptOrder)
+		orders.POST("/:id/reject", h.RejectOrder)
 		orders.POST("/:id/preparing", h.MarkPreparing)
 		orders.POST("/:id/ready", h.MarkReady)
 	}
@@ -768,13 +791,13 @@ func (h *RestaurantOrderHandler) ActiveOrders(c *gin.Context) {
 	}
 
 	var orders []model.Order
-	h.db.Where("merchant_id = ? AND status IN ?", merchant.ID,
+	h.db.Where("merchant_id = ? AND status IN ? AND (payment_type = ? OR payment_status = ?)", merchant.ID,
 		[]string{
 			string(model.OrderStatusPending),
 			string(model.OrderStatusConfirmed),
 			string(model.OrderStatusPreparing),
 			string(model.OrderStatusReady),
-		}).
+		}, "cash", "paid").
 		Preload("Customer").
 		Preload("Items").
 		Order("created_at ASC").
@@ -786,6 +809,54 @@ func (h *RestaurantOrderHandler) ActiveOrders(c *gin.Context) {
 // AcceptOrder transitions: pending → confirmed
 func (h *RestaurantOrderHandler) AcceptOrder(c *gin.Context) {
 	h.transitionOrder(c, model.OrderStatusPending, model.OrderStatusConfirmed, "confirmed_at")
+}
+
+// RejectOrder cancels an order the merchant won't fulfill. If the order was
+// already paid (online or wallet payment), the customer is instantly
+// refunded to their wallet — see service.CancelOrderAndRefund.
+func (h *RestaurantOrderHandler) RejectOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	userID := c.GetString("user_id")
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ? AND status = ?",
+		orderID, merchant.ID, model.OrderStatusPending).First(&order).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or not pending"})
+		return
+	}
+	if !order.IsAwaitingMerchantAction() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order payment not yet completed"})
+		return
+	}
+
+	reason := req.Reason
+	if reason == "" {
+		reason = fmt.Sprintf("Order rejected by merchant: %s", order.OrderNumber)
+	}
+	if err := service.CancelOrderAndRefund(h.db, &order, reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject order"})
+		return
+	}
+
+	if order.CustomerID != nil {
+		service.SendToUser(h.db, *order.CustomerID,
+			"Pesanan Ditolak",
+			fmt.Sprintf("Order #%s ditolak merchant. Dana dikembalikan ke wallet kamu.", order.OrderNumber),
+			map[string]string{"order_id": order.ID.String(), "type": "order_status"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order rejected", "status": model.OrderStatusCancelled})
 }
 
 // MarkPreparing transitions: confirmed → preparing
@@ -812,6 +883,10 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 	if err := h.db.Where("id = ? AND merchant_id = ? AND status = ?",
 		orderID, merchant.ID, from).First(&order).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Order not found or not in '%s' status", from)})
+		return
+	}
+	if from == model.OrderStatusPending && !order.IsAwaitingMerchantAction() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order payment not yet completed"})
 		return
 	}
 

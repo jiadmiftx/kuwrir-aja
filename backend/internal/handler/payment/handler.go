@@ -3,6 +3,7 @@ package payment
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,21 +16,19 @@ import (
 )
 
 type Handler struct {
-	db     *gorm.DB
-	duitku *service.DuitkuClient
+	db  *gorm.DB
+	cfg *config.Config
 }
 
 func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
-	return &Handler{
-		db: db,
-		duitku: &service.DuitkuClient{
-			MerchantCode: cfg.Duitku.MerchantCode,
-			APIKey:       cfg.Duitku.APIKey,
-			BaseURL:      cfg.Duitku.BaseURL,
-			CallbackURL:  cfg.Duitku.CallbackURL,
-			ReturnURL:    cfg.Duitku.ReturnURL,
-		},
-	}
+	return &Handler{db: db, cfg: cfg}
+}
+
+// duitku builds a client from the current admin-configured settings
+// (falling back to env defaults) on every call, so a key rotation via the
+// admin panel takes effect without a redeploy — see service.LoadDuitkuClient.
+func (h *Handler) duitku() *service.DuitkuClient {
+	return service.LoadDuitkuClient(h.db, h.cfg)
 }
 
 func (h *Handler) RegisterRoutes(public *gin.RouterGroup, customer *gin.RouterGroup, debugMode bool) {
@@ -94,7 +93,7 @@ func (h *Handler) CreatePayment(c *gin.Context) {
 	amountIDR := int64(order.Total)
 	productDesc := fmt.Sprintf("Kuwrir Order %s", order.OrderNumber)
 
-	result, err := h.duitku.CreatePayment(order.ID.String(), order.OrderNumber, amountIDR, customerName, email, req.PaymentMethod, productDesc)
+	result, err := h.duitku().CreatePayment(order.ID.String(), order.OrderNumber, amountIDR, customerName, email, req.PaymentMethod, productDesc)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Payment gateway error: " + err.Error()})
 		return
@@ -152,8 +151,14 @@ func (h *Handler) Callback(c *gin.Context) {
 		return
 	}
 
-	if !h.duitku.VerifyCallbackSignature(payload.Amount, payload.MerchantOrderID, payload.Signature) {
+	if !h.duitku().VerifyCallbackSignature(payload.Amount, payload.MerchantOrderID, payload.Signature) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid signature"})
+		return
+	}
+
+	if strings.HasPrefix(payload.MerchantOrderID, "TOPUP-") {
+		h.handleTopupCallback(payload.MerchantOrderID, payload.ResultCode)
+		c.String(http.StatusOK, "OK")
 		return
 	}
 
@@ -164,13 +169,47 @@ func (h *Handler) Callback(c *gin.Context) {
 	}
 
 	if payload.ResultCode == "00" {
-		h.db.Model(&order).Update("payment_status", "paid")
+		deadline := time.Now().Add(5 * time.Minute)
+		h.db.Model(&order).Updates(map[string]interface{}{
+			"payment_status":        "paid",
+			"confirmation_deadline": &deadline,
+		})
 	} else {
 		h.db.Model(&order).Update("payment_status", "failed")
 	}
 
 	// Duitku expects plain "OK" text response
 	c.String(http.StatusOK, "OK")
+}
+
+// handleTopupCallback credits a customer's wallet once a wallet top-up
+// payment succeeds. Uses the same signature verification as order
+// payments (Callback) — only the routing (by "TOPUP-" prefix) differs.
+func (h *Handler) handleTopupCallback(merchantOrderID, resultCode string) {
+	var topup model.WalletTopupRequest
+	if err := h.db.Where("merchant_order_id = ?", merchantOrderID).First(&topup).Error; err != nil {
+		return
+	}
+	if topup.Status != "pending" {
+		return
+	}
+
+	if resultCode != "00" {
+		h.db.Model(&topup).Update("status", "failed")
+		return
+	}
+
+	tx := h.db.Begin()
+	if err := tx.Model(&topup).Update("status", "paid").Error; err != nil {
+		tx.Rollback()
+		return
+	}
+	notes := fmt.Sprintf("Wallet top-up %s", merchantOrderID)
+	if err := service.CreditWallet(tx, topup.UserID, topup.Amount, "topup", nil, notes); err != nil {
+		tx.Rollback()
+		return
+	}
+	tx.Commit()
 }
 
 // SimulatePaid marks an order as paid without calling Duitku.
@@ -193,9 +232,11 @@ func (h *Handler) SimulatePaid(c *gin.Context) {
 		return
 	}
 
+	deadline := time.Now().Add(5 * time.Minute)
 	h.db.Model(&order).Updates(map[string]interface{}{
-		"payment_status": "paid",
-		"payment_ref":    fmt.Sprintf("SIM-%s", order.OrderNumber),
+		"payment_status":        "paid",
+		"payment_ref":           fmt.Sprintf("SIM-%s", order.OrderNumber),
+		"confirmation_deadline": &deadline,
 	})
 
 	c.JSON(http.StatusOK, gin.H{

@@ -80,6 +80,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 
 	// Wallet & withdrawals
 	r.GET("/withdrawals", h.GetWithdrawals)
+	r.POST("/withdrawals/:id/check-status", h.CheckWithdrawalStatus)
 	r.GET("/drivers/:id/cod-holding", h.GetDriverCODHolding)
 	r.POST("/drivers/:id/cod-deposit", h.AdminConfirmCODDeposit)
 
@@ -179,7 +180,7 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 
 	var pendingDriverCash float64
 	h.db.Model(&model.Driver{}).
-		Select("COALESCE(SUM(cash_balance), 0)").
+		Select("COALESCE(SUM(cod_holding), 0)").
 		Scan(&pendingDriverCash)
 
 	var pendingMerchants int64
@@ -213,11 +214,34 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 
+// secretSettingKeys are never returned in plaintext by GetSettings — the
+// masked value acts as a sentinel: submitting it back unchanged (or blank)
+// via UpdateSetting is treated as "leave as-is", not "clear the secret".
+var secretSettingKeys = map[string]bool{
+	"duitku_api_key": true,
+}
+
+// maskSecret shows only the last 4 characters, e.g. "••••••••ab12".
+func maskSecret(s string) string {
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 4 {
+		return "••••"
+	}
+	return "••••••••" + s[len(s)-4:]
+}
+
 func (h *Handler) GetSettings(c *gin.Context) {
 	var settings []model.SystemSetting
 	if err := h.db.Find(&settings).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch settings"})
 		return
+	}
+	for i := range settings {
+		if secretSettingKeys[settings[i].Key] {
+			settings[i].Value = maskSecret(settings[i].Value)
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"settings": settings})
 }
@@ -225,12 +249,26 @@ func (h *Handler) GetSettings(c *gin.Context) {
 func (h *Handler) UpdateSetting(c *gin.Context) {
 	key := c.Param("key")
 	var req struct {
-		Value string `json:"value" binding:"required"`
+		Value string `json:"value"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	if secretSettingKeys[key] {
+		// Blank, or the mask echoed back unchanged, means "keep existing value".
+		var existing model.SystemSetting
+		h.db.Where("key = ?", key).First(&existing)
+		if req.Value == "" || req.Value == maskSecret(existing.Value) {
+			c.JSON(http.StatusOK, gin.H{"message": "Setting unchanged"})
+			return
+		}
+	} else if req.Value == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "value is required"})
+		return
+	}
+
 	result := h.db.Model(&model.SystemSetting{}).Where("key = ?", key).Update("value", req.Value)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update setting"})
@@ -438,7 +476,7 @@ func (h *Handler) CreateDriverDeposit(c *gin.Context) {
 	}
 	// Deduct from driver cash balance
 	tx.Model(&model.Driver{}).Where("id = ?", driver.ID).
-		UpdateColumn("cash_balance", gorm.Expr("cash_balance - ?", req.Amount))
+		UpdateColumn("cod_holding", gorm.Expr("cod_holding - ?", req.Amount))
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit deposit"})
 		return
@@ -538,7 +576,7 @@ func (h *Handler) BulkDeleteOrders(c *gin.Context) {
 // GetSettlements returns platform-level financial summary
 func (h *Handler) GetSettlements(c *gin.Context) {
 	var totalDriverCash float64
-	h.db.Model(&model.Driver{}).Select("COALESCE(SUM(cash_balance), 0)").Scan(&totalDriverCash)
+	h.db.Model(&model.Driver{}).Select("COALESCE(SUM(cod_holding), 0)").Scan(&totalDriverCash)
 
 	var totalPlatformRevenue float64
 	h.db.Model(&model.Order{}).Where("status = ?", "delivered").
@@ -1084,6 +1122,33 @@ func (h *Handler) GetWithdrawals(c *gin.Context) {
 	}
 	q.Order("created_at DESC").Find(&requests)
 	c.JSON(http.StatusOK, gin.H{"withdrawals": requests})
+}
+
+// CheckWithdrawalStatus polls Duitku for a still-"processing" withdrawal
+// and resolves it immediately, instead of waiting for the periodic
+// reconciliation sweeper (service.RunWithdrawalReconciliation) — useful
+// when an admin wants to confirm a payout landed right now.
+func (h *Handler) CheckWithdrawalStatus(c *gin.Context) {
+	id := c.Param("id")
+
+	var wr model.WithdrawalRequest
+	if err := h.db.First(&wr, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Withdrawal not found"})
+		return
+	}
+	if wr.Status != "processing" {
+		c.JSON(http.StatusOK, gin.H{"message": "Already resolved", "status": wr.Status})
+		return
+	}
+
+	duitku := service.LoadDuitkuClient(h.db, h.cfg)
+	if err := service.ResolveWithdrawalStatus(h.db, duitku, &wr); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.First(&wr, "id = ?", id)
+	c.JSON(http.StatusOK, gin.H{"status": wr.Status})
 }
 
 // GetDriverCODHolding returns a driver's COD cash balance and deposit history.

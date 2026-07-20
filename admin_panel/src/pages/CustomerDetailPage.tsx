@@ -7,7 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Loader2, Package, MapPin, ShieldCheck, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, MapPin, ShieldCheck, RotateCcw, Wallet } from 'lucide-react'
 
 import { apiFetch as api } from '@/lib/api'
 import { DeleteUserAccountButton } from '@/components/DeleteUserAccountButton'
@@ -24,6 +24,14 @@ const orderStatusColor: Record<string, string> = {
   picked_up: 'bg-cyan-100 text-cyan-800',
   delivered: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
+}
+
+const walletCategoryLabel: Record<string, string> = {
+  order_payment: 'Bayar Pesanan',
+  topup: 'Top Up',
+  withdrawal: 'Penarikan',
+  refund: 'Refund',
+  adjustment: 'Penyesuaian',
 }
 
 const refundStatusBadge = (status: string) => {
@@ -73,6 +81,21 @@ interface RefundRequest {
   created_at: string
 }
 
+interface WalletTransaction {
+  id: string
+  type: 'credit' | 'debit'
+  category: string
+  amount: number
+  balance_after: number
+  created_at: string
+}
+
+interface BankAccount {
+  bank_code: string
+  account_number: string
+  account_name: string
+}
+
 interface CustomerDetail {
   customer: Customer
   addresses: SavedAddress[]
@@ -80,6 +103,8 @@ interface CustomerDetail {
   total_orders: number
   total_spent: number
   refunds: RefundRequest[]
+  wallet?: { balance: number; total_earned: number; transactions: WalletTransaction[] }
+  bank_account?: BankAccount | null
 }
 
 export default function CustomerDetailPage() {
@@ -120,6 +145,9 @@ export default function CustomerDetailPage() {
   const addresses = data.addresses ?? []
   const orders = data.orders ?? []
   const refunds = data.refunds ?? []
+  const wallet = data.wallet ?? { balance: 0, total_earned: 0, transactions: [] }
+  const walletTxns = wallet.transactions ?? []
+  const bankAccount = data.bank_account ?? null
 
   return (
     <div className="space-y-6">
@@ -165,6 +193,7 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="ringkasan">Ringkasan</TabsTrigger>
           <TabsTrigger value="alamat">Alamat Tersimpan</TabsTrigger>
           <TabsTrigger value="pesanan">Pesanan</TabsTrigger>
+          <TabsTrigger value="wallet">Wallet</TabsTrigger>
           <TabsTrigger value="refund">Refund</TabsTrigger>
         </TabsList>
 
@@ -246,6 +275,66 @@ export default function CustomerDetailPage() {
                           <Badge className={orderStatusColor[o.status] ?? 'bg-gray-100 text-gray-800'}>{o.status}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{fmtDateTime(o.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Wallet */}
+        <TabsContent value="wallet" className="mt-4 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Wallet className="h-4 w-4" /> Saldo Wallet
+                </CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{fmt(wallet.balance)}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Rekening Bank Tersimpan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bankAccount ? (
+                  <div className="text-sm">
+                    <div className="font-medium">{bankAccount.bank_code} — {bankAccount.account_number}</div>
+                    <div className="text-muted-foreground">{bankAccount.account_name}</div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Belum ada rekening tersimpan</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Riwayat Transaksi Wallet</CardTitle></CardHeader>
+            <CardContent>
+              {walletTxns.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Belum ada transaksi</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead>Jumlah</TableHead>
+                      <TableHead>Saldo Setelah</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {walletTxns.map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="text-sm text-muted-foreground">{fmtDateTime(t.created_at)}</TableCell>
+                        <TableCell className="text-sm">{walletCategoryLabel[t.category] ?? t.category}</TableCell>
+                        <TableCell className={`font-medium ${t.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                          {t.type === 'credit' ? '+' : '-'}{fmt(t.amount)}
+                        </TableCell>
+                        <TableCell className="text-sm">{fmt(t.balance_after)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

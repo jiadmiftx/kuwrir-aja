@@ -48,17 +48,38 @@ const defaultContactSettings: Setting[] = [
   { key: 'support_hours', value: '', label: 'Jam Layanan CS' },
 ]
 
+// Env vars stay the bootstrap default (see service.LoadDuitkuClient on the
+// backend) — these overrides let an admin rotate the key / switch
+// sandbox↔production without a redeploy. duitku_api_key is masked by the
+// backend (never returned in plaintext); leaving it blank on save keeps
+// the existing value.
+const PAYMENT_SETTING_KEYS = ['duitku_merchant_code', 'duitku_api_key', 'duitku_base_url', 'duitku_callback_url', 'duitku_return_url']
+const defaultPaymentSettings: Setting[] = [
+  { key: 'duitku_merchant_code', value: '', label: 'Duitku Merchant Code' },
+  { key: 'duitku_api_key', value: '', label: 'Duitku API Key (kosongkan untuk tidak mengubah)' },
+  { key: 'duitku_base_url', value: '', label: 'Duitku Base URL (kosongkan untuk default sandbox)' },
+  { key: 'duitku_callback_url', value: '', label: 'Duitku Callback URL' },
+  { key: 'duitku_return_url', value: '', label: 'Duitku Return URL' },
+]
+
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Setting[]>([...defaultSettings, ...defaultContactSettings])
+  const [settings, setSettings] = useState<Setting[]>([...defaultSettings, ...defaultContactSettings, ...defaultPaymentSettings])
   const [saving, setSaving] = useState(false)
+  // The backend returns duitku_api_key masked (e.g. "••••••••ab12"), never
+  // in plaintext. Shown as a placeholder only — the actual input field
+  // stays blank/editable so typing in it doesn't fight the masked value.
+  const [apiKeyPlaceholder, setApiKeyPlaceholder] = useState('Belum diatur')
 
   useEffect(() => {
     apiFetch('/api/v1/admin/settings')
       .then((r) => r.json())
       .then((data: { settings: Setting[] }) => {
         if (data.settings) {
+          const remoteApiKey = data.settings.find((r) => r.key === 'duitku_api_key')
+          if (remoteApiKey?.value) setApiKeyPlaceholder(remoteApiKey.value)
           setSettings((prev) =>
             prev.map((s) => {
+              if (s.key === 'duitku_api_key') return s // stays blank, see above
               const remote = data.settings.find((r) => r.key === s.key)
               return remote ? { ...s, value: remote.value } : s
             })
@@ -141,7 +162,7 @@ export default function SettingsPage() {
                 <CardDescription>Changes apply to all new orders immediately.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {settings.filter((s) => !CONTACT_SETTING_KEYS.includes(s.key)).map((setting) => {
+                {settings.filter((s) => !CONTACT_SETTING_KEYS.includes(s.key) && !PAYMENT_SETTING_KEYS.includes(s.key)).map((setting) => {
                   const isPctInput = setting.key === 'platform_markup_percentage'
                   const isFixedInput = setting.key === 'product_markup_fixed_amount'
                   const isInactive =
@@ -198,6 +219,32 @@ export default function SettingsPage() {
                     <Input
                       id={setting.key}
                       type="text"
+                      value={setting.value}
+                      onChange={(e) => updateValue(setting.key, e.target.value)}
+                    />
+                  </div>
+                ))}
+                <Separator />
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Gateway (Duitku)</CardTitle>
+                <CardDescription>Override env-var defaults tanpa redeploy. Kosongkan field untuk memakai nilai default.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {settings.filter((s) => PAYMENT_SETTING_KEYS.includes(s.key)).map((setting) => (
+                  <div key={setting.key} className="space-y-2">
+                    <Label htmlFor={setting.key}>{setting.label}</Label>
+                    <Input
+                      id={setting.key}
+                      type={setting.key === 'duitku_api_key' ? 'password' : 'text'}
+                      placeholder={setting.key === 'duitku_api_key' ? apiKeyPlaceholder : undefined}
                       value={setting.value}
                       onChange={(e) => updateValue(setting.key, e.target.value)}
                     />

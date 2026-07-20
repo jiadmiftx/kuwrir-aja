@@ -208,6 +208,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
+                const _ProfileSectionLabel('Dompet'),
+                const SizedBox(height: 10),
+                _ProfileSoftPanel(
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.account_balance_wallet_outlined, size: 18, color: KuwrirColors.primary),
+                    ),
+                    title: const Text('Wallet Kuwrir', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                    trailing: Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                    onTap: () => Navigator.pushNamed(context, '/wallet'),
+                  ),
+                ),
+                const SizedBox(height: 28),
                 _ProfileSoftPanel(
                   child: ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

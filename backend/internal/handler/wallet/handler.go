@@ -3,7 +3,6 @@ package wallet
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,21 +14,18 @@ import (
 )
 
 type Handler struct {
-	db     *gorm.DB
-	duitku *service.DuitkuClient
+	db  *gorm.DB
+	cfg *config.Config
 }
 
 func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
-	return &Handler{
-		db: db,
-		duitku: &service.DuitkuClient{
-			MerchantCode: cfg.Duitku.MerchantCode,
-			APIKey:       cfg.Duitku.APIKey,
-			BaseURL:      cfg.Duitku.BaseURL,
-			CallbackURL:  cfg.Duitku.CallbackURL,
-			ReturnURL:    cfg.Duitku.ReturnURL,
-		},
-	}
+	return &Handler{db: db, cfg: cfg}
+}
+
+// duitku builds a client from the current admin-configured settings
+// (falling back to env defaults) on every call — see service.LoadDuitkuClient.
+func (h *Handler) duitku() *service.DuitkuClient {
+	return service.LoadDuitkuClient(h.db, h.cfg)
 }
 
 func (h *Handler) RegisterDriverRoutes(driver *gin.RouterGroup) {
@@ -160,11 +156,13 @@ func (h *Handler) MerchantWithdraw(c *gin.Context) {
 
 // --- Shared helpers ---
 
+// WithdrawRequest's bank fields are optional — if omitted, ProcessWithdrawal
+// falls back to the user's saved BankAccount (see /me/bank-account).
 type WithdrawRequest struct {
 	Amount            float64 `json:"amount" binding:"required,gt=0"`
-	BankCode          string  `json:"bank_code" binding:"required"`
-	BankAccountNumber string  `json:"bank_account_number" binding:"required"`
-	BankAccountName   string  `json:"bank_account_name" binding:"required"`
+	BankCode          string  `json:"bank_code"`
+	BankAccountNumber string  `json:"bank_account_number"`
+	BankAccountName   string  `json:"bank_account_name"`
 }
 
 func (h *Handler) withdraw(c *gin.Context, userID string) {
@@ -175,77 +173,26 @@ func (h *Handler) withdraw(c *gin.Context, userID string) {
 	}
 
 	uid := mustParseUUID(userID)
-	wallet, err := service.GetOrCreateWallet(h.db, uid)
+	result, err := service.ProcessWithdrawal(h.db, h.duitku(), uid, req.Amount, req.BankCode, req.BankAccountNumber, req.BankAccountName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-	if wallet.Balance < req.Amount {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Insufficient wallet balance",
-			"balance": wallet.Balance,
-		})
-		return
-	}
-
-	// Unique disbursement ref
-	disbRef := fmt.Sprintf("WD-%s-%d", wallet.ID.String()[:8], time.Now().UnixMilli())
-
-	result, err := h.duitku.Disburse(disbRef, req.BankCode, req.BankAccountNumber, req.BankAccountName, int64(req.Amount))
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Disbursement failed: " + err.Error()})
-		return
-	}
-
-	// Record withdrawal request
-	status := "processing"
-	if result.Status == "SUCCESS" {
-		status = "success"
-	}
-
-	wReq := model.WithdrawalRequest{
-		WalletID:          wallet.ID,
-		Amount:            req.Amount,
-		BankCode:          req.BankCode,
-		BankAccountNumber: req.BankAccountNumber,
-		BankAccountName:   req.BankAccountName,
-		Status:            status,
-		DisbursementRef:   result.DisbursementRef,
-	}
-	h.db.Create(&wReq)
-
-	// Debit wallet only if success (for processing, debit on disbursement webhook)
-	if status == "success" {
-		tx := h.db.Begin()
-		notes := fmt.Sprintf("Withdrawal to %s %s", req.BankCode, req.BankAccountNumber)
-		if err := service.DebitWallet(tx, uid, req.Amount, "withdrawal", nil, notes); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to debit wallet"})
-			return
-		}
-		tx.Commit()
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Withdrawal initiated",
-		"disbursement_ref": result.DisbursementRef,
-		"status":           status,
+		"disbursement_ref": result.Withdrawal.DisbursementRef,
+		"status":           result.Status,
 		"amount":           req.Amount,
 	})
 }
 
 func (h *Handler) getTransactions(c *gin.Context, userID string) {
-	wallet, err := service.GetOrCreateWallet(h.db, mustParseUUID(userID))
+	wallet, txs, err := service.GetWalletTransactions(h.db, mustParseUUID(userID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return
 	}
-
-	var txs []model.WalletTransaction
-	h.db.Where("wallet_id = ?", wallet.ID).
-		Order("created_at DESC").
-		Limit(50).
-		Find(&txs)
 
 	c.JSON(http.StatusOK, gin.H{
 		"wallet":       wallet,

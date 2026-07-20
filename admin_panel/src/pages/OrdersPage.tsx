@@ -14,6 +14,13 @@ import { Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck, Trash2,
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
+const paymentStatusConfig: Record<string, { label: string; color: string }> = {
+  paid:    { label: 'Paid',    color: 'bg-green-100 text-green-800' },
+  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
+  failed:  { label: 'Failed',  color: 'bg-red-100 text-red-800' },
+  expired: { label: 'Expired', color: 'bg-gray-100 text-gray-800' },
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   confirmed: { label: 'Confirmed', color: 'bg-blue-100 text-blue-800',     icon: CheckCircle },
@@ -29,6 +36,8 @@ interface Order {
   order_number: string
   status: string
   delivery_type: string
+  payment_type?: string
+  payment_status?: string
   total: number
   platform_markup?: number
   delivery_commission?: number
@@ -365,15 +374,16 @@ export default function OrdersPage() {
                     <TableHead>Driver</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Platform Cut</TableHead>
+                    <TableHead>Pembayaran</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={10} className="text-center">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={11} className="text-center">Loading...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={10} className="text-center">No orders found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={11} className="text-center">No orders found</TableCell></TableRow>
                   ) : filtered.map((order) => {
                     const cfg = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100', icon: Clock }
                     const platformCut = (order.platform_markup || 0) + (order.delivery_commission || 0) + (order.app_service_fee || 0)
@@ -447,6 +457,18 @@ export default function OrdersPage() {
                         </TableCell>
                         <TableCell className="text-primary font-medium">
                           IDR {platformCut.toLocaleString('id-ID')}
+                        </TableCell>
+                        <TableCell>
+                          {order.payment_type === 'cash' ? (
+                            <Badge variant="outline">COD</Badge>
+                          ) : (
+                            <div className="flex flex-col gap-0.5">
+                              <Badge variant="outline" className="w-fit text-xs">{order.payment_type || '—'}</Badge>
+                              <Badge className={paymentStatusConfig[order.payment_status || '']?.color || 'bg-gray-100 text-gray-800'}>
+                                {paymentStatusConfig[order.payment_status || '']?.label || order.payment_status || '—'}
+                              </Badge>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge className={cfg.color}>{cfg.label}</Badge>

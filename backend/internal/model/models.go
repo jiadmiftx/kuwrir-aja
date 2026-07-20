@@ -394,6 +394,12 @@ type Order struct {
 	PaymentURL       string     `json:"payment_url,omitempty"`       // URL bayar untuk customer
 	PaymentExpiredAt *time.Time `json:"payment_expired_at,omitempty"` // kapan link expired
 
+	// ConfirmationDeadline is set once an online (non-cash) order becomes
+	// paid; the merchant must accept or reject before this time or the SLA
+	// sweeper auto-cancels + refunds it. Left nil for cash orders and for
+	// online orders that haven't been paid yet.
+	ConfirmationDeadline *time.Time `json:"confirmation_deadline,omitempty"`
+
 	// Timestamps
 	PlacedAt        *time.Time `json:"placed_at,omitempty"`
 	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
@@ -412,6 +418,21 @@ type Order struct {
 	Driver   *Driver     `gorm:"foreignKey:DriverID" json:"driver,omitempty"`
 	Items    []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 	Review   *Review     `gorm:"foreignKey:OrderID" json:"review,omitempty"`
+}
+
+// IsAwaitingMerchantAction reports whether the merchant can legally
+// accept/reject this order right now. Cash orders are actionable as soon as
+// they're placed; online orders only once payment has actually gone through
+// (payment_status == "paid") — otherwise a merchant could accept/reject an
+// order nobody has paid for yet.
+func (o *Order) IsAwaitingMerchantAction() bool {
+	if o.Status != OrderStatusPending {
+		return false
+	}
+	if o.PaymentType == "cash" {
+		return true
+	}
+	return o.PaymentStatus == "paid"
 }
 
 // OrderItem snapshot of what was ordered
@@ -745,6 +766,29 @@ type WithdrawalRequest struct {
 	Wallet Wallet `gorm:"foreignKey:WalletID" json:"wallet,omitempty"`
 }
 
+// BankAccount is a user's saved payout destination, one per user, so
+// withdrawal requests don't require re-entering bank details every time.
+type BankAccount struct {
+	Base
+	UserID        uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	BankCode      string    `gorm:"type:varchar(20);not null" json:"bank_code"`
+	AccountNumber string    `gorm:"type:varchar(50);not null" json:"account_number"`
+	AccountName   string    `gorm:"type:varchar(100);not null" json:"account_name"`
+}
+
+// WalletTopupRequest tracks a Duitku charge initiated to top up a wallet
+// (as opposed to an order payment). MerchantOrderID uses a "TOPUP-" prefix
+// so payment.Handler.Callback can route it separately from order callbacks.
+type WalletTopupRequest struct {
+	Base
+	UserID          uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	Amount          float64    `gorm:"not null" json:"amount"`
+	MerchantOrderID string     `gorm:"type:varchar(60);not null;uniqueIndex" json:"merchant_order_id"`
+	PaymentRef      string     `json:"payment_ref,omitempty"`
+	PaymentURL      string     `json:"payment_url,omitempty"`
+	Status          string     `gorm:"type:varchar(20);default:'pending'" json:"status"` // pending | paid | failed | expired
+	ExpiredAt       *time.Time `json:"expired_at,omitempty"`
+}
 
 // ChatMessage stores in-order chat between customer and driver.
 type ChatMessage struct {

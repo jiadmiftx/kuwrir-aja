@@ -18,6 +18,7 @@ import 'screens/support_chat_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/addresses_screen.dart';
+import 'screens/wallet_screen.dart';
 import 'utils/auth_guard.dart';
 import 'cubits/home_cubit.dart';
 import 'cubits/merchant_detail_cubit.dart';
@@ -27,6 +28,7 @@ import 'cubits/order_tracking_cubit.dart';
 import 'cubits/location_cubit.dart';
 import 'cubits/session_cubit.dart';
 import 'cubits/address_cubit.dart';
+import 'cubits/wallet_cubit.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -69,6 +71,7 @@ class KuwrirCustomerApp extends StatelessWidget {
           BlocProvider(create: (_) => OrderCubit(apiClient)),
           BlocProvider(create: (_) => OrderTrackingCubit(apiClient)),
           BlocProvider(create: (_) => AddressCubit(apiClient)),
+          BlocProvider(create: (_) => CustomerWalletCubit(apiClient)),
         ],
         child: MaterialApp(
           title: 'Cocourir',
@@ -123,6 +126,8 @@ class KuwrirCustomerApp extends StatelessWidget {
                 return MaterialPageRoute(
                   builder: (_) => const AddressesScreen(),
                 );
+              case '/wallet':
+                return MaterialPageRoute(builder: (_) => const WalletScreen());
               default:
                 return null;
             }
