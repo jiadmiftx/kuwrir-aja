@@ -292,11 +292,12 @@ func main() {
 			custWalletH := customerwalletHandler.NewHandler(db, cfg)
 			custWalletH.RegisterRoutes(custRoutes)
 
-			// Saved bank account (payout destination) — role-agnostic
+			// Saved bank account (payout destination) — role-agnostic, so
+			// registered once on `protected` (any authenticated role)
+			// instead of per role-specific group, which would try to
+			// register the same literal path multiple times and panic.
 			bankH := bankaccountHandler.NewHandler(db)
-			bankH.RegisterRoutes(custRoutes)
-			bankH.RegisterRoutes(driverRoutes)
-			bankH.RegisterRoutes(merchOwnerRoutes)
+			bankH.RegisterRoutes(protected)
 		}
 	}
 
