@@ -36,20 +36,6 @@ services:
     volumes:
       - redis_data:/data
 
-  # Self-hosted WhatsApp OTP sender (Baileys, unofficial WhatsApp Web
-  # protocol) — redeployed by CI/CD on every push to whatsapp-gateway/**.
-  # No host port published; only the backend container calls it, over the
-  # compose network. auth_session is a named volume so pairing survives
-  # redeploys — losing it means re-scanning the QR from GET /qr.
-  whatsapp-gateway:
-    image: ghcr.io/jiadmiftx/kuwrir-aja/whatsapp-gateway:latest
-    container_name: kuwrir-whatsapp-gateway
-    restart: unless-stopped
-    env_file:
-      - .env.production
-    volumes:
-      - whatsapp_session:/app/auth_session
-
   # Go backend API — redeployed by CI/CD on every push to backend/**
   backend:
     image: ghcr.io/jiadmiftx/kuwrir-aja/backend:latest
@@ -61,8 +47,12 @@ services:
       SERVER_MODE: release
       DB_HOST: postgres
       REDIS_HOST: redis
-      WHATSAPP_GATEWAY_URL: http://whatsapp-gateway:3000
-      # WHATSAPP_API_KEY: set in .env.production, shared with whatsapp-gateway
+      # WhatsApp OTP sending goes through the shared multi-tenant wa-gateway
+      # service (separate repo/deploy, same VPS) instead of this repo's own
+      # whatsapp-gateway/ — one Baileys session to operate instead of two.
+      # WHATSAPP_API_KEY (this tenant's key, from wa-gateway) is set in
+      # .env.production.
+      WHATSAPP_GATEWAY_URL: https://wa.ihtada.com/kuwrir-aja
       # FIREBASE_SERVICE_ACCOUNT_JSON: set in .env.production (base64-encoded service account JSON)
     ports:
       - "8090:8080"
@@ -74,7 +64,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - whatsapp-gateway
 
   # Admin panel (React, served by nginx) — redeployed by CI/CD on every push to admin_panel/**
   admin:
@@ -89,5 +78,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  whatsapp_session:
   uploads_data:
