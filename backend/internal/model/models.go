@@ -404,6 +404,13 @@ type Order struct {
 	PlacedAt        *time.Time `json:"placed_at,omitempty"`
 	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
 	ReadyAt         *time.Time `json:"ready_at,omitempty"`
+	// AcceptedAt is set the moment a driver taps "Ambil Pesanan" — distinct
+	// from DriverID being set, since admin pre-assignment (AssignDriverToOrder)
+	// also sets DriverID before the driver has actually accepted. Without this,
+	// AvailableOrders can't tell "pre-assigned, still needs accept" apart from
+	// "already accepted by me", so an already-accepted order keeps reappearing
+	// in the same driver's job board on every poll until they pick it up.
+	AcceptedAt      *time.Time `json:"accepted_at,omitempty"`
 	PickedUpAt      *time.Time `json:"picked_up_at,omitempty"`
 	DeliveredAt     *time.Time `json:"delivered_at,omitempty"`
 	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`

@@ -989,9 +989,12 @@ func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 	}
 
 	var orders []model.Order
-	// Show: (a) unassigned orders, OR (b) orders admin pre-assigned to this specific driver
+	// Show: (a) unassigned orders, OR (b) orders admin pre-assigned to this
+	// specific driver that they haven't accepted yet (accepted_at still
+	// nil) — once accepted, it must drop out of this list even though
+	// driver_id still matches, or it just keeps reappearing on every poll.
 	// If driver has a zone, only show orders from that zone (or orders with no zone = legacy/fallback)
-	query := h.db.Where("status = ? AND (driver_id IS NULL OR driver_id = ?)", model.OrderStatusReady, driver.ID)
+	query := h.db.Where("status = ? AND (driver_id IS NULL OR (driver_id = ? AND accepted_at IS NULL))", model.OrderStatusReady, driver.ID)
 	if driver.ZoneID != nil {
 		query = query.Where("zone_id = ? OR zone_id IS NULL", driver.ZoneID)
 	}
@@ -1012,15 +1015,18 @@ func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 	}
 
 	var order model.Order
-	// Allow accept if: not yet assigned to anyone, OR admin pre-assigned to this driver
-	if err := h.db.Where("id = ? AND status = ? AND (driver_id IS NULL OR driver_id = ?)",
+	// Allow accept if: not yet assigned to anyone, OR admin pre-assigned to
+	// this driver and they haven't accepted it yet.
+	if err := h.db.Where("id = ? AND status = ? AND (driver_id IS NULL OR (driver_id = ? AND accepted_at IS NULL))",
 		orderID, model.OrderStatusReady, driver.ID).First(&order).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not available for pickup"})
 		return
 	}
 
+	now := time.Now()
 	h.db.Model(&order).Updates(map[string]interface{}{
-		"driver_id": driver.ID,
+		"driver_id":   driver.ID,
+		"accepted_at": &now,
 	})
 
 	// Reload with merchant info for the Flutter app
