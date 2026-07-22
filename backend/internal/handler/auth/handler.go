@@ -332,6 +332,15 @@ const (
 	otpResendCooldown  = 60 * time.Second
 	otpMaxPerHour      = 5
 	otpMaxVerifyTries  = 5
+
+	// testerPhone/testerOTP: a fixed account for app-store reviewers, who
+	// can't receive a real WhatsApp OTP. Requesting a code for this exact
+	// number always succeeds with this fixed code instead of sending a real
+	// WhatsApp message — everything else (rate limits, expiry, role
+	// attachment) behaves identically to a real number. Keep this in sync
+	// with what's listed in each store's "Sign-in details" review field.
+	testerPhone = "+6281199998888"
+	testerOTP   = "123456"
 )
 
 func hashOTP(code string) string {
@@ -382,10 +391,18 @@ func (h *Handler) RequestOTP(c *gin.Context) {
 		return
 	}
 
-	code, err := generateOTP()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
-		return
+	isTester := req.Phone == testerPhone
+
+	var code string
+	if isTester {
+		code = testerOTP
+	} else {
+		var err error
+		code, err = generateOTP()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
+			return
+		}
 	}
 
 	otp := model.OtpCode{
@@ -398,9 +415,11 @@ func (h *Handler) RequestOTP(c *gin.Context) {
 		return
 	}
 
-	if err := h.whatsapp.SendOTP(req.Phone, code); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to send WhatsApp message"})
-		return
+	if !isTester {
+		if err := h.whatsapp.SendOTP(req.Phone, code); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to send WhatsApp message"})
+			return
+		}
 	}
 
 	resp := gin.H{"message": "OTP sent"}
