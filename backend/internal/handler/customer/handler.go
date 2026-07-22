@@ -1096,9 +1096,14 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 		return
 	}
 
-	// Notify customer that order is on the way
+	// Notify customer that order is on the way, and hand the updated order
+	// back to the driver app — without this it can't tell locally that
+	// status is now picked_up, so the "Sudah Diambil" button never goes
+	// away and a driver who taps it again (thinking nothing happened) gets
+	// a confusing "cannot mark as picked up" on the harmless second try.
 	var pickedOrder model.Order
-	if h.db.Where("id = ?", orderID).First(&pickedOrder).Error == nil && pickedOrder.CustomerID != nil {
+	h.db.Where("id = ?", orderID).First(&pickedOrder)
+	if pickedOrder.CustomerID != nil {
 		service.SendToUser(h.db, *pickedOrder.CustomerID,
 			"Pesanan Sedang Diantar 🛵",
 			"Driver sedang dalam perjalanan menuju lokasimu",
@@ -1106,7 +1111,7 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 		)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Order picked up", "status": model.OrderStatusPickedUp})
+	c.JSON(http.StatusOK, gin.H{"message": "Order picked up", "status": model.OrderStatusPickedUp, "order": pickedOrder})
 }
 
 // MarkDelivered transitions: picked_up → delivered.
