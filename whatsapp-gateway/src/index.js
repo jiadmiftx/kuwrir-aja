@@ -1,6 +1,7 @@
 import express from 'express'
 import QRCode from 'qrcode'
 import pino from 'pino'
+import { rm } from 'fs/promises'
 import {
   makeWASocket,
   useMultiFileAuthState,
@@ -82,7 +83,16 @@ async function startSocket() {
       if (!loggedOut) {
         startSocket()
       } else {
-        logger.error('Session logged out from the phone — delete AUTH_DIR and re-scan a fresh QR')
+        // A real logout (device removed from the phone, etc.) leaves stale
+        // creds in AUTH_DIR that useMultiFileAuthState would otherwise keep
+        // trying to resume with — Baileys never falls back to a fresh QR on
+        // its own. Clear them and restart so a new QR is generated
+        // automatically instead of the gateway going silent until someone
+        // manually restarts the container.
+        logger.warn('Session logged out from the phone — clearing stale auth and generating a fresh QR')
+        rm(AUTH_DIR, { recursive: true, force: true })
+          .then(() => startSocket())
+          .catch((err) => logger.error({ err }, 'Failed to clear stale AUTH_DIR after logout'))
       }
     }
   })
