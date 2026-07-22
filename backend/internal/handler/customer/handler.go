@@ -935,6 +935,7 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 	orders := r.Group("/driver-orders")
 	{
 		orders.GET("/available", h.AvailableOrders)
+		orders.GET("/current", h.CurrentDelivery)
 		orders.POST("/:id/accept", h.AcceptDelivery)
 		orders.POST("/:id/pickup", h.MarkPickedUp)
 		orders.POST("/:id/deliver", h.MarkDelivered)
@@ -1001,6 +1002,33 @@ func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 	query.Preload("Merchant").Preload("Customer").Order("created_at ASC").Find(&orders)
 
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// CurrentDelivery returns the order the driver has already accepted (or is
+// mid-delivery on), if any — so the app can resume the active-delivery
+// screen after a restart instead of showing an empty job board with no way
+// back to an order that's already theirs (it's intentionally excluded from
+// AvailableOrders once accepted_at is set).
+func (h *DriverOrderHandler) CurrentDelivery(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var order model.Order
+	err := h.db.Preload("Merchant").Preload("Customer").
+		Where("driver_id = ? AND accepted_at IS NOT NULL AND status IN ?",
+			driver.ID, []model.OrderStatus{model.OrderStatusReady, model.OrderStatusPickedUp}).
+		Order("accepted_at DESC").First(&order).Error
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"order": nil})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"order": order})
 }
 
 // AcceptDelivery assigns the driver to an order: ready → picked_up flow
