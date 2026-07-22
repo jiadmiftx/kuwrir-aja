@@ -540,6 +540,13 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
+	// user.Role is the account's single original signup role — for a
+	// multi-role account (same phone as customer AND driver, say) that's
+	// not necessarily what this login session is. Report the role this
+	// token actually carries, or every app's own "user.role != <my role>"
+	// gate rejects a login that's otherwise perfectly valid.
+	user.Role = model.Role(effectiveRole)
+
 	resp := AuthResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
@@ -610,6 +617,15 @@ func (h *Handler) GetMe(c *gin.Context) {
 	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
 		return
+	}
+
+	// Same reasoning as VerifyOTP: user.Role is the account's original
+	// signup role, not necessarily this token's role for a multi-role
+	// account — report the session's actual role (from the JWT, set by
+	// AuthMiddleware) or e.g. driver_app's post-login "is this a driver
+	// account" check wrongly bounces a driver-role session back to /login.
+	if sessionRole := c.GetString("user_role"); sessionRole != "" {
+		user.Role = model.Role(sessionRole)
 	}
 
 	resp := gin.H{"user": user}
