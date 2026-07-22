@@ -579,6 +579,15 @@ class ApiClient {
     return list.cast<Map<String, dynamic>>();
   }
 
+  /// The order the driver already accepted and hasn't finished delivering
+  /// yet, if any — null otherwise. Lets the app resume the active-delivery
+  /// screen after a restart instead of losing track of an in-progress order
+  /// (it's deliberately excluded from getAvailableJobs once accepted).
+  Future<Map<String, dynamic>?> getCurrentDelivery() async {
+    final data = await get('/driver-orders/current');
+    return data['order'] as Map<String, dynamic>?;
+  }
+
   Future<Map<String, dynamic>> acceptDelivery(String orderId) async {
     return await post('/driver-orders/$orderId/accept', {});
   }

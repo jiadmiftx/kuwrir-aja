@@ -26,6 +26,17 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(state.message)));
         }
+        if (state is JobBoardResumeDelivery) {
+          context.read<ActiveDeliveryCubit>().setOrder(state.order);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ActiveDeliveryScreen()),
+          ).then((_) {
+            if (context.mounted) {
+              context.read<JobBoardCubit>().resetAfterDelivery();
+            }
+          });
+        }
       },
       builder: (context, state) {
         final isOnline = state is JobBoardLoaded && state.isOnline;
@@ -170,7 +181,7 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
       );
     }
 
-    if (state is JobBoardLoading || state is JobBoardAccepting) {
+    if (state is JobBoardLoading || state is JobBoardAccepting || state is JobBoardResumeDelivery) {
       return const Center(child: CircularProgressIndicator());
     }
 

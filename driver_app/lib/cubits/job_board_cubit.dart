@@ -19,6 +19,15 @@ class JobBoardAccepting extends JobBoardState {
   JobBoardAccepting(this.orderId);
 }
 
+/// The driver already has an order accepted but not yet delivered — surfaces
+/// on app start (see JobBoardCubit's constructor) so a restart mid-delivery
+/// (app killed in background, crash, etc.) doesn't strand them on an empty
+/// job board with no way back to the order that's already theirs.
+class JobBoardResumeDelivery extends JobBoardState {
+  final Map<String, dynamic> order;
+  JobBoardResumeDelivery(this.order);
+}
+
 class JobBoardError extends JobBoardState {
   final String message;
   JobBoardError(this.message);
@@ -29,7 +38,19 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   bool _isOnline = false;
   Timer? _pollTimer;
 
-  JobBoardCubit(this._api) : super(JobBoardOffline());
+  JobBoardCubit(this._api) : super(JobBoardOffline()) {
+    _checkResumeDelivery();
+  }
+
+  Future<void> _checkResumeDelivery() async {
+    try {
+      final order = await _api.getCurrentDelivery();
+      if (order != null && !isClosed) emit(JobBoardResumeDelivery(order));
+    } catch (_) {
+      // No active delivery, or the check failed — falling through to the
+      // normal offline/online flow is the safe default either way.
+    }
+  }
 
   @override
   Future<void> close() {
@@ -42,6 +63,11 @@ class JobBoardCubit extends Cubit<JobBoardState> {
     try {
       await _api.setDriverStatus(true);
       _isOnline = true;
+      final resume = await _api.getCurrentDelivery();
+      if (resume != null) {
+        emit(JobBoardResumeDelivery(resume));
+        return;
+      }
       await loadJobs();
       _startPolling();
     } on ApiException catch (e) {
