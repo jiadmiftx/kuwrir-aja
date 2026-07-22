@@ -55,6 +55,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 
 	// Orders
 	r.GET("/orders", h.GetOrders)
+	r.GET("/orders/:id", h.GetOrder)
 	r.GET("/orders/:id/nearby-drivers", h.NearbyDriversForOrder)
 	r.POST("/orders/:id/assign-driver", h.AssignDriverToOrder)
 	r.POST("/orders/:id/admin-cancel", h.AdminCancelOrder)
@@ -178,6 +179,17 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 		Select("COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0)").
 		Scan(&monthRevenue)
 
+	// Same revenue formula, split by how it was collected — cash handled
+	// by drivers vs. paid through the Duitku payment gateway (QRIS/card).
+	// Tells an operator how much of this month's revenue is still sitting
+	// as physical cash in the field vs. already settled electronically.
+	var gatewayRevenue float64
+	h.db.Model(&model.Order{}).
+		Where("status = ? AND delivered_at >= ? AND payment_type != ?", "delivered", monthStart, "cash").
+		Select("COALESCE(SUM(platform_markup + delivery_commission + app_service_fee), 0)").
+		Scan(&gatewayRevenue)
+	cashRevenue := monthRevenue - gatewayRevenue
+
 	var pendingDriverCash float64
 	h.db.Model(&model.Driver{}).
 		Select("COALESCE(SUM(cod_holding), 0)").
@@ -185,6 +197,48 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 
 	var pendingMerchants int64
 	h.db.Model(&model.Merchant{}).Where("is_verified = ?", false).Count(&pendingMerchants)
+
+	var pendingDriverApplications int64
+	h.db.Model(&model.DriverApplication{}).Where("status = ?", "pending").Count(&pendingDriverApplications)
+
+	var pendingRefunds int64
+	h.db.Model(&model.RefundRequest{}).Where("status = ?", "pending").Count(&pendingRefunds)
+
+	// Just enough for an at-a-glance feed, not a full order list (that's
+	// what the Orders page is for) — small, fixed-size, own query rather
+	// than reusing GetOrders so this endpoint stays cheap regardless of
+	// how many orders the platform accumulates.
+	var recentOrders []model.Order
+	h.db.Preload("Merchant").Order("created_at DESC").Limit(6).Find(&recentOrders)
+
+	type merchantRank struct {
+		MerchantID uuid.UUID `json:"merchant_id"`
+		Name       string    `json:"name"`
+		OrderCount int64     `json:"order_count"`
+	}
+	var topMerchants []merchantRank
+	h.db.Model(&model.Order{}).
+		Select("orders.merchant_id, merchants.name, COUNT(*) as order_count").
+		Joins("JOIN merchants ON merchants.id = orders.merchant_id").
+		Where("orders.created_at >= ? AND orders.merchant_id IS NOT NULL", monthStart).
+		Group("orders.merchant_id, merchants.name").
+		Order("order_count DESC").
+		Limit(3).
+		Scan(&topMerchants)
+
+	type productRank struct {
+		ItemName string `json:"item_name"`
+		Quantity int64  `json:"quantity"`
+	}
+	var topProducts []productRank
+	h.db.Model(&model.OrderItem{}).
+		Select("order_items.item_name, SUM(order_items.quantity) as quantity").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Where("orders.created_at >= ?", monthStart).
+		Group("order_items.item_name").
+		Order("quantity DESC").
+		Limit(3).
+		Scan(&topProducts)
 
 	c.JSON(http.StatusOK, gin.H{
 		"orders": gin.H{
@@ -198,6 +252,9 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 			"open":     openMerchants,
 			"pending":  pendingMerchants,
 		},
+		"driver_applications_pending": pendingDriverApplications,
+		"refunds_pending":             pendingRefunds,
+		"recent_orders":               recentOrders,
 		"drivers": gin.H{
 			"total":  totalDrivers,
 			"online": onlineDrivers,
@@ -206,9 +263,13 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 			"total": totalCustomers,
 		},
 		"revenue": gin.H{
-			"this_month": monthRevenue,
+			"this_month":         monthRevenue,
+			"this_month_gateway": gatewayRevenue,
+			"this_month_cash":    cashRevenue,
 		},
 		"pending_driver_cash": pendingDriverCash,
+		"top_merchants":       topMerchants,
+		"top_products":        topProducts,
 	})
 }
 
@@ -504,6 +565,20 @@ func (h *Handler) GetOrders(c *gin.Context) {
 	}
 	q.Order("created_at DESC").Find(&orders)
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// GetOrder returns a single order with full detail — used by the order
+// detail page (linked from the dashboard's recent-orders feed and the
+// orders list, since neither shows everything about an order inline).
+func (h *Handler) GetOrder(c *gin.Context) {
+	id := c.Param("id")
+	var order model.Order
+	if err := h.db.Preload("Merchant").Preload("Customer").Preload("Driver.User").Preload("Items").
+		First(&order, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"order": order})
 }
 
 // deleteOrdersHard permanently removes orders and everything scoped to

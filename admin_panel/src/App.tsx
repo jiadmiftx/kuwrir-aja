@@ -6,6 +6,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import MerchantsPage from '@/pages/MerchantsPage'
 import MerchantDetailPage from '@/pages/MerchantDetailPage'
 import OrdersPage from '@/pages/OrdersPage'
+import OrderDetailPage from '@/pages/OrderDetailPage'
 import DriversPage from '@/pages/DriversPage'
 import DriverDetailPage from '@/pages/DriverDetailPage'
 import DriverApplicationsPage from '@/pages/DriverApplicationsPage'
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/orders/:id" element={<OrderDetailPage />} />
                 <Route path="/merchants" element={<MerchantsPage />} />
                 <Route path="/merchants/:id" element={<MerchantDetailPage />} />
                 <Route path="/drivers" element={<DriversPage />} />
