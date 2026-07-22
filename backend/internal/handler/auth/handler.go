@@ -519,9 +519,15 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 		user.PhoneVerifiedAt = &now
 	}
 
-	effectiveRole := user.Role
-	if req.Role != "" {
-		effectiveRole = req.Role
+	// req.Role == "" means customer_app is calling (the only caller that
+	// leaves it empty, see the branch above) — always treat that as a
+	// customer login, regardless of what role the account originally
+	// signed up under, otherwise a phone that registered as merchant/driver
+	// first gets a merchant/driver-scoped token when logging into
+	// customer_app and every customer-only endpoint 403s.
+	effectiveRole := req.Role
+	if effectiveRole == "" {
+		effectiveRole = model.RoleCustomer
 	}
 	if err := h.attachRole(user.ID, effectiveRole); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set up role"})
