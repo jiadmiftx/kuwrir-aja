@@ -1491,7 +1491,15 @@ func (h *Handler) AssignDriverToOrder(c *gin.Context) {
 	}
 
 	driverUID, _ := uuid.Parse(req.DriverID)
-	h.db.Model(&order).Update("driver_id", driverUID)
+	// accepted_at must be cleared here too — it's how AvailableOrders tells
+	// "pre-assigned, still needs the driver to accept" apart from "already
+	// accepted". Reassigning (e.g. after the previous driver flaked) without
+	// clearing it left the order invisible to the newly assigned driver,
+	// since a stale accepted_at from a prior assignment was still set.
+	h.db.Model(&order).Updates(map[string]interface{}{
+		"driver_id":   driverUID,
+		"accepted_at": nil,
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "Driver assigned",
