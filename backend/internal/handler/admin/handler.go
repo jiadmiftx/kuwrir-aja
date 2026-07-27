@@ -325,9 +325,6 @@ func (h *Handler) UpdateSetting(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "Setting unchanged"})
 			return
 		}
-	} else if req.Value == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "value is required"})
-		return
 	}
 
 	result := h.db.Model(&model.SystemSetting{}).Where("key = ?", key).Update("value", req.Value)
