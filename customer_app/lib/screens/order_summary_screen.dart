@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
+import 'payment_webview_screen.dart';
 
 /// Confirmation step shown after Cart — shows the real delivery fee/tax/
 /// total (Cart only ever shows a flat delivery-fee estimate) before the
@@ -40,21 +43,61 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   String? _quoteError;
   bool _loadingQuote = true;
   String _paymentType = 'cash';
-  double? _walletBalance;
+  List<Map<String, dynamic>> _paymentMethods = [];
+  bool _loadingMethods = false;
+  final Set<String> _expandedGroups = {};
+
+  static const _groupOrder = [
+    'E-Wallet',
+    'QRIS',
+    'Virtual Account',
+    'Kartu Kredit',
+    'Gerai Retail',
+    'PayLater',
+  ];
+
+  static const _groupIcons = {
+    'E-Wallet': Icons.account_balance_wallet_outlined,
+    'QRIS': Icons.qr_code_rounded,
+    'Virtual Account': Icons.account_balance_outlined,
+    'Kartu Kredit': Icons.credit_card_outlined,
+    'Gerai Retail': Icons.storefront_outlined,
+    'PayLater': Icons.schedule_outlined,
+  };
+
+  String _categoryFor(String paymentName) {
+    final upper = paymentName.toUpperCase();
+    if (upper.contains('QRIS')) return 'QRIS';
+    if (upper.contains('CREDIT CARD')) return 'Kartu Kredit';
+    if (upper.contains('PAYLATER')) return 'PayLater';
+    if (upper.contains('RETAIL') ||
+        upper.contains('INDOMARET') ||
+        upper.contains('ALFAMART')) {
+      return 'Gerai Retail';
+    }
+    if (upper.contains('VA')) return 'Virtual Account';
+    return 'E-Wallet';
+  }
 
   @override
   void initState() {
     super.initState();
     _loadQuote();
-    _loadWalletBalance();
   }
 
-  Future<void> _loadWalletBalance() async {
+  /// Live channel list from Duitku, re-fetched once the real total is
+  /// known (fees can vary per amount tier). Best-effort: if the gateway
+  /// isn't configured or the call fails, checkout just falls back to
+  /// Cash (COD) only rather than blocking the whole screen.
+  Future<void> _loadPaymentMethods(double amount) async {
+    setState(() => _loadingMethods = true);
     try {
-      final wallet = await context.read<ApiClient>().getCustomerWallet();
-      if (mounted) setState(() => _walletBalance = wallet.balance);
+      final methods = await context.read<ApiClient>().getPaymentMethods(amount);
+      if (mounted) setState(() => _paymentMethods = methods);
     } catch (_) {
-      // Wallet balance is a nice-to-have on this screen — silently skip.
+      if (mounted) setState(() => _paymentMethods = []);
+    } finally {
+      if (mounted) setState(() => _loadingMethods = false);
     }
   }
 
@@ -71,6 +114,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         dropoffLng: widget.dropoffLng,
       );
       if (mounted) setState(() => _quote = quote);
+      unawaited(_loadPaymentMethods(quote.total));
     } catch (e) {
       if (mounted) {
         setState(
@@ -84,13 +128,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     }
   }
 
-  bool get _walletInsufficient =>
-      _paymentType == 'wallet' &&
-      _quote != null &&
-      (_walletBalance ?? 0) < _quote!.total;
-
   void _confirmOrder() {
-    if (_walletInsufficient) return;
     context.read<OrderCubit>().placeOrder(
       merchantId: widget.merchantId,
       items: widget.items,
@@ -102,6 +140,44 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       paymentType: _paymentType,
       notes: widget.notes,
     );
+  }
+
+  /// Non-cash orders still need a Duitku payment link created after the
+  /// order exists (order creation and payment-link creation are separate
+  /// steps server-side) — rendered in-app via PaymentWebViewScreen, pushed
+  /// on top of the tracking screen so back/close lands back on it.
+  ///
+  /// Takes the NavigatorState/ApiClient directly (captured before the
+  /// stack-reset below) rather than a BuildContext — this screen's own
+  /// context gets torn down by pushNamedAndRemoveUntil before the awaited
+  /// createOrderPayment call resolves, but the NavigatorState itself stays
+  /// alive as the app's root navigator.
+  Future<void> _openPaymentWebView(
+    NavigatorState navigator,
+    ApiClient api,
+    Order order,
+    String paymentType,
+  ) async {
+    if (paymentType == 'cash') return;
+    try {
+      final resp = await api.createOrderPayment(
+        orderId: order.id,
+        paymentMethod: paymentType,
+      );
+      final url = resp['payment_url'] as String?;
+      if (url != null && navigator.mounted) {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                PaymentWebViewScreen(paymentUrl: url, orderId: order.id),
+          ),
+        );
+      }
+    } catch (_) {
+      // Order is already placed regardless — customer can retry payment
+      // from the "Bayar Sekarang" button on the tracking screen if this
+      // fails.
+    }
   }
 
   String _fmt(double v) => v
@@ -117,11 +193,23 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       listener: (context, state) {
         if (state is OrderPlaced) {
           context.read<CartCubit>().clear();
-          Navigator.pushReplacementNamed(
-            context,
-            '/tracking',
-            arguments: {'order_id': state.order.id},
+          final navigator = Navigator.of(context);
+          final api = context.read<ApiClient>();
+          final order = state.order;
+          final paymentType = _paymentType;
+          // Reset the stack to Home (Orders tab) -> Detail Order so the
+          // payment WebView (pushed next) sits on a clean, predictable
+          // back-stack instead of the now-irrelevant Cart/Checkout screens.
+          navigator.pushNamedAndRemoveUntil(
+            '/home',
+            (route) => false,
+            arguments: {'tab': 2},
           );
+          navigator.pushNamed(
+            '/tracking',
+            arguments: {'order_id': order.id},
+          );
+          unawaited(_openPaymentWebView(navigator, api, order, paymentType));
         } else if (state is OrderError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -223,17 +311,51 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               selected: _paymentType == 'cash',
               onTap: () => setState(() => _paymentType = 'cash'),
             ),
-            const SizedBox(height: 10),
-            _PaymentMethodOption(
-              icon: Icons.account_balance_wallet_outlined,
-              title: 'Wallet Kuwrir',
-              subtitle: _walletBalance != null
-                  ? 'Saldo: Rp ${_fmt(_walletBalance!)}'
-                  : 'Memuat saldo...',
-              selected: _paymentType == 'wallet',
-              onTap: () => setState(() => _paymentType = 'wallet'),
-              error: _walletInsufficient ? 'Saldo wallet tidak cukup' : null,
-            ),
+            if (_loadingMethods) ...[
+              const SizedBox(height: 10),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ] else
+              for (final entry in () {
+                final grouped = <String, List<Map<String, dynamic>>>{};
+                for (final method in _paymentMethods) {
+                  final cat = _categoryFor(
+                    (method['paymentName'] as String?) ?? '',
+                  );
+                  grouped.putIfAbsent(cat, () => []).add(method);
+                }
+                return _groupOrder.where(
+                  (cat) => grouped[cat]?.isNotEmpty ?? false,
+                ).map((cat) => MapEntry(cat, grouped[cat]!));
+              }()) ...[
+                const SizedBox(height: 10),
+                _PaymentMethodGroup(
+                  category: entry.key,
+                  icon: _groupIcons[entry.key] ?? Icons.payments_outlined,
+                  methods: entry.value,
+                  expanded:
+                      _expandedGroups.contains(entry.key) ||
+                      entry.value.any((m) => m['paymentMethod'] == _paymentType),
+                  onToggle: () => setState(() {
+                    if (_expandedGroups.contains(entry.key)) {
+                      _expandedGroups.remove(entry.key);
+                    } else {
+                      _expandedGroups.add(entry.key);
+                    }
+                  }),
+                  selectedMethod: _paymentType,
+                  onSelect: (code) => setState(() => _paymentType = code),
+                  fmt: _fmt,
+                ),
+              ],
             const SizedBox(height: 24),
             _SectionLabel('Rincian Biaya'),
             const SizedBox(height: 10),
@@ -310,8 +432,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         bottomNavigationBar: BlocBuilder<OrderCubit, OrderState>(
           builder: (context, state) {
             final placing = state is OrderPlacing;
-            final canConfirm =
-                !_loadingQuote && _quote != null && !placing && !_walletInsufficient;
+            final canConfirm = !_loadingQuote && _quote != null && !placing;
             return Container(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -392,7 +513,7 @@ class _PaymentMethodOption extends StatelessWidget {
   final String subtitle;
   final bool selected;
   final VoidCallback onTap;
-  final String? error;
+  final String? imageUrl;
 
   const _PaymentMethodOption({
     required this.icon,
@@ -400,7 +521,7 @@ class _PaymentMethodOption extends StatelessWidget {
     required this.subtitle,
     required this.selected,
     required this.onTap,
-    this.error,
+    this.imageUrl,
   });
 
   @override
@@ -421,7 +542,9 @@ class _PaymentMethodOption extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _PanelIcon(icon),
+            imageUrl != null
+                ? _MethodImageIcon(imageUrl: imageUrl!, fallback: icon)
+                : _PanelIcon(icon),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -435,12 +558,10 @@ class _PaymentMethodOption extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    error ?? subtitle,
+                    subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: error != null
-                          ? KuwrirColors.error
-                          : KuwrirColors.textSecondary,
+                      color: KuwrirColors.textSecondary,
                     ),
                   ),
                 ],
@@ -453,6 +574,158 @@ class _PaymentMethodOption extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MethodImageIcon extends StatelessWidget {
+  final String imageUrl;
+  final IconData fallback;
+  const _MethodImageIcon({required this.imageUrl, required this.fallback});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: KuwrirColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        imageUrl,
+        width: 26,
+        height: 26,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, progress) =>
+            progress == null
+                ? child
+                : Icon(fallback, color: KuwrirColors.primary, size: 19),
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(fallback, color: KuwrirColors.primary, size: 19),
+      ),
+    );
+  }
+}
+
+/// One payment-method category (e.g. "E-Wallet", "Virtual Account") as a
+/// collapsible section — Duitku returns 20+ channels flat, which is too
+/// long to scan as one list, so channels are grouped by category and only
+/// expanded on demand (or automatically if it already holds the selected
+/// method).
+class _PaymentMethodGroup extends StatelessWidget {
+  final String category;
+  final IconData icon;
+  final List<Map<String, dynamic>> methods;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final String selectedMethod;
+  final ValueChanged<String> onSelect;
+  final String Function(double) fmt;
+
+  const _PaymentMethodGroup({
+    required this.category,
+    required this.icon,
+    required this.methods,
+    required this.expanded,
+    required this.onToggle,
+    required this.selectedMethod,
+    required this.onSelect,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KuwrirColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  _PanelIcon(icon),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      category,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${methods.length}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: KuwrirColors.textHint,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                children: [
+                  for (var i = 0; i < methods.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _PaymentMethodOption(
+                      icon: icon,
+                      imageUrl: methods[i]['paymentImage'] as String?,
+                      title:
+                          (methods[i]['paymentName'] as String?) ??
+                          'Pembayaran Online',
+                      subtitle: () {
+                        final fee = double.tryParse(
+                          (methods[i]['totalFee'] as String?) ?? '0',
+                        );
+                        return fee != null && fee > 0
+                            ? 'Biaya admin Rp ${fmt(fee)}'
+                            : 'Tanpa biaya admin';
+                      }(),
+                      selected:
+                          selectedMethod == methods[i]['paymentMethod'],
+                      onTap: () =>
+                          onSelect(methods[i]['paymentMethod'] as String),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

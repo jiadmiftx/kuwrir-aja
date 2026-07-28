@@ -706,6 +706,30 @@ class ApiClient {
     });
   }
 
+  // --- Order payment (Duitku) ---
+
+  /// Live payment channels enabled for the merchant account at [amount] —
+  /// fees can vary per amount tier, so this is re-fetched once the real
+  /// order total is known rather than cached.
+  Future<List<Map<String, dynamic>>> getPaymentMethods(double amount) async {
+    final data = await get('/payment/methods?amount=${amount.round()}');
+    final list = data['payment_methods'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  /// Creates a Duitku payment link for an already-placed non-cash order.
+  /// Returns the raw response (`payment_url`, `payment_ref`, `expires_at`).
+  Future<Map<String, dynamic>> createOrderPayment({
+    required String orderId,
+    required String paymentMethod,
+    String email = '',
+  }) async {
+    return await post('/payment/$orderId/create', {
+      'payment_method': paymentMethod,
+      if (email.isNotEmpty) 'email': email,
+    });
+  }
+
   // --- Saved bank account (customer/driver/merchant, role-agnostic) ---
 
   Future<Map<String, dynamic>?> getBankAccount() async {

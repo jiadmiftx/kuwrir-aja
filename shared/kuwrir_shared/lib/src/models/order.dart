@@ -35,6 +35,7 @@ class Order {
   final String paymentType;
   final String paymentStatus;
   final String? paymentUrl;
+  final DateTime? paymentExpiredAt;
   final double total;
   final double subtotal;
   final double deliveryFee;
@@ -69,6 +70,7 @@ class Order {
     this.paymentType = 'cash',
     this.paymentStatus = 'pending',
     this.paymentUrl,
+    this.paymentExpiredAt,
     required this.total,
     required this.subtotal,
     this.deliveryFee = 0,
@@ -103,6 +105,9 @@ class Order {
       paymentType: json['payment_type'] as String? ?? 'cash',
       paymentStatus: json['payment_status'] as String? ?? 'pending',
       paymentUrl: json['payment_url'] as String?,
+      paymentExpiredAt: DateTime.tryParse(
+        json['payment_expired_at'] as String? ?? '',
+      ),
       total: (json['total'] as num?)?.toDouble() ?? 0,
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
       deliveryFee: (json['delivery_fee'] as num?)?.toDouble() ?? 0,

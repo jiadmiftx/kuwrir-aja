@@ -87,8 +87,13 @@ class KuwrirCustomerApp extends StatelessWidget {
                   builder: (_) => const CustomerLoginScreen(),
                 );
               case '/home':
+                final homeArgs = settings.arguments as Map<String, dynamic>?;
                 return MaterialPageRoute(
-                  builder: (_) => const AppLockGate(child: CustomerHome()),
+                  builder: (_) => AppLockGate(
+                    child: CustomerHome(
+                      initialTab: homeArgs?['tab'] as int? ?? 0,
+                    ),
+                  ),
                 );
               case '/search':
                 return MaterialPageRoute(builder: (_) => const SearchScreen());
@@ -197,14 +202,15 @@ class _SplashRouterState extends State<_SplashRouter> {
 }
 
 class CustomerHome extends StatefulWidget {
-  const CustomerHome({super.key});
+  final int initialTab;
+  const CustomerHome({super.key, this.initialTab = 0});
 
   @override
   State<CustomerHome> createState() => _CustomerHomeState();
 }
 
 class _CustomerHomeState extends State<CustomerHome> {
-  int _idx = 0;
+  late int _idx = widget.initialTab;
 
   @override
   Widget build(BuildContext context) {
@@ -915,12 +921,14 @@ class _ChatListScreenState extends State<_ChatListScreen> {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiClient>();
-      final orders = await api.getMyOrders();
-      _activeOrders = orders
-          .where((o) => _chatStatuses.contains(o.status))
-          .toList();
-      _loaded = true;
+      if (await api.isAuthenticated()) {
+        final orders = await api.getMyOrders();
+        _activeOrders = orders
+            .where((o) => _chatStatuses.contains(o.status))
+            .toList();
+      }
     } catch (_) {}
+    _loaded = true;
     if (mounted) setState(() => _loading = false);
   }
 

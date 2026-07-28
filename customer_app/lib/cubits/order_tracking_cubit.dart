@@ -29,8 +29,12 @@ class OrderTrackingCubit extends Cubit<OrderTrackingState> {
 
   void startTracking(String orderId) {
     _loadOrder(orderId);
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _loadOrder(orderId));
+    _timer = Timer.periodic(const Duration(seconds: 12), (_) => _loadOrder(orderId));
   }
+
+  /// Manual pull-to-refresh — reuses the same load path as the periodic
+  /// timer, just triggered on demand instead of waiting for the next tick.
+  Future<void> refreshNow(String orderId) => _loadOrder(orderId);
 
   Future<void> _loadOrder(String orderId) async {
     try {
