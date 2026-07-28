@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -93,6 +94,57 @@ func (d *DuitkuClient) VerifyCallbackSignature(amount, merchantOrderID, signatur
 	raw := fmt.Sprintf("%s%s%s%s", d.MerchantCode, amount, merchantOrderID, d.APIKey)
 	expected := fmt.Sprintf("%x", md5.Sum([]byte(raw)))
 	return expected == signature
+}
+
+// --- Payment Method List ---
+
+type DuitkuPaymentMethod struct {
+	PaymentMethod string `json:"paymentMethod"`
+	PaymentName   string `json:"paymentName"`
+	PaymentImage  string `json:"paymentImage"`
+	TotalFee      string `json:"totalFee"`
+}
+
+type duitkuPaymentMethodResponse struct {
+	PaymentFee      []DuitkuPaymentMethod `json:"paymentFee"`
+	ResponseCode    string                `json:"responseCode"`
+	ResponseMessage string                `json:"responseMessage"`
+}
+
+// GetPaymentMethods asks Duitku which payment channels are currently
+// enabled for this merchant account at the given amount (fees can vary
+// per amount tier) — lets the app render the real, live channel list
+// instead of a hardcoded guess.
+func (d *DuitkuClient) GetPaymentMethods(amount int64) ([]DuitkuPaymentMethod, error) {
+	// Jakarta is UTC+7 with no DST — a fixed offset avoids depending on the
+	// container having an IANA tzdata database installed.
+	datetime := time.Now().UTC().Add(7 * time.Hour).Format("2006-01-02 15:04:05")
+	raw := fmt.Sprintf("%s%d%s%s", d.MerchantCode, amount, datetime, d.APIKey)
+	sig := fmt.Sprintf("%x", sha256.Sum256([]byte(raw)))
+
+	payload := map[string]interface{}{
+		"merchantcode": d.MerchantCode,
+		"amount":       amount,
+		"datetime":     datetime,
+		"signature":    sig,
+	}
+
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(d.BaseURL+"/api/merchant/paymentmethod/getpaymentmethod", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("duitku payment methods request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+	var result duitkuPaymentMethodResponse
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("duitku payment methods parse: %w", err)
+	}
+	if result.ResponseCode != "00" {
+		return nil, fmt.Errorf("duitku error: %s", result.ResponseMessage)
+	}
+	return result.PaymentFee, nil
 }
 
 // --- Disbursement ---

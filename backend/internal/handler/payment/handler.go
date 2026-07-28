@@ -3,6 +3,7 @@ package payment
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, customer *gin.RouterGr
 	public.POST("/payment/callback", h.Callback)
 
 	// Customer-authenticated endpoints
+	customer.GET("/payment/methods", h.GetPaymentMethods)
 	customer.POST("/payment/:orderId/create", h.CreatePayment)
 	customer.GET("/payment/:orderId/status", h.GetPaymentStatus)
 
@@ -50,6 +52,25 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, customer *gin.RouterGr
 type CreatePaymentRequest struct {
 	PaymentMethod string `json:"payment_method" binding:"required"` // VC, QRIS, OV
 	Email         string `json:"email"`
+}
+
+// GetPaymentMethods returns the live list of Duitku payment channels
+// enabled for this merchant at the given amount, so the checkout screen
+// renders real channels instead of a hardcoded guess.
+func (h *Handler) GetPaymentMethods(c *gin.Context) {
+	amount, err := strconv.ParseInt(c.Query("amount"), 10, 64)
+	if err != nil || amount <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "valid amount query param required"})
+		return
+	}
+
+	methods, err := h.duitku().GetPaymentMethods(amount)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Payment gateway error: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"payment_methods": methods})
 }
 
 // CreatePayment creates a Duitku payment link for a pending order.

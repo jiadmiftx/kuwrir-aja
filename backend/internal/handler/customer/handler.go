@@ -594,6 +594,16 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	if paymentType == "" {
 		paymentType = "cash"
 	}
+	// Wallet is not a valid order payment method: Wallet.UserID is the
+	// account's single shared balance across every role that phone number
+	// holds (customer/driver/merchant are separate apps but the same
+	// account row), so paying an order from "wallet" could silently spend
+	// a driver's delivery earnings or a merchant's payout. Online payment
+	// goes through Duitku instead (see payment.Handler.GetPaymentMethods).
+	if paymentType == "wallet" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Wallet is not a supported payment method for orders"})
+		return
+	}
 
 	order := model.Order{
 		OrderNumber:             orderNumber,
@@ -636,12 +646,6 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		order.ZoneID = &result.SelectedZone.ID
 	}
 
-	if paymentType == "wallet" {
-		deadline := now.Add(5 * time.Minute)
-		order.PaymentStatus = "paid"
-		order.ConfirmationDeadline = &deadline
-	}
-
 	tx := h.db.Begin()
 	if err := tx.Create(&order).Error; err != nil {
 		tx.Rollback()
@@ -653,15 +657,6 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	for _, d := range result.StockDeductions {
 		tx.Model(&model.Product{}).Where("id = ?", d.Product.ID).
 			Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
-	}
-
-	if paymentType == "wallet" {
-		notes := fmt.Sprintf("Payment for order %s", order.OrderNumber)
-		if err := service.DebitWallet(tx, customerUUID, order.Total, "order_payment", &order.ID, notes); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient wallet balance"})
-			return
-		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
