@@ -71,19 +71,24 @@ func (d *DuitkuClient) CreatePayment(orderID, orderNumber string, amount int64, 
 	}
 
 	body, _ := json.Marshal(payload)
-	resp, err := http.Post(d.BaseURL+"/api/merchant/v2/inquiry", "application/json", bytes.NewReader(body))
+	url := d.BaseURL + "/api/merchant/v2/inquiry"
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("duitku request: %w", err)
+		return nil, fmt.Errorf("duitku request to %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 
 	data, _ := io.ReadAll(resp.Body)
 	var result DuitkuPaymentResponse
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("duitku response parse: %w", err)
+		snippet := string(data)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return nil, fmt.Errorf("duitku response parse: url=%s status=%d body=%q: %w", url, resp.StatusCode, snippet, err)
 	}
 	if result.StatusCode != "00" {
-		return nil, fmt.Errorf("duitku error: %s", result.StatusMessage)
+		return nil, fmt.Errorf("duitku error (url=%s status=%d): %s", url, resp.StatusCode, result.StatusMessage)
 	}
 	return &result, nil
 }
