@@ -44,11 +44,22 @@ class KuwrirMerchantApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final apiClient = ApiClient();
+    final storeOrdersCubit = StoreOrdersCubit(apiClient);
+
+    // Push already tells us the moment a new order lands (backend sends it
+    // on order creation) — use that as the primary refresh trigger instead
+    // of waiting on the slow poll fallback in StoreOrdersCubit.
+    NotificationService.onPushData.addListener(() {
+      if (NotificationService.onPushData.value?['type'] == 'new_order') {
+        storeOrdersCubit.load();
+      }
+    });
+
     return MultiRepositoryProvider(
       providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(create: (_) => StoreOrdersCubit(apiClient)),
+          BlocProvider.value(value: storeOrdersCubit),
           BlocProvider(create: (_) => MenuCubit(apiClient)),
           BlocProvider(create: (_) => StoreCubit(apiClient)),
           BlocProvider(create: (_) => DashboardCubit(apiClient)),

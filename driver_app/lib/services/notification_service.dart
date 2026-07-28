@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -6,6 +7,12 @@ class NotificationService {
   static final _localNotif = FlutterLocalNotificationsPlugin();
   static const _channelId = 'kuwrir_driver';
   static const _channelName = 'Cocourir Driver Notifications';
+
+  /// Latest push message's data payload, published on both foreground
+  /// arrival and tap-to-open. Screens (e.g. chat) listen to this to refresh
+  /// immediately instead of waiting on a slow poll fallback.
+  static final ValueNotifier<Map<String, dynamic>?> onPushData =
+      ValueNotifier(null);
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');
@@ -36,7 +43,16 @@ class NotificationService {
   }
 
   static void setupForegroundHandler() {
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (message.data.isNotEmpty) {
+        onPushData.value = message.data;
+      }
+    });
+
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.data.isNotEmpty) {
+        onPushData.value = message.data;
+      }
       final notification = message.notification;
       if (notification == null) return;
 

@@ -23,8 +23,12 @@ class ChatCubit extends Cubit<ChatState> {
 
   void start() {
     _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _silentRefresh());
+    // Push (see NotificationService.onPushData) is the primary refresh
+    // trigger now — this is just a fallback for missed/delayed pushes.
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) => _silentRefresh());
   }
+
+  Future<void> refreshNow() => _silentRefresh();
 
   Future<void> _load() async {
     emit(ChatLoading());

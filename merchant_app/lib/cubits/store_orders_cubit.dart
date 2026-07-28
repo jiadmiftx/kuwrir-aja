@@ -24,7 +24,9 @@ class StoreOrdersCubit extends Cubit<StoreOrdersState> {
 
   void startPolling() {
     load();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => load());
+    // Push (see NotificationService.onPushData / main.dart) is the primary
+    // refresh trigger now — this is just a fallback for missed/delayed pushes.
+    _timer = Timer.periodic(const Duration(seconds: 45), (_) => load());
   }
 
   Future<void> load() async {

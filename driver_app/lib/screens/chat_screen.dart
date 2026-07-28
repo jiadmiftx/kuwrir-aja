@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/chat_cubit.dart';
+import '../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String orderId;
@@ -22,10 +23,19 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _cubit = ChatCubit(context.read<ApiClient>(), orderId: widget.orderId)..start();
+    NotificationService.onPushData.addListener(_onPush);
+  }
+
+  void _onPush() {
+    final data = NotificationService.onPushData.value;
+    if (data?['type'] == 'chat' && data?['order_id'] == widget.orderId) {
+      _cubit.refreshNow();
+    }
   }
 
   @override
   void dispose() {
+    NotificationService.onPushData.removeListener(_onPush);
     _cubit.close();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
