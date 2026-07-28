@@ -2,6 +2,7 @@ package payment
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -116,6 +117,7 @@ func (h *Handler) CreatePayment(c *gin.Context) {
 
 	result, err := h.duitku().CreatePayment(order.ID.String(), order.OrderNumber, amountIDR, customerName, email, req.PaymentMethod, productDesc)
 	if err != nil {
+		log.Printf("CreatePayment failed for order %s: %v", order.ID, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Payment gateway error: " + err.Error()})
 		return
 	}
