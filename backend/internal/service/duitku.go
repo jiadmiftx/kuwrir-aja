@@ -47,8 +47,8 @@ type DuitkuPaymentResponse struct {
 
 // CreatePayment creates a Duitku payment request and returns the payment URL.
 func (d *DuitkuClient) CreatePayment(orderID, orderNumber string, amount int64, customerName, email, paymentMethod, productDesc string) (*DuitkuPaymentResponse, error) {
-	// Signature: MD5(merchantCode + amount + merchantOrderId + apiKey)
-	raw := fmt.Sprintf("%s%d%s%s", d.MerchantCode, amount, orderNumber, d.APIKey)
+	// Signature: MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
+	raw := fmt.Sprintf("%s%s%d%s", d.MerchantCode, orderNumber, amount, d.APIKey)
 	sig := fmt.Sprintf("%x", md5.Sum([]byte(raw)))
 
 	returnURL := d.ReturnURL
