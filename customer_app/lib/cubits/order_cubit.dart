@@ -32,6 +32,7 @@ class OrderCubit extends Cubit<OrderState> {
     String receiverPhone = '',
     String paymentType = 'cash',
     String notes = '',
+    String promoCode = '',
   }) async {
     emit(OrderPlacing());
     try {
@@ -54,6 +55,7 @@ class OrderCubit extends Cubit<OrderState> {
         'receiver_phone': receiverPhone,
         'payment_type': paymentType,
         'notes': notes,
+        'promo_code': promoCode,
       };
       final order = await _api.placeOrder(body);
       emit(OrderPlaced(order));
@@ -74,6 +76,7 @@ class OrderCubit extends Cubit<OrderState> {
     required double dropoffLat,
     required double dropoffLng,
     String paymentType = 'cash',
+    String promoCode = '',
   }) {
     final body = {
       'merchant_id': merchantId,
@@ -90,6 +93,7 @@ class OrderCubit extends Cubit<OrderState> {
       'dropoff_lat': dropoffLat,
       'dropoff_lng': dropoffLng,
       'payment_type': paymentType,
+      'promo_code': promoCode,
     };
     return _api.quoteOrder(body);
   }

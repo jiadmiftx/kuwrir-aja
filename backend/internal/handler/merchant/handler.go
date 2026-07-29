@@ -6,6 +6,7 @@ import (
 	"math"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/kuwrir-platform/backend/internal/legal"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/pricing"
+	"github.com/kuwrir-platform/backend/internal/service"
 	"github.com/kuwrir-platform/backend/internal/upload"
 )
 
@@ -125,6 +127,19 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, protected *gin.RouterG
 		// Dashboard summary
 		owner.GET("/today-summary", h.TodaySummary)
 		owner.GET("/dashboard-summary", h.GetDashboardSummary)
+
+		// Promo codes (merchant-owned — only ever discount this merchant's
+		// own orders, separate from admin's platform-wide promos)
+		owner.GET("/promotions", h.GetMyPromotions)
+		owner.POST("/promotions", h.CreateMyPromotion)
+		owner.PUT("/promotions/:id", h.UpdateMyPromotion)
+		owner.DELETE("/promotions/:id", h.DeleteMyPromotion)
+		owner.PUT("/promotions/:id/toggle", h.ToggleMyPromotion)
+
+		// Homepage banner slots (paid, admin-approved)
+		owner.GET("/banners", h.GetMyBanners)
+		owner.POST("/banners", h.CreateMyBanner)
+		owner.POST("/banners/:id/image", h.UploadMyBannerImage)
 	}
 }
 
@@ -1045,6 +1060,301 @@ func (h *Handler) DeleteVariant(c *gin.Context) {
 	variantID := c.Param("variantId")
 	h.db.Where("id = ?", variantID).Delete(&model.ProductVariant{})
 	c.JSON(http.StatusOK, gin.H{"message": "Variant deleted"})
+}
+
+// --- Promo Code Handlers ---
+//
+// Mirrors admin's platform-wide promo CRUD (admin/handler.go), but every
+// query is scoped to "merchant_id = this merchant's own ID" — a merchant can
+// never see or touch another merchant's promo, or a platform-wide one.
+
+type MerchantPromoRequest struct {
+	Code        string  `json:"code" binding:"required"`
+	Title       string  `json:"title" binding:"required"`
+	Type        string  `json:"type" binding:"required"` // percentage, fixed, free_delivery
+	Value       float64 `json:"value"`                    // required > 0 unless type is free_delivery
+	MinOrder    float64 `json:"min_order"`
+	MaxDiscount float64 `json:"max_discount"`
+	UsageLimit  int     `json:"usage_limit"`
+	StartsAt    string  `json:"starts_at" binding:"required"`
+	ExpiresAt   string  `json:"expires_at" binding:"required"`
+}
+
+func validateMerchantPromoValue(req MerchantPromoRequest) error {
+	if req.Type != "free_delivery" && req.Value <= 0 {
+		return fmt.Errorf("value must be greater than 0")
+	}
+	return nil
+}
+
+func (h *Handler) GetMyPromotions(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var promos []model.Promotion
+	h.db.Where("merchant_id = ?", merchant.ID).Order("created_at DESC").Find(&promos)
+	c.JSON(http.StatusOK, gin.H{"promotions": promos})
+}
+
+func (h *Handler) CreateMyPromotion(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var req MerchantPromoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateMerchantPromoValue(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	starts, err := time.Parse("2006-01-02", req.StartsAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid starts_at"})
+		return
+	}
+	expires, err := time.Parse("2006-01-02", req.ExpiresAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid expires_at"})
+		return
+	}
+
+	promo := model.Promotion{
+		MerchantID:  &merchant.ID,
+		Code:        req.Code,
+		Title:       req.Title,
+		Type:        req.Type,
+		Value:       req.Value,
+		MinOrder:    req.MinOrder,
+		MaxDiscount: req.MaxDiscount,
+		UsageLimit:  req.UsageLimit,
+		IsActive:    true,
+		StartsAt:    starts,
+		ExpiresAt:   expires,
+	}
+	if err := h.db.Create(&promo).Error; err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Promo code already exists"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"promotion": promo})
+}
+
+func (h *Handler) UpdateMyPromotion(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var req MerchantPromoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateMerchantPromoValue(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	starts, err := time.Parse("2006-01-02", req.StartsAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid starts_at"})
+		return
+	}
+	expires, err := time.Parse("2006-01-02", req.ExpiresAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid expires_at"})
+		return
+	}
+
+	result := h.db.Model(&model.Promotion{}).
+		Where("id = ? AND merchant_id = ?", id, merchant.ID).
+		Updates(map[string]interface{}{
+			"code": req.Code, "title": req.Title, "type": req.Type,
+			"value": req.Value, "min_order": req.MinOrder, "max_discount": req.MaxDiscount,
+			"usage_limit": req.UsageLimit, "starts_at": starts, "expires_at": expires,
+		})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Promotion not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Promotion updated"})
+}
+
+func (h *Handler) DeleteMyPromotion(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	result := h.db.Where("id = ? AND merchant_id = ?", id, merchant.ID).Delete(&model.Promotion{})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Promotion not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Promotion deleted"})
+}
+
+func (h *Handler) ToggleMyPromotion(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var promo model.Promotion
+	if err := h.db.Where("id = ? AND merchant_id = ?", id, merchant.ID).First(&promo).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Promotion not found"})
+		return
+	}
+	h.db.Model(&promo).Update("is_active", !promo.IsActive)
+	c.JSON(http.StatusOK, gin.H{"is_active": !promo.IsActive})
+}
+
+// --- Homepage Banner Slot Handlers ---
+//
+// A merchant can buy a homepage carousel slot for a flat price per day,
+// paid out of their existing Wallet balance (same balance/ledger as order
+// payouts and withdrawals — see service.DebitMerchantWallet). The slot
+// doesn't go live until an admin approves it (Banner.Status).
+
+// defaultBannerPricePerDay is used until an admin sets a real value via the
+// "banner_price_per_day" system_settings key.
+const defaultBannerPricePerDay = 50000
+
+func (h *Handler) loadBannerPricePerDay() float64 {
+	var s model.SystemSetting
+	if err := h.db.Where("key = ?", "banner_price_per_day").First(&s).Error; err == nil {
+		if v, err := strconv.ParseFloat(s.Value, 64); err == nil && v > 0 {
+			return v
+		}
+	}
+	return defaultBannerPricePerDay
+}
+
+type BannerPurchaseRequest struct {
+	Title    string `json:"title" binding:"required"`
+	Subtitle string `json:"subtitle"`
+	CTAText  string `json:"cta_text"`
+	Days     int    `json:"days" binding:"required,min=1"`
+}
+
+func (h *Handler) GetMyBanners(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var banners []model.Banner
+	h.db.Where("merchant_id = ?", merchant.ID).Order("created_at DESC").Find(&banners)
+	c.JSON(http.StatusOK, gin.H{"banners": banners})
+}
+
+func (h *Handler) CreateMyBanner(c *gin.Context) {
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var req BannerPurchaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pricePerDay := h.loadBannerPricePerDay()
+	cost := pricePerDay * float64(req.Days)
+	now := time.Now()
+	expires := now.AddDate(0, 0, req.Days)
+
+	ctaText := req.CTAText
+	if ctaText == "" {
+		ctaText = "Lihat Menu"
+	}
+
+	banner := model.Banner{
+		MerchantID: &merchant.ID,
+		Title:      req.Title,
+		Subtitle:   req.Subtitle,
+		CTAText:    ctaText,
+		IsActive:   true,
+		Status:     "pending_review",
+		StartsAt:   &now,
+		ExpiresAt:  &expires,
+		PricePaid:  cost,
+	}
+
+	tx := h.db.Begin()
+	notes := fmt.Sprintf("Slot banner homepage %d hari (%s)", req.Days, req.Title)
+	if err := service.DebitMerchantWallet(tx, merchant.ID, cost, "banner_ad", nil, notes); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo wallet tidak cukup untuk membeli slot ini. Silakan top up terlebih dahulu."})
+		return
+	}
+	if err := tx.Create(&banner).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create banner"})
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create banner"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"banner": banner})
+}
+
+// UploadMyBannerImage sets the image for a banner slot the merchant just
+// purchased. Separate step (create-then-upload) rather than one multipart
+// request, mirroring admin's UploadPromotionImage.
+func (h *Handler) UploadMyBannerImage(c *gin.Context) {
+	id := c.Param("id")
+	userID := c.GetString("user_id")
+	merchant, err := h.getMerchantByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var banner model.Banner
+	if err := h.db.Where("id = ? AND merchant_id = ?", id, merchant.ID).First(&banner).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Banner not found"})
+		return
+	}
+
+	fh, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image file required"})
+		return
+	}
+
+	url, err := upload.Save(fh, "banners")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.db.Model(&banner).Update("image_url", url)
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
 // --- Helpers ---

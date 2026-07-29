@@ -8,6 +8,7 @@ class OrderQuote {
   final String deliveryType;
   final double appServiceFee;
   final double taxAmount;
+  final double discountAmount;
   final double total;
   final double distanceKm;
 
@@ -18,6 +19,7 @@ class OrderQuote {
     required this.deliveryType,
     required this.appServiceFee,
     required this.taxAmount,
+    this.discountAmount = 0,
     required this.total,
     required this.distanceKm,
   });
@@ -29,6 +31,7 @@ class OrderQuote {
         deliveryType: json['delivery_type'] as String? ?? 'platform',
         appServiceFee: (json['app_service_fee'] as num?)?.toDouble() ?? 0,
         taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0,
+        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
         total: (json['total'] as num?)?.toDouble() ?? 0,
         distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0,
       );

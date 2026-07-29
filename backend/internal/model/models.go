@@ -250,6 +250,17 @@ type Banner struct {
 	PromoType string `gorm:"default:''" json:"promo_type,omitempty"`
 	SortOrder int    `gorm:"default:0" json:"sort_order"`
 	IsActive  bool   `gorm:"default:true" json:"is_active"`
+
+	// MerchantID/Status/StartsAt/ExpiresAt/PricePaid are only set for a
+	// merchant-purchased homepage slot (nil MerchantID = today's plain
+	// admin-curated banner, unaffected by any of this). Status flows
+	// pending_review -> approved | rejected; only "approved" +
+	// ExpiresAt > now() slots are shown to customers.
+	MerchantID *uuid.UUID `gorm:"type:uuid;index" json:"merchant_id,omitempty"`
+	Status     string     `gorm:"type:varchar(20);default:''" json:"status,omitempty"`
+	StartsAt   *time.Time `json:"starts_at,omitempty"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	PricePaid  float64    `gorm:"default:0" json:"price_paid,omitempty"`
 }
 
 // Product is an item sold by the merchant
@@ -383,6 +394,13 @@ type Order struct {
 	TaxAmount     float64 `gorm:"default:0" json:"tax_amount"`      // PPN applied on subtotal_with_markup
 	AppServiceFee float64 `gorm:"default:0" json:"app_service_fee"` // platform service fee on delivery
 	PackagingFee  float64 `gorm:"default:0" json:"packaging_fee"`   // sum of product.packaging_fee * quantity across items, not marked up
+
+	// Promo redemption (nil/0 when no code was applied). DiscountAmount is
+	// already subtracted out of Total — kept here only so the order's own
+	// receipt/history can show what was discounted and by which code.
+	PromoID        *uuid.UUID `gorm:"type:uuid;index" json:"promo_id,omitempty"`
+	PromoCode      string     `json:"promo_code,omitempty"`
+	DiscountAmount float64    `gorm:"default:0" json:"discount_amount,omitempty"`
 
 	// Payout tracking (what each party actually receives)
 	MerchantPayout          float64 `gorm:"default:0" json:"merchant_payout"`           // = Subtotal - PlatformMarkup (merchant's base price)
@@ -522,6 +540,11 @@ type Promotion struct {
 	StartsAt    time.Time `gorm:"not null" json:"starts_at"`
 	ExpiresAt   time.Time `gorm:"not null" json:"expires_at"`
 	ImageURL    string    `json:"image_url,omitempty"`
+
+	// MerchantID scopes this promo to a single merchant's orders only, funded
+	// by that merchant rather than the platform. Nil means platform-wide,
+	// admin-managed — the only kind that existed before merchant-owned promos.
+	MerchantID *uuid.UUID `gorm:"type:uuid;index" json:"merchant_id,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -713,7 +736,7 @@ type WalletTransaction struct {
 	WalletID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"wallet_id"`
 	OrderID     *uuid.UUID `gorm:"type:uuid;index" json:"order_id,omitempty"` // source order (nullable for manual adjustments)
 	Type        string     `gorm:"type:varchar(20);not null" json:"type"`      // credit | debit
-	Category    string     `gorm:"type:varchar(30);not null" json:"category"`  // order_earning | withdrawal | refund | adjustment | cod_deposit
+	Category    string     `gorm:"type:varchar(30);not null" json:"category"`  // order_earning | withdrawal | refund | adjustment | cod_deposit | banner_ad
 	Amount      float64    `gorm:"not null" json:"amount"`
 	BalanceAfter float64   `gorm:"not null" json:"balance_after"` // snapshot of balance after this entry
 	Notes       string     `json:"notes,omitempty"`

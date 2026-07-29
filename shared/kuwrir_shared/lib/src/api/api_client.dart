@@ -500,6 +500,59 @@ class ApiClient {
     return data['banner_url'] as String;
   }
 
+  // ── Merchant: Promo Codes ──────────────────────────────────────────────
+  // Raw maps (not a shared model) since this view needs every field the
+  // backend stores (usage_limit, used_count, is_active, dates), unlike the
+  // trimmed customer-facing Promotion model above.
+
+  Future<List<Map<String, dynamic>>> getMyPromotions() async {
+    final data = await get('/my-store/promotions');
+    final list = data['promotions'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> createMyPromotion(Map<String, dynamic> body) async {
+    await post('/my-store/promotions', body);
+  }
+
+  Future<void> updateMyPromotion(String id, Map<String, dynamic> body) async {
+    await put('/my-store/promotions/$id', body);
+  }
+
+  Future<void> deleteMyPromotion(String id) async {
+    await _logged(
+      'DELETE',
+      '/my-store/promotions/$id',
+      send: () async => _client.delete(
+        Uri.parse('$baseUrl/my-store/promotions/$id'),
+        headers: await _headers(),
+      ),
+    );
+  }
+
+  Future<void> toggleMyPromotion(String id) async {
+    await put('/my-store/promotions/$id/toggle', {});
+  }
+
+  // ── Merchant: Homepage Banner Slots ────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getMyBanners() async {
+    final data = await get('/my-store/banners');
+    final list = data['banners'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createMyBanner(Map<String, dynamic> body) async {
+    final data = await post('/my-store/banners', body);
+    return data['banner'] as Map<String, dynamic>;
+  }
+
+  Future<String> uploadMyBannerImage(String bannerId, File imageFile) async {
+    final body = await _loggedMultipart('/my-store/banners/$bannerId/image', imageFile);
+    final data = _handleResponse(body);
+    return data['image_url'] as String;
+  }
+
   Future<void> deleteProduct(String productId) async {
     await _logged(
       'DELETE',

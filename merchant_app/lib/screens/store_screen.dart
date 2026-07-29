@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_cubit.dart';
+import 'promo_codes_screen.dart';
+import 'banner_ads_screen.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -320,6 +322,33 @@ class _StoreScreenState extends State<StoreScreen> {
                           subtitle: 'Semua produk tokomu tampil di filter Gratis Ongkir',
                           value: merchant.isFreeDelivery,
                           onChanged: (v) => _toggleFreeDelivery(context, v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _SectionLabel('Promosi'),
+                  _SoftPanel(
+                    child: Column(
+                      children: [
+                        _InfoRow(
+                          icon: Icons.sell_outlined,
+                          label: 'Kode diskon buat pelangganmu sendiri',
+                          value: 'Kode Promo',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PromoCodesScreen()),
+                          ),
+                        ),
+                        const _Hairline(),
+                        _InfoRow(
+                          icon: Icons.campaign_outlined,
+                          label: 'Tampil di carousel utama halaman depan',
+                          value: 'Iklan Banner Homepage',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BannerAdsScreen()),
+                          ),
                         ),
                       ],
                     ),

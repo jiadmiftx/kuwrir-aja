@@ -116,6 +116,11 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 	r.DELETE("/banners/:id", h.DeleteBanner)
 	r.POST("/banners/:id/image", h.UploadBannerImage)
 
+	// Merchant-purchased banner slots, awaiting review before they go live
+	r.GET("/banners/pending", h.GetPendingBanners)
+	r.PUT("/banners/:id/approve", h.ApproveBanner)
+	r.PUT("/banners/:id/reject", h.RejectBanner)
+
 	// WhatsApp gateway pairing/status/logs (proxied — the gateway container
 	// has no host-published port, only reachable from sibling containers)
 	r.GET("/whatsapp/status", h.WhatsAppStatus)
@@ -1048,6 +1053,64 @@ func (h *Handler) UploadBannerImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
+// GetPendingBanners lists merchant-purchased banner slots awaiting review —
+// plain admin-created banners (MerchantID nil) never enter this queue since
+// they're never anything but "live" already.
+func (h *Handler) GetPendingBanners(c *gin.Context) {
+	var banners []model.Banner
+	h.db.Where("merchant_id IS NOT NULL AND status = ?", "pending_review").
+		Order("created_at ASC").Find(&banners)
+	c.JSON(http.StatusOK, gin.H{"banners": banners})
+}
+
+// ApproveBanner puts a merchant-purchased slot live in the homepage
+// carousel (see PublicActiveBanners).
+func (h *Handler) ApproveBanner(c *gin.Context) {
+	id := c.Param("id")
+	result := h.db.Model(&model.Banner{}).
+		Where("id = ? AND merchant_id IS NOT NULL AND status = ?", id, "pending_review").
+		Update("status", "approved")
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pending banner not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Banner approved"})
+}
+
+// RejectBanner declines a merchant-purchased slot and refunds what they
+// paid for it back into their wallet.
+func (h *Handler) RejectBanner(c *gin.Context) {
+	id := c.Param("id")
+
+	var banner model.Banner
+	if err := h.db.Where("id = ? AND merchant_id IS NOT NULL AND status = ?", id, "pending_review").
+		First(&banner).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Pending banner not found"})
+		return
+	}
+
+	tx := h.db.Begin()
+	if err := tx.Model(&banner).Update("status", "rejected").Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject banner"})
+		return
+	}
+	if banner.PricePaid > 0 {
+		notes := fmt.Sprintf("Refund slot banner ditolak: %s", banner.Title)
+		if err := service.CreditMerchantWallet(tx, *banner.MerchantID, banner.PricePaid, "refund", nil, notes); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund merchant"})
+			return
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject banner"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Banner rejected and refunded"})
+}
+
 // --- WhatsApp gateway proxy ---
 // The gateway container has no host-published port (only reachable from
 // sibling containers on the compose network), so every admin-panel call
@@ -1120,11 +1183,62 @@ func (h *Handler) WhatsAppSendMessage(c *gin.Context) {
 	io.Copy(c.Writer, resp.Body)
 }
 
+// targetBannerSlots is how many carousel items PublicActiveBanners tries to
+// fill — paid slots first, then a merit-based backfill of top merchants so
+// the carousel never looks sparse just because nobody's currently paying.
+const targetBannerSlots = 5
+
 // PublicActiveBanners returns active homepage promo banners, ordered for
 // display as the customer app's Home carousel — no auth required.
+//
+// Three layers, in priority order:
+//  1. Plain admin-curated banners (MerchantID nil) — unaffected by any of
+//     the paid-slot logic below, exactly as before this feature existed.
+//  2. Merchant-purchased slots that have cleared admin review and haven't
+//     expired yet.
+//  3. If (1)+(2) don't fill targetBannerSlots, backfill with the
+//     highest-rated open merchants, computed fresh on every request (not
+//     persisted as fake Banner rows) so it never goes stale and always
+//     reflects current standings.
 func (h *Handler) PublicActiveBanners(c *gin.Context) {
+	now := time.Now()
+
 	var banners []model.Banner
-	h.db.Where("is_active = ?", true).Order("sort_order ASC, created_at DESC").Find(&banners)
+	h.db.Where("is_active = ? AND merchant_id IS NULL", true).
+		Or("is_active = ? AND merchant_id IS NOT NULL AND status = ? AND expires_at > ?", true, "approved", now).
+		Order("sort_order ASC, created_at DESC").
+		Find(&banners)
+
+	if len(banners) < targetBannerSlots {
+		excludeIDs := []uuid.UUID{}
+		for _, b := range banners {
+			if b.MerchantID != nil {
+				excludeIDs = append(excludeIDs, *b.MerchantID)
+			}
+		}
+
+		var topMerchants []model.Merchant
+		q := h.db.Where("is_active = ? AND is_verified = ? AND is_open = ?", true, true, true)
+		if len(excludeIDs) > 0 {
+			q = q.Where("id NOT IN ?", excludeIDs)
+		}
+		q.Order("rating DESC, total_reviews DESC").Limit(targetBannerSlots - len(banners)).Find(&topMerchants)
+
+		for _, m := range topMerchants {
+			mID := m.ID
+			banners = append(banners, model.Banner{
+				Base:       model.Base{ID: m.ID},
+				MerchantID: &mID,
+				ImageURL:   m.LogoURL,
+				Title:      m.Name,
+				Subtitle:   "Toko pilihan buat kamu",
+				CTAText:    "Lihat Menu",
+				IsActive:   true,
+				Status:     "approved",
+			})
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"banners": banners})
 }
 

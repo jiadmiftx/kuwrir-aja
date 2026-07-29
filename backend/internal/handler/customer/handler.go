@@ -233,6 +233,7 @@ type PlaceOrderRequest struct {
 	ReceiverPhone  string             `json:"receiver_phone"`
 	PaymentType    string             `json:"payment_type"` // cash | qris | virtual_account
 	Notes          string             `json:"notes"`
+	PromoCode      string             `json:"promo_code"`
 }
 
 // --- Handlers ---
@@ -274,6 +275,8 @@ type orderPricingResult struct {
 	DistanceKm              float64
 	SelectedZone            *model.DeliveryZone
 	StockDeductions         []stockDeduction
+	AppliedPromo            *model.Promotion
+	DiscountAmount          float64
 }
 
 // calculateOrderPricing runs the full COD pricing calculation shared by
@@ -287,6 +290,7 @@ func (h *Handler) calculateOrderPricing(
 	items []OrderItemRequest,
 	dropoffLat, dropoffLng float64,
 	paymentType string,
+	promoCode string,
 	settings settingsData,
 	pricingSettings pricing.Settings,
 ) (*orderPricingResult, *pricingError) {
@@ -484,6 +488,24 @@ func (h *Handler) calculateOrderPricing(
 		return nil, &pricingError{http.StatusBadRequest, fmt.Sprintf("COD maximum is IDR %.0f. Please use online payment for larger orders.", settings.MaxCODAmount)}
 	}
 
+	// Promo redemption — validated against the final subtotal/delivery fee so
+	// MinOrder checks see the real charged amount, not a pre-markup figure.
+	var appliedPromo *model.Promotion
+	var discountAmount float64
+	if promoCode != "" {
+		var promo model.Promotion
+		if err := h.db.Where("code = ?", promoCode).First(&promo).Error; err != nil {
+			return nil, &pricingError{http.StatusBadRequest, "Kode promo tidak ditemukan"}
+		}
+		discount, err := pricing.ApplyPromo(promo, merchant.ID, subtotalWithMarkup, deliveryFee)
+		if err != nil {
+			return nil, &pricingError{http.StatusBadRequest, err.Error()}
+		}
+		appliedPromo = &promo
+		discountAmount = discount
+		grandTotal -= discount
+	}
+
 	return &orderPricingResult{
 		OrderItems:              orderItems,
 		SubtotalWithMarkup:      subtotalWithMarkup,
@@ -502,6 +524,8 @@ func (h *Handler) calculateOrderPricing(
 		DistanceKm:              distanceKm,
 		SelectedZone:            selectedZone,
 		StockDeductions:         stockDeductions,
+		AppliedPromo:            appliedPromo,
+		DiscountAmount:          discountAmount,
 	}, nil
 }
 
@@ -514,6 +538,7 @@ type QuoteRequest struct {
 	DropoffLat  float64            `json:"dropoff_lat" binding:"required"`
 	DropoffLng  float64            `json:"dropoff_lng" binding:"required"`
 	PaymentType string             `json:"payment_type"`
+	PromoCode   string             `json:"promo_code"`
 }
 
 // QuoteOrder computes the real delivery fee, tax, and total for the
@@ -539,7 +564,7 @@ func (h *Handler) QuoteOrder(c *gin.Context) {
 	}
 
 	result, perr := h.calculateOrderPricing(
-		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, settings, pricingSettings)
+		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, req.PromoCode, settings, pricingSettings)
 	if perr != nil {
 		c.JSON(perr.Status, gin.H{"error": perr.Message})
 		return
@@ -552,6 +577,7 @@ func (h *Handler) QuoteOrder(c *gin.Context) {
 		"delivery_type":   result.DeliveryType,
 		"app_service_fee": result.AppServiceFee,
 		"tax_amount":      result.TaxAmount,
+		"discount_amount": result.DiscountAmount,
 		"total":           result.GrandTotal,
 		"distance_km":     result.DistanceKm,
 	})
@@ -578,7 +604,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	}
 
 	result, perr := h.calculateOrderPricing(
-		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, settings, pricingSettings)
+		merchant, req.Items, req.DropoffLat, req.DropoffLng, req.PaymentType, req.PromoCode, settings, pricingSettings)
 	if perr != nil {
 		c.JSON(perr.Status, gin.H{"error": perr.Message})
 		return
@@ -624,6 +650,7 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 		MerchantPayout:          result.MerchantPayout,
 		MerchantDeliveryEarning: result.MerchantDeliveryEarning,
 		Total:                   result.GrandTotal,
+		DiscountAmount:          result.DiscountAmount,
 
 		PickupAddress: merchant.Address,
 		PickupLat:     merchant.Latitude,
@@ -645,6 +672,10 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	if result.SelectedZone != nil {
 		order.ZoneID = &result.SelectedZone.ID
 	}
+	if result.AppliedPromo != nil {
+		order.PromoID = &result.AppliedPromo.ID
+		order.PromoCode = result.AppliedPromo.Code
+	}
 
 	tx := h.db.Begin()
 	if err := tx.Create(&order).Error; err != nil {
@@ -657,6 +688,23 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	for _, d := range result.StockDeductions {
 		tx.Model(&model.Product{}).Where("id = ?", d.Product.ID).
 			Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
+	}
+
+	// Increment redemption count inside the same tx as order creation. The
+	// WHERE clause re-checks the usage limit atomically at increment time
+	// (not just back when calculateOrderPricing read it), so two concurrent
+	// checkouts racing the last slot of a limited promo can't both win.
+	if result.AppliedPromo != nil {
+		q := tx.Model(&model.Promotion{}).Where("id = ?", result.AppliedPromo.ID)
+		if result.AppliedPromo.UsageLimit > 0 {
+			q = q.Where("used_count < ?", result.AppliedPromo.UsageLimit)
+		}
+		res := q.Update("used_count", gorm.Expr("used_count + 1"))
+		if res.Error != nil || res.RowsAffected == 0 {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Kode promo sudah mencapai batas penggunaan"})
+			return
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {

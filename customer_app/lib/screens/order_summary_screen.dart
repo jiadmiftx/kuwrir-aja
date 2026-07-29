@@ -47,6 +47,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   bool _loadingMethods = false;
   final Set<String> _expandedGroups = {};
 
+  final _promoCtrl = TextEditingController();
+  String _appliedPromoCode = '';
+  String? _promoError;
+  bool _applyingPromo = false;
+
   static const _groupOrder = [
     'E-Wallet',
     'QRIS',
@@ -85,6 +90,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     _loadQuote();
   }
 
+  @override
+  void dispose() {
+    _promoCtrl.dispose();
+    super.dispose();
+  }
+
   /// Live channel list from Duitku, re-fetched once the real total is
   /// known (fees can vary per amount tier). Best-effort: if the gateway
   /// isn't configured or the call fails, checkout just falls back to
@@ -112,6 +123,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         items: widget.items,
         dropoffLat: widget.dropoffLat,
         dropoffLng: widget.dropoffLng,
+        promoCode: _appliedPromoCode,
       );
       if (mounted) setState(() => _quote = quote);
       unawaited(_loadPaymentMethods(quote.total));
@@ -128,6 +140,49 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     }
   }
 
+  /// Validates the typed code against the real total (server enforces
+  /// min-order/usage-limit/merchant-scope) — a bad code shows inline under
+  /// the input instead of blowing away the whole price breakdown, since
+  /// delivery fee etc. are still valid regardless of promo validity.
+  Future<void> _applyPromo() async {
+    final code = _promoCtrl.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+    setState(() {
+      _applyingPromo = true;
+      _promoError = null;
+    });
+    try {
+      final quote = await context.read<OrderCubit>().fetchQuote(
+        merchantId: widget.merchantId,
+        items: widget.items,
+        dropoffLat: widget.dropoffLat,
+        dropoffLng: widget.dropoffLng,
+        promoCode: code,
+      );
+      if (mounted) {
+        setState(() {
+          _quote = quote;
+          _appliedPromoCode = code;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _promoError = e is ApiException ? e.message : 'Kode promo tidak valid');
+      }
+    } finally {
+      if (mounted) setState(() => _applyingPromo = false);
+    }
+  }
+
+  void _removePromo() {
+    setState(() {
+      _appliedPromoCode = '';
+      _promoCtrl.clear();
+      _promoError = null;
+    });
+    _loadQuote();
+  }
+
   void _confirmOrder() {
     context.read<OrderCubit>().placeOrder(
       merchantId: widget.merchantId,
@@ -139,6 +194,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       receiverPhone: widget.receiverPhone,
       paymentType: _paymentType,
       notes: widget.notes,
+      promoCode: _appliedPromoCode,
     );
   }
 
@@ -357,6 +413,66 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                 ),
               ],
             const SizedBox(height: 24),
+            _SectionLabel('Kode Promo'),
+            const SizedBox(height: 10),
+            _SoftPanel(
+              child: _appliedPromoCode.isNotEmpty
+                  ? Row(
+                      children: [
+                        Icon(Icons.local_offer, size: 18, color: KuwrirColors.success),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _appliedPromoCode,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _removePromo,
+                          child: const Text('Hapus'),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _promoCtrl,
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                  hintText: 'Masukkan kode promo',
+                                ),
+                                onSubmitted: (_) => _applyPromo(),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _applyingPromo ? null : _applyPromo,
+                              child: _applyingPromo
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Text('Terapkan'),
+                            ),
+                          ],
+                        ),
+                        if (_promoError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _promoError!,
+                            style: TextStyle(color: KuwrirColors.error, fontSize: 12.5),
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 24),
             _SectionLabel('Rincian Biaya'),
             const SizedBox(height: 10),
             _SoftPanel(
@@ -405,6 +521,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                           _PriceRow(
                             label: 'Pajak (PPN)',
                             amount: _quote!.taxAmount,
+                          ),
+                        if (_quote!.discountAmount > 0)
+                          _PriceRow(
+                            label: 'Diskon ($_appliedPromoCode)',
+                            amount: _quote!.discountAmount,
+                            isDiscount: true,
                           ),
                         Divider(height: 20, color: KuwrirColors.border),
                         Container(
@@ -864,11 +986,13 @@ class _PriceRow extends StatelessWidget {
   final String label;
   final double amount;
   final bool isBold;
+  final bool isDiscount;
 
   const _PriceRow({
     required this.label,
     required this.amount,
     this.isBold = false,
+    this.isDiscount = false,
   });
 
   @override
@@ -878,6 +1002,8 @@ class _PriceRow extends StatelessWidget {
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
       color: isBold ? KuwrirColors.textPrimary : KuwrirColors.textSecondary,
     );
+    final formatted =
+        '${isDiscount ? '-' : ''}Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -885,8 +1011,10 @@ class _PriceRow extends StatelessWidget {
         children: [
           Text(label, style: style),
           Text(
-            'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-            style: style.copyWith(color: isBold ? KuwrirColors.primary : null),
+            formatted,
+            style: style.copyWith(
+              color: isDiscount ? KuwrirColors.success : (isBold ? KuwrirColors.primary : null),
+            ),
           ),
         ],
       ),
