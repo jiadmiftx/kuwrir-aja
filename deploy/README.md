@@ -11,6 +11,11 @@ and to wire up the GitHub Actions CI/CD pipelines.
 - **Push to `main` touching `admin_panel/**`** → `.github/workflows/deploy-admin.yml`
   does the same for the admin panel (`ghcr.io/jiadmiftx/kuwrir-aja/admin`),
   restarting only the `admin` container.
+- **Push to `main` touching `web_app/**`** → `.github/workflows/deploy-webapp.yml`
+  does the same for the customer web app / PWA (`ghcr.io/jiadmiftx/kuwrir-aja/webapp`),
+  restarting only the `webapp` container. Served at `app.cocourir.com` via
+  `deploy/nginx/app.cocourir.com.conf` (same pattern as `platform.cocourir.com`
+  for the admin panel) — proxies to the container's host port `8092`.
 - **Push to `main` touching `customer_app/**`, `driver_app/**`, `merchant_app/**`
   or `shared/**`** → `.github/workflows/firebase-distribution.yml` builds release
   APKs for the affected app(s) and uploads them to Firebase App Distribution.
@@ -45,6 +50,28 @@ Repo → Settings → Secrets and variables → Actions:
 `GITHUB_TOKEN` (used to push to GHCR) is provided automatically by Actions —
 no setup needed, but the repo's package visibility defaults to **private**,
 which is why the VPS needs to `docker login ghcr.io` once (step 2.3 below).
+
+### 1.1 GitHub Variables for web push (optional, `deploy-webapp.yml`)
+
+Repo → Settings → Secrets and variables → Actions → **Variables** tab (not
+Secrets — these are all public/client-visible values by design, same as any
+Firebase web app config):
+
+| Variable | Description |
+|---|---|
+| `FIREBASE_WEB_API_KEY` | From Firebase console → Project settings → your Web app |
+| `FIREBASE_WEB_AUTH_DOMAIN` | " |
+| `FIREBASE_WEB_PROJECT_ID` | `kuwrir-3495d` (same project the 3 Flutter apps use) |
+| `FIREBASE_WEB_STORAGE_BUCKET` | " |
+| `FIREBASE_WEB_MESSAGING_SENDER_ID` | " |
+| `FIREBASE_WEB_APP_ID` | " |
+| `FIREBASE_WEB_VAPID_KEY` | Project settings → Cloud Messaging → Web configuration → generate a Web Push certificate |
+
+No Web app exists yet in the `kuwrir-3495d` Firebase project — add one via
+**Project settings → Add app → Web** first. Until these variables are set,
+`deploy-webapp.yml` just builds with them empty and the web app's "Aktifkan
+Notifikasi" button reports push as unconfigured; order/chat polling keeps
+working as the fallback either way.
 
 ## 2. VPS provisioning (one-time)
 

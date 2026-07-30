@@ -1,0 +1,85 @@
+name: Deploy Customer Web App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web_app/**'
+      - '.github/workflows/deploy-webapp.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+        working-directory: web_app
+
+      - run: npx tsc --noEmit
+        working-directory: web_app
+
+      - run: npm run lint
+        working-directory: web_app
+
+      - run: npm run build
+        working-directory: web_app
+
+  build-and-push:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./web_app
+          push: true
+          tags: |
+            ghcr.io/jiadmiftx/kuwrir-aja/webapp:latest
+            ghcr.io/jiadmiftx/kuwrir-aja/webapp:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # All public/non-secret values (Firebase web config + VAPID key
+          # are meant to be client-visible) — repo Variables, not Secrets.
+          # Empty until a Web app is registered in the Firebase console (see
+          # web_app/.env.example); push just stays "unconfigured" until then.
+          build-args: |
+            NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.FIREBASE_WEB_API_KEY }}
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.FIREBASE_WEB_AUTH_DOMAIN }}
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.FIREBASE_WEB_PROJECT_ID }}
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_WEB_STORAGE_BUCKET }}
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.FIREBASE_WEB_MESSAGING_SENDER_ID }}
+            NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_WEB_APP_ID }}
+            NEXT_PUBLIC_FIREBASE_VAPID_KEY=${{ vars.FIREBASE_WEB_VAPID_KEY }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/kuwrir-aja
+            git pull
+            docker compose -f deploy/docker-compose.yml pull webapp
+            docker compose -f deploy/docker-compose.yml up -d --no-deps webapp
+            docker image prune -f

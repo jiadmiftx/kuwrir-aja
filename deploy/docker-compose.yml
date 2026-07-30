@@ -75,6 +75,17 @@ services:
     depends_on:
       - backend
 
+  # Customer web app (Next.js PWA, so iOS users without an App Store app can
+  # still order) — redeployed by CI/CD on every push to web_app/**
+  webapp:
+    image: ghcr.io/jiadmiftx/kuwrir-aja/webapp:latest
+    container_name: kuwrir-webapp
+    restart: unless-stopped
+    ports:
+      - "8092:3000"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:
