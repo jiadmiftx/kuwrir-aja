@@ -43,8 +43,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col justify-center px-6 py-12">
       <div className="mb-10 text-center">
-        <div className="mb-2 text-3xl font-bold text-emerald-600">Kuwrir Aja</div>
-        <p className="text-sm text-gray-500">Pesan makanan & kebutuhan harian, diantar cepat.</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/cocourir_food_logo.svg" alt="Cocourir" className="mx-auto h-16 w-auto" />
+        <p className="mt-2 text-sm text-gray-500">Pesan makanan & kebutuhan harian, diantar cepat.</p>
       </div>
 
       {step === "phone" && (
@@ -113,7 +114,7 @@ export default function LoginPage() {
             <Link href="/terms" target="_blank" className="text-emerald-600 underline">
               Syarat &amp; Ketentuan
             </Link>{" "}
-            Kuwrir Aja
+            Cocourir
           </label>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button

@@ -17,13 +17,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kuwrir Aja",
+  title: "Cocourir",
   description: "Pesan makanan & kebutuhan harian, diantar cepat.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Kuwrir Aja",
+    title: "Cocourir",
   },
   icons: {
     icon: [{ url: "/favicon-32.png", sizes: "32x32", type: "image/png" }],

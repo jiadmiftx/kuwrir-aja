@@ -18,7 +18,7 @@ const messaging = firebase.messaging();
 // Foreground messages are handled in lib/firebase/messaging.ts instead —
 // this only fires when the tab/PWA isn't focused.
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || "Kuwrir Aja";
+  const title = payload.notification?.title || "Cocourir";
   const options = {
     body: payload.notification?.body || "",
     icon: "/icons/icon-192.png",

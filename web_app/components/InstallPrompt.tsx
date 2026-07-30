@@ -32,7 +32,7 @@ export function InstallPrompt() {
       <div className="flex items-start gap-3 rounded-xl bg-gray-900 p-3 text-white shadow-lg">
         <span className="text-xl">📲</span>
         <div className="flex-1 text-xs leading-relaxed">
-          <p className="font-semibold">Install Kuwrir Aja di iPhone kamu</p>
+          <p className="font-semibold">Install Cocourir di iPhone kamu</p>
           <p className="mt-0.5 text-gray-300">
             Ketuk tombol Bagikan <span aria-hidden>⬆️</span> lalu pilih &quot;Add to Home Screen&quot; agar bisa
             menerima notifikasi pesanan.
