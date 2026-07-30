@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Download01Icon, Share08Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 
 const DISMISS_KEY = "kuwrir-install-prompt-dismissed";
 
@@ -28,14 +30,17 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-40 mx-auto max-w-(--shell-width) px-4 pb-3">
-      <div className="flex items-start gap-3 rounded-xl bg-gray-900 p-3 text-white shadow-lg">
-        <span className="text-xl">📲</span>
+    <div className="fixed bottom-16 left-0 right-0 z-40 mx-auto max-w-lg px-4 pb-3 md:bottom-4">
+      <div className="flex items-start gap-3 rounded-2xl bg-(--color-ink) p-3.5 text-(--color-accent-contrast) shadow-lg">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
+          <HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.5} />
+        </span>
         <div className="flex-1 text-xs leading-relaxed">
           <p className="font-semibold">Install Cocourir di iPhone kamu</p>
-          <p className="mt-0.5 text-gray-300">
-            Ketuk tombol Bagikan <span aria-hidden>⬆️</span> lalu pilih &quot;Add to Home Screen&quot; agar bisa
-            menerima notifikasi pesanan.
+          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-white/70">
+            Ketuk tombol Bagikan
+            <HugeiconsIcon icon={Share08Icon} size={13} strokeWidth={1.5} className="inline" />
+            lalu pilih &quot;Add to Home Screen&quot; agar bisa menerima notifikasi pesanan.
           </p>
         </div>
         <button
@@ -43,9 +48,10 @@ export function InstallPrompt() {
             localStorage.setItem(DISMISS_KEY, "1");
             setShow(false);
           }}
-          className="text-gray-400"
+          className="text-white/50"
+          aria-label="Tutup"
         >
-          ✕
+          <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.5} />
         </button>
       </div>
     </div>

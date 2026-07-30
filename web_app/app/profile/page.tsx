@@ -4,10 +4,32 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  UserIcon,
+  PencilEdit01Icon,
+  Location01Icon,
+  Invoice01Icon,
+  Wallet01Icon,
+  Message01Icon,
+  Shield01Icon,
+  ArrowRight01Icon,
+  Notification01Icon,
+  Logout01Icon,
+} from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuthStore } from "@/lib/stores/auth";
 import { requestPushToken } from "@/lib/firebase/messaging";
 import { saveDeviceToken } from "@/lib/api/endpoints";
+
+const MENU = [
+  { href: "/profile/edit", label: "Edit Profil", icon: PencilEdit01Icon },
+  { href: "/addresses", label: "Alamat Tersimpan", icon: Location01Icon },
+  { href: "/orders", label: "Riwayat Pesanan", icon: Invoice01Icon },
+  { href: "/wallet", label: "Wallet", icon: Wallet01Icon },
+  { href: "/support", label: "Chat Admin / Bantuan", icon: Message01Icon },
+  { href: "/terms", label: "Syarat & Ketentuan", icon: Shield01Icon },
+] as const;
 
 function NotificationSettings() {
   const [status, setStatus] = useState<"idle" | "granted" | "denied" | "unsupported" | "unconfigured">(
@@ -24,31 +46,37 @@ function NotificationSettings() {
   });
 
   if (status === "granted") {
-    return <p className="px-4 py-3 text-xs text-emerald-600">🔔 Notifikasi pesanan aktif di perangkat ini.</p>;
+    return (
+      <p className="mt-4 flex items-center gap-2 text-xs text-(--color-accent)">
+        <HugeiconsIcon icon={Notification01Icon} size={14} strokeWidth={1.5} />
+        Notifikasi pesanan aktif di perangkat ini.
+      </p>
+    );
   }
 
   return (
-    <div className="px-4 py-3">
+    <div className="mt-4">
       <button
         onClick={() => enable.mutate()}
         disabled={enable.isPending}
-        className="w-full rounded-full border border-emerald-600 py-2.5 text-sm font-semibold text-emerald-600 disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-full border border-(--color-accent) py-2.5 text-sm font-semibold text-(--color-accent) disabled:opacity-50"
       >
-        {enable.isPending ? "Mengaktifkan..." : "🔔 Aktifkan Notifikasi Pesanan"}
+        <HugeiconsIcon icon={Notification01Icon} size={16} strokeWidth={1.5} />
+        {enable.isPending ? "Mengaktifkan..." : "Aktifkan Notifikasi Pesanan"}
       </button>
       {status === "denied" && (
-        <p className="mt-1.5 text-xs text-red-500">
+        <p className="mt-2 text-xs text-(--color-danger)">
           Izin notifikasi ditolak — aktifkan lewat pengaturan browser/perangkat.
         </p>
       )}
       {status === "unsupported" && (
-        <p className="mt-1.5 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-(--color-ink-faint)">
           Perangkat/browser ini belum mendukung notifikasi push. Di iPhone, install dulu ke Layar Utama lewat tombol
           Bagikan.
         </p>
       )}
       {status === "unconfigured" && (
-        <p className="mt-1.5 text-xs text-gray-400">Notifikasi push belum dikonfigurasi untuk versi web ini.</p>
+        <p className="mt-2 text-xs text-(--color-ink-faint)">Notifikasi push belum dikonfigurasi untuk versi web ini.</p>
       )}
     </div>
   );
@@ -59,52 +87,46 @@ function ProfileContent() {
   const { user, clear } = useAuthStore();
 
   return (
-    <div className="pb-6">
-      <header className="sticky top-0 z-20 border-b border-gray-100 bg-white px-4 py-3">
-        <p className="text-base font-bold text-gray-800">Profil</p>
+    <div className="mx-auto max-w-(--content-width) px-4 pb-6 md:px-8">
+      <header className="pt-5 md:pt-8">
+        <h1 className="text-xl font-semibold tracking-tight text-(--color-ink) md:text-2xl">Profil</h1>
       </header>
 
-      <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">👤</div>
-        <div>
-          <p className="text-base font-semibold text-gray-800">{user?.name || "Pengguna"}</p>
-          <p className="text-sm text-gray-500">{user?.phone}</p>
+      <div className="mx-auto max-w-2xl">
+        <div className="mt-4 flex items-center gap-3.5 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
+            <HugeiconsIcon icon={UserIcon} size={26} strokeWidth={1.5} />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-(--color-ink)">{user?.name || "Pengguna"}</p>
+            <p className="text-sm text-(--color-ink-faint)">{user?.phone}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-col divide-y divide-gray-100">
-        <Link href="/profile/edit" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Edit Profil <span className="text-gray-300">›</span>
-        </Link>
-        <Link href="/addresses" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Alamat Tersimpan <span className="text-gray-300">›</span>
-        </Link>
-        <Link href="/orders" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Riwayat Pesanan <span className="text-gray-300">›</span>
-        </Link>
-        <Link href="/wallet" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Wallet <span className="text-gray-300">›</span>
-        </Link>
-        <Link href="/support" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Chat Admin / Bantuan <span className="text-gray-300">›</span>
-        </Link>
-        <Link href="/terms" className="flex items-center justify-between px-4 py-3 text-sm text-gray-700">
-          Syarat &amp; Ketentuan <span className="text-gray-300">›</span>
-        </Link>
-      </div>
+        <div className="mt-3 flex flex-col divide-y divide-(--color-border) overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface-raised)">
+          {MENU.map((item) => (
+            <Link key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3.5 text-sm text-(--color-ink)">
+              <HugeiconsIcon icon={item.icon} size={18} strokeWidth={1.5} className="text-(--color-ink-faint)" />
+              <span className="flex-1">{item.label}</span>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.5} className="text-(--color-ink-faint)" />
+            </Link>
+          ))}
+        </div>
 
-      <NotificationSettings />
+        <NotificationSettings />
 
-      <div className="px-4 py-6">
-        <button
-          onClick={() => {
-            clear();
-            router.replace("/login");
-          }}
-          className="w-full rounded-full border border-red-500 py-3 text-sm font-semibold text-red-500"
-        >
-          Keluar
-        </button>
+        <div className="mt-6">
+          <button
+            onClick={() => {
+              clear();
+              router.replace("/login");
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-(--color-danger) py-3 text-sm font-semibold text-(--color-danger)"
+          >
+            <HugeiconsIcon icon={Logout01Icon} size={17} strokeWidth={1.5} />
+            Keluar
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { getWallet, withdrawWallet } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
@@ -39,14 +41,16 @@ function WithdrawContent() {
   if (success) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-4xl">✅</p>
-        <p className="text-base font-semibold text-gray-800">Penarikan Diproses</p>
-        <p className="text-sm text-gray-500">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
+          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={30} strokeWidth={1.5} />
+        </div>
+        <p className="text-base font-semibold text-(--color-ink)">Penarikan Diproses</p>
+        <p className="text-sm text-(--color-ink-soft)">
           Permintaan tarik dana {formatIDR(amountValue)} sedang diproses ke rekening {bankCode}.
         </p>
         <button
           onClick={() => router.replace("/wallet")}
-          className="mt-2 rounded-full bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white"
+          className="mt-2 rounded-full bg-(--color-accent) px-6 py-2.5 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
         >
           Kembali ke Wallet
         </button>
@@ -56,80 +60,82 @@ function WithdrawContent() {
 
   return (
     <div className="pb-6">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-3">
-        <button onClick={() => router.back()} className="text-xl">
-          ←
+      <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-(--color-border) bg-(--color-surface-raised) px-4 py-3 md:static md:mx-auto md:max-w-2xl md:border-none md:bg-transparent md:px-0 md:pt-8">
+        <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center text-(--color-ink-soft) md:hidden" aria-label="Kembali">
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
         </button>
-        <p className="text-base font-bold text-gray-800">Tarik Dana</p>
-      </header>
+        <p className="text-base font-semibold text-(--color-ink) md:text-xl">Tarik Dana</p>
+      </div>
 
-      <p className="px-4 pt-3 text-xs text-gray-500">Saldo tersedia: {formatIDR(balance)}</p>
+      <div className="mx-auto max-w-2xl px-4 py-4 md:px-0">
+        <p className="text-xs text-(--color-ink-faint)">Saldo tersedia: {formatIDR(balance)}</p>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setError("");
-          if (amountValue > balance) {
-            setError("Jumlah melebihi saldo tersedia");
-            return;
-          }
-          submit.mutate();
-        }}
-        className="flex flex-col gap-3 px-4 py-4"
-      >
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Jumlah</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            required
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Masukkan nominal"
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Bank</span>
-          <select
-            value={bankCode}
-            onChange={(e) => setBankCode(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
-          >
-            {BANKS.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Nomor Rekening</span>
-          <input
-            required
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Nama Pemilik Rekening</span>
-          <input
-            required
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
-          />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={submit.isPending || amountValue <= 0}
-          className="mt-2 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError("");
+            if (amountValue > balance) {
+              setError("Jumlah melebihi saldo tersedia");
+              return;
+            }
+            submit.mutate();
+          }}
+          className="mt-3 flex flex-col gap-3 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4"
         >
-          {submit.isPending ? "Memproses..." : "Ajukan Penarikan"}
-        </button>
-      </form>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-(--color-ink-soft)">Jumlah</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Masukkan nominal"
+              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-(--color-ink-soft)">Bank</span>
+            <select
+              value={bankCode}
+              onChange={(e) => setBankCode(e.target.value)}
+              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+            >
+              {BANKS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-(--color-ink-soft)">Nomor Rekening</span>
+            <input
+              required
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-(--color-ink-soft)">Nama Pemilik Rekening</span>
+            <input
+              required
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+            />
+          </label>
+          {error && <p className="text-sm text-(--color-danger)">{error}</p>}
+          <button
+            type="submit"
+            disabled={submit.isPending || amountValue <= 0}
+            className="mt-2 rounded-full bg-(--color-accent) py-3 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover) disabled:opacity-40"
+          >
+            {submit.isPending ? "Memproses..." : "Ajukan Penarikan"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

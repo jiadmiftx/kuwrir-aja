@@ -6,9 +6,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Avoids leaflet's default marker icon asset-path bug under bundlers by
-// using a plain emoji pin instead of the shipped PNG icons.
+// inlining a plain SVG pin instead of the shipped PNG icons.
 const pinIcon = L.divIcon({
-  html: '<div style="font-size:32px;line-height:1;transform:translate(-50%,-90%)">📍</div>',
+  html:
+    '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" style="transform:translate(-50%,-92%)">' +
+    '<path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="oklch(0.4 0.1 160)" stroke="white" stroke-width="1.2"/>' +
+    '<circle cx="12" cy="9.5" r="2.6" fill="white"/>' +
+    "</svg>",
   className: "",
   iconSize: [0, 0],
 });
@@ -43,7 +47,7 @@ export default function LocationPickerMap({ lat, lng, onChange }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only mount gate; leaflet needs `window`
     setReady(true);
   }, []);
-  if (!ready) return <div className="h-64 w-full animate-pulse bg-gray-100" />;
+  if (!ready) return <div className="h-64 w-full animate-pulse bg-(--color-border-soft)" />;
 
   return (
     <MapContainer center={[lat, lng]} zoom={16} scrollWheelZoom className="h-64 w-full">

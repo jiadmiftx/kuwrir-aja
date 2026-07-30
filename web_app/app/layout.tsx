@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
+import { TopNav } from "@/components/TopNav";
 import { BottomNav } from "@/components/BottomNav";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { PushForegroundListener } from "@/components/PushForegroundListener";
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#059669",
+  themeColor: "#005734",
   width: "device-width",
   initialScale: 1,
 };
@@ -47,11 +48,10 @@ export default function RootLayout({
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-gray-100">
+      <body className="min-h-full">
         <Providers>
-          <div className="mx-auto min-h-screen max-w-(--shell-width) bg-white pb-16 shadow-sm">
-            {children}
-          </div>
+          <TopNav />
+          <div className="min-h-screen pb-20 md:pb-8">{children}</div>
           <BottomNav />
           <InstallPrompt />
           <PushForegroundListener />

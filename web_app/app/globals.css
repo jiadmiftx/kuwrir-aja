@@ -3,13 +3,34 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  /* Single source of truth for the app shell's max width — every fixed
-     bottom bar / overlay that pins itself under the shell (BottomNav,
-     InstallPrompt, ProductSheet, checkout/cart/topup action bars) reads
-     this instead of a hardcoded max-w-[480px] so they can't drift apart. */
-  --shell-width: 720px;
+
+  /* Ink (text) — near-black tinted toward the brand hue instead of pure gray */
+  --color-ink: oklch(0.2 0.014 160);
+  --color-ink-soft: oklch(0.47 0.012 160);
+  --color-ink-faint: oklch(0.64 0.01 160);
+
+  /* Surfaces */
+  --color-surface: oklch(0.982 0.003 160);
+  --color-surface-raised: oklch(0.997 0.002 160);
+  --color-border: oklch(0.907 0.006 160);
+  --color-border-soft: oklch(0.945 0.004 160);
+
+  /* Brand accent — a deeper, more restrained green than a stock SaaS emerald */
+  --color-accent: oklch(0.4 0.1 160);
+  --color-accent-hover: oklch(0.34 0.1 160);
+  --color-accent-soft: oklch(0.94 0.035 160);
+  --color-accent-contrast: oklch(0.99 0.004 160);
+
+  --color-danger: oklch(0.55 0.16 25);
+  --color-danger-soft: oklch(0.95 0.03 25);
+  --color-warning: oklch(0.62 0.13 70);
+  --color-warning-soft: oklch(0.95 0.045 80);
+
+  /* Single source of truth for the page's max content width */
+  --content-width: 1200px;
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-ink);
 }

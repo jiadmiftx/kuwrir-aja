@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { updateMe } from "@/lib/api/endpoints";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -26,51 +28,51 @@ function EditProfileContent() {
 
   return (
     <div className="pb-6">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-3">
-        <button onClick={() => router.back()} className="text-xl">
-          ←
+      <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-(--color-border) bg-(--color-surface-raised) px-4 py-3 md:static md:mx-auto md:max-w-2xl md:border-none md:bg-transparent md:px-0 md:pt-8">
+        <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center text-(--color-ink-soft) md:hidden" aria-label="Kembali">
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
         </button>
-        <p className="text-base font-bold text-gray-800">Edit Profil</p>
-      </header>
+        <p className="text-base font-semibold text-(--color-ink) md:text-xl">Edit Profil</p>
+      </div>
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
           save.mutate();
         }}
-        className="flex flex-col gap-3 px-4 py-4"
+        className="mx-4 mt-4 flex max-w-2xl flex-col gap-3 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4 md:mx-auto md:p-5"
       >
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Nama Lengkap</span>
+          <span className="text-sm font-medium text-(--color-ink-soft)">Nama Lengkap</span>
           <input
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
+            className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Email</span>
+          <span className="text-sm font-medium text-(--color-ink-soft)">Email</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
+            className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Nomor HP</span>
+          <span className="text-sm font-medium text-(--color-ink-soft)">Nomor HP</span>
           <input
             disabled
             value={user?.phone ?? ""}
-            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-400"
+            className="rounded-xl border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm text-(--color-ink-faint)"
           />
         </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-(--color-danger)">{error}</p>}
         <button
           type="submit"
           disabled={save.isPending || !name}
-          className="mt-2 rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-2 rounded-full bg-(--color-accent) py-3 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover) disabled:opacity-40"
         >
           {save.isPending ? "Menyimpan..." : "Simpan"}
         </button>

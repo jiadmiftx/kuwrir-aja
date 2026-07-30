@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowLeft01Icon, Message01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { cancelOrder, getOrder, getOrderChat, requestRefund, sendOrderChat } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
@@ -61,187 +63,198 @@ function OrderDetailContent() {
   });
 
   const o = order.data?.order;
-  if (!o) return <div className="p-4 text-sm text-gray-400">Memuat...</div>;
+  if (!o) return <div className="p-4 text-sm text-(--color-ink-faint)">Memuat...</div>;
 
   const canCancel = o.status === "pending";
   const canRefund = o.status === "delivered" || o.status === "cancelled";
 
   return (
     <div className="pb-6">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-3">
-        <button onClick={() => router.back()} className="text-xl">
-          ←
+      <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-(--color-border) bg-(--color-surface-raised) px-4 py-3 md:static md:mx-auto md:max-w-2xl md:border-none md:bg-transparent md:px-0 md:pt-8">
+        <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center text-(--color-ink-soft) md:hidden" aria-label="Kembali">
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
         </button>
-        <p className="text-base font-bold text-gray-800">#{o.order_number}</p>
-      </header>
-
-      <section className="border-b border-gray-100 px-4 py-4">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
-            {orderStatusLabel(o.status)}
-          </span>
-          {o.payment_type !== "cash" && (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                o.payment_status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {o.payment_status === "paid" ? "Sudah Dibayar" : "Menunggu Pembayaran"}
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-gray-600">{o.merchant?.name}</p>
-        <p className="text-xs text-gray-400">{o.dropoff_address}</p>
-      </section>
-
-      {o.payment_type !== "cash" && o.payment_status !== "paid" && o.payment_url && (
-        <section className="border-b border-gray-100 px-4 py-3">
-          <a
-            href={o.payment_url}
-            className="block w-full rounded-full bg-amber-500 py-2.5 text-center text-sm font-semibold text-white"
-          >
-            Lanjutkan Pembayaran
-          </a>
-          <p className="mt-1.5 text-center text-xs text-gray-400">
-            Link pembayaran masih berlaku, klik untuk menyelesaikan pembayaran.
-          </p>
-        </section>
-      )}
-
-      {o.items && o.items.length > 0 && (
-        <section className="border-b border-gray-100 px-4 py-3">
-          <p className="mb-2 text-sm font-bold text-gray-800">Item Pesanan</p>
-          <div className="flex flex-col gap-1.5">
-            {o.items.map((it) => (
-              <div key={it.id} className="flex justify-between text-sm">
-                <span className="text-gray-600">
-                  {it.quantity}x {it.item_name}
-                </span>
-                <span className="text-gray-800">{formatIDR(it.total_price)}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="border-b border-gray-100 px-4 py-3">
-        <div className="flex flex-col gap-1.5 text-sm">
-          <div className="flex justify-between text-gray-600">
-            <span>Subtotal</span>
-            <span>{formatIDR(o.subtotal)}</span>
-          </div>
-          <div className="flex justify-between text-gray-600">
-            <span>Ongkos Kirim</span>
-            <span>{formatIDR(o.delivery_fee)}</span>
-          </div>
-          {o.discount_amount > 0 && (
-            <div className="flex justify-between text-emerald-600">
-              <span>Diskon {o.promo_code && `(${o.promo_code})`}</span>
-              <span>-{formatIDR(o.discount_amount)}</span>
-            </div>
-          )}
-          <div className="mt-1 flex justify-between border-t border-gray-100 pt-1.5 text-base font-bold text-gray-800">
-            <span>Total {o.payment_type === "cash" ? "(Bayar di Tempat)" : ""}</span>
-            <span>{formatIDR(o.total)}</span>
-          </div>
-        </div>
-      </section>
-
-      <div className="flex gap-2 px-4 py-3">
-        <button
-          onClick={() => setShowChat((v) => !v)}
-          className="flex-1 rounded-full border border-emerald-600 py-2.5 text-sm font-semibold text-emerald-600"
-        >
-          💬 Chat
-        </button>
-        {canCancel && (
-          <button
-            onClick={() => {
-              if (confirm("Batalkan pesanan ini?")) cancel.mutate();
-            }}
-            disabled={cancel.isPending}
-            className="flex-1 rounded-full border border-red-500 py-2.5 text-sm font-semibold text-red-500"
-          >
-            Batalkan
-          </button>
-        )}
-        {canRefund && !refundResult && (
-          <button
-            onClick={() => setShowRefundForm((v) => !v)}
-            className="flex-1 rounded-full border border-amber-500 py-2.5 text-sm font-semibold text-amber-600"
-          >
-            Ajukan Refund
-          </button>
-        )}
+        <p className="text-base font-semibold text-(--color-ink) md:text-xl">#{o.order_number}</p>
       </div>
 
-      {refundResult && (
-        <section className="border-b border-gray-100 px-4 py-3">
-          <p className={`text-xs ${refundResult.ok ? "text-emerald-600" : "text-red-500"}`}>{refundResult.message}</p>
-        </section>
-      )}
-
-      {showRefundForm && (
-        <section className="border-b border-gray-100 px-4 py-3">
-          <p className="mb-2 text-sm font-semibold text-gray-800">Alasan Refund</p>
-          <textarea
-            value={refundReason}
-            onChange={(e) => setRefundReason(e.target.value)}
-            rows={3}
-            placeholder="Jelaskan alasan pengajuan refund..."
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-          />
-          <button
-            onClick={() => refund.mutate()}
-            disabled={refund.isPending || !refundReason.trim()}
-            className="mt-2 w-full rounded-full bg-amber-500 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {refund.isPending ? "Mengirim..." : "Kirim Pengajuan"}
-          </button>
-          <p className="mt-1.5 text-xs text-gray-400">Refund sebesar {formatIDR(o.total)} akan ditinjau admin dalam 1-2 hari kerja.</p>
-        </section>
-      )}
-
-      {showChat && (
-        <section className="border-t border-gray-100 px-4 py-3">
-          <div className="mb-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
-            {chat.data?.messages.map((m) => (
-              <div
-                key={m.id}
-                className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                  m.sender_id === userId ? "self-end bg-emerald-600 text-white" : "self-start bg-gray-100 text-gray-800"
+      <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-4 md:px-0">
+        <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="rounded-full bg-(--color-accent-soft) px-3 py-1 text-sm font-medium text-(--color-accent)">
+              {orderStatusLabel(o.status)}
+            </span>
+            {o.payment_type !== "cash" && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  o.payment_status === "paid"
+                    ? "bg-(--color-accent-soft) text-(--color-accent)"
+                    : "bg-(--color-warning-soft) text-(--color-warning)"
                 }`}
               >
-                {m.text}
-              </div>
-            ))}
-            {chat.data && chat.data.messages.length === 0 && (
-              <p className="text-center text-xs text-gray-400">Belum ada percakapan.</p>
+                {o.payment_status === "paid" ? "Sudah Dibayar" : "Menunggu Pembayaran"}
+              </span>
             )}
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (chatText.trim()) sendChat.mutate();
-            }}
-            className="flex gap-2"
+          <p className="text-sm text-(--color-ink-soft)">{o.merchant?.name}</p>
+          <p className="text-xs text-(--color-ink-faint)">{o.dropoff_address}</p>
+        </section>
+
+        {o.payment_type !== "cash" && o.payment_status !== "paid" && o.payment_url && (
+          <section className="rounded-2xl border border-(--color-warning-soft) bg-(--color-warning-soft) p-4">
+            <a
+              href={o.payment_url}
+              className="block w-full rounded-full bg-(--color-warning) py-2.5 text-center text-sm font-semibold text-(--color-accent-contrast)"
+            >
+              Lanjutkan Pembayaran
+            </a>
+            <p className="mt-2 text-center text-xs text-(--color-warning)">
+              Link pembayaran masih berlaku, klik untuk menyelesaikan pembayaran.
+            </p>
+          </section>
+        )}
+
+        {o.items && o.items.length > 0 && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <p className="mb-2.5 text-sm font-medium text-(--color-ink)">Item Pesanan</p>
+            <div className="flex flex-col gap-1.5">
+              {o.items.map((it) => (
+                <div key={it.id} className="flex justify-between text-sm">
+                  <span className="text-(--color-ink-soft)">
+                    {it.quantity}x {it.item_name}
+                  </span>
+                  <span className="text-(--color-ink)">{formatIDR(it.total_price)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+          <div className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between text-(--color-ink-soft)">
+              <span>Subtotal</span>
+              <span>{formatIDR(o.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-(--color-ink-soft)">
+              <span>Ongkos Kirim</span>
+              <span>{formatIDR(o.delivery_fee)}</span>
+            </div>
+            {o.discount_amount > 0 && (
+              <div className="flex justify-between text-(--color-accent)">
+                <span>Diskon {o.promo_code && `(${o.promo_code})`}</span>
+                <span>-{formatIDR(o.discount_amount)}</span>
+              </div>
+            )}
+            <div className="mt-1 flex justify-between border-t border-(--color-border) pt-2 text-base font-semibold text-(--color-ink)">
+              <span>Total {o.payment_type === "cash" ? "(Bayar di Tempat)" : ""}</span>
+              <span>{formatIDR(o.total)}</span>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowChat((v) => !v)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-(--color-accent) py-2.5 text-sm font-semibold text-(--color-accent)"
           >
-            <input
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value)}
-              placeholder="Tulis pesan..."
-              className="flex-1 rounded-full border border-gray-200 px-4 py-2 text-sm outline-none focus:border-emerald-500"
+            <HugeiconsIcon icon={Message01Icon} size={16} strokeWidth={1.5} />
+            Chat
+          </button>
+          {canCancel && (
+            <button
+              onClick={() => {
+                if (confirm("Batalkan pesanan ini?")) cancel.mutate();
+              }}
+              disabled={cancel.isPending}
+              className="flex-1 rounded-full border border-(--color-danger) py-2.5 text-sm font-semibold text-(--color-danger)"
+            >
+              Batalkan
+            </button>
+          )}
+          {canRefund && !refundResult && (
+            <button
+              onClick={() => setShowRefundForm((v) => !v)}
+              className="flex-1 rounded-full border border-(--color-warning) py-2.5 text-sm font-semibold text-(--color-warning)"
+            >
+              Ajukan Refund
+            </button>
+          )}
+        </div>
+
+        {refundResult && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <p className={`text-xs ${refundResult.ok ? "text-(--color-accent)" : "text-(--color-danger)"}`}>
+              {refundResult.message}
+            </p>
+          </section>
+        )}
+
+        {showRefundForm && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <p className="mb-2 text-sm font-medium text-(--color-ink)">Alasan Refund</p>
+            <textarea
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              rows={3}
+              placeholder="Jelaskan alasan pengajuan refund..."
+              className="w-full rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
             />
             <button
-              type="submit"
-              disabled={sendChat.isPending}
-              className="rounded-full bg-emerald-600 px-4 text-sm font-semibold text-white"
+              onClick={() => refund.mutate()}
+              disabled={refund.isPending || !refundReason.trim()}
+              className="mt-2 w-full rounded-full bg-(--color-warning) py-2.5 text-sm font-semibold text-(--color-accent-contrast) disabled:opacity-50"
             >
-              Kirim
+              {refund.isPending ? "Mengirim..." : "Kirim Pengajuan"}
             </button>
-          </form>
-        </section>
-      )}
+            <p className="mt-2 text-xs text-(--color-ink-faint)">
+              Refund sebesar {formatIDR(o.total)} akan ditinjau admin dalam 1-2 hari kerja.
+            </p>
+          </section>
+        )}
+
+        {showChat && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <div className="mb-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
+              {chat.data?.messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                    m.sender_id === userId
+                      ? "self-end bg-(--color-accent) text-(--color-accent-contrast)"
+                      : "self-start bg-(--color-border-soft) text-(--color-ink)"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {chat.data && chat.data.messages.length === 0 && (
+                <p className="text-center text-xs text-(--color-ink-faint)">Belum ada percakapan.</p>
+              )}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (chatText.trim()) sendChat.mutate();
+              }}
+              className="flex gap-2"
+            >
+              <input
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                placeholder="Tulis pesan..."
+                className="flex-1 rounded-full border border-(--color-border) px-4 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+              />
+              <button
+                type="submit"
+                disabled={sendChat.isPending}
+                className="rounded-full bg-(--color-accent) px-4 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
+              >
+                Kirim
+              </button>
+            </form>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

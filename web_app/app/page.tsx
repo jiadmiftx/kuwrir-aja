@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Search01Icon, LocationOffline01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { MerchantCard } from "@/components/MerchantCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -35,39 +37,37 @@ function HomeContent() {
   const popularProducts = useQuery({ queryKey: ["products-popular"], queryFn: getPopularProducts });
 
   return (
-    <div className="pb-4">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
-        <div>
-          <p className="text-xs text-gray-500">Halo{user ? `, ${user.name || "kamu"}` : ""} 👋</p>
-          <p className="text-sm font-semibold text-gray-800">Mau pesan apa hari ini?</p>
-        </div>
-        <Link href="/profile" className="text-2xl">
-          👤
-        </Link>
+    <div className="mx-auto max-w-(--content-width) px-4 pb-6 md:px-8">
+      <header className="pt-5 md:pt-8">
+        <p className="text-sm text-(--color-ink-faint)">Halo{user ? `, ${user.name || "kamu"}` : ""}</p>
+        <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-(--color-ink) md:text-2xl">
+          Mau pesan apa hari ini?
+        </h1>
       </header>
 
       <Link
         href="/search"
-        className="mx-4 mt-3 flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-400"
+        className="mt-4 flex items-center gap-2.5 rounded-full border border-(--color-border) bg-(--color-surface-raised) px-4 py-3 text-sm text-(--color-ink-faint) transition-colors hover:border-(--color-ink-faint) md:max-w-md"
       >
-        🔍 Cari toko atau produk...
+        <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.5} />
+        Cari toko atau produk...
       </Link>
 
       {banners.data && banners.data.banners.length > 0 && (
-        <div className="mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+        <div className="mt-6 flex snap-x gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-2 md:overflow-visible lg:grid-cols-3">
           {banners.data.banners.map((b) => (
             <div
               key={b.id}
-              className="relative flex min-w-[85%] snap-center flex-col justify-end overflow-hidden rounded-xl bg-emerald-600 text-white"
+              className="relative flex min-w-[85%] snap-center flex-col justify-end overflow-hidden rounded-2xl bg-(--color-ink) text-(--color-accent-contrast) md:min-w-0"
               style={{ aspectRatio: "16/7" }}
             >
               {b.image_url && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={b.image_url} alt={b.title} className="absolute inset-0 h-full w-full object-cover" />
               )}
-              <div className="relative z-10 bg-gradient-to-t from-black/70 to-transparent p-3">
-                <p className="text-sm font-bold">{b.title}</p>
-                {b.subtitle && <p className="text-xs opacity-90">{b.subtitle}</p>}
+              <div className="relative z-10 bg-gradient-to-t from-black/75 to-transparent p-4">
+                <p className="text-sm font-semibold">{b.title}</p>
+                {b.subtitle && <p className="mt-0.5 text-xs opacity-85">{b.subtitle}</p>}
               </div>
             </div>
           ))}
@@ -75,11 +75,13 @@ function HomeContent() {
       )}
 
       {categories.data && categories.data.food_categories.length > 0 && (
-        <div className="mt-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
-              activeCategory === null ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-600"
+            className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-medium transition-colors ${
+              activeCategory === null
+                ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
+                : "border-(--color-border) text-(--color-ink-soft)"
             }`}
           >
             Semua
@@ -88,11 +90,12 @@ function HomeContent() {
             <button
               key={c.id}
               onClick={() => setActiveCategory(c.id)}
-              className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
-                activeCategory === c.id ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-600"
+              className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-medium transition-colors ${
+                activeCategory === c.id
+                  ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
+                  : "border-(--color-border) text-(--color-ink-soft)"
               }`}
             >
-              {c.icon ? `${c.icon} ` : ""}
               {c.name}
             </button>
           ))}
@@ -100,9 +103,9 @@ function HomeContent() {
       )}
 
       {geo.status === "granted" && nearbyMerchants.data && nearbyMerchants.data.merchants.length > 0 && (
-        <section className="mt-5">
-          <h2 className="px-4 text-sm font-bold text-gray-800">Terdekat dari kamu</h2>
-          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
+        <section className="mt-9">
+          <h2 className="text-base font-semibold text-(--color-ink)">Terdekat dari kamu</h2>
+          <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {nearbyMerchants.data.merchants.map((m) => (
               <MerchantCard key={m.id} merchant={m} />
             ))}
@@ -110,15 +113,16 @@ function HomeContent() {
         </section>
       )}
       {geo.status === "denied" && (
-        <p className="mx-4 mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        <p className="mt-6 flex items-center gap-2 rounded-xl bg-(--color-warning-soft) px-4 py-3 text-xs text-(--color-warning)">
+          <HugeiconsIcon icon={LocationOffline01Icon} size={16} strokeWidth={1.5} className="shrink-0" />
           Izinkan akses lokasi di browser untuk melihat toko terdekat.
         </p>
       )}
 
       {popularProducts.data && popularProducts.data.products.length > 0 && (
-        <section className="mt-5">
-          <h2 className="px-4 text-sm font-bold text-gray-800">Sedang Rame</h2>
-          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
+        <section className="mt-8">
+          <h2 className="text-base font-semibold text-(--color-ink)">Sedang Rame</h2>
+          <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {popularProducts.data.products.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -126,15 +130,15 @@ function HomeContent() {
         </section>
       )}
 
-      <section className="mt-5">
-        <h2 className="px-4 text-sm font-bold text-gray-800">Rating Tertinggi</h2>
-        <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
-          {popularMerchants.isLoading && <p className="px-4 text-xs text-gray-400">Memuat...</p>}
+      <section className="mt-9">
+        <h2 className="text-base font-semibold text-(--color-ink)">Rating Tertinggi</h2>
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
+          {popularMerchants.isLoading && <p className="text-xs text-(--color-ink-faint)">Memuat...</p>}
           {popularMerchants.data?.merchants.map((m) => (
             <MerchantCard key={m.id} merchant={m} />
           ))}
           {popularMerchants.data && popularMerchants.data.merchants.length === 0 && (
-            <p className="px-4 text-xs text-gray-400">Belum ada toko untuk kategori ini.</p>
+            <p className="text-xs text-(--color-ink-faint)">Belum ada toko untuk kategori ini.</p>
           )}
         </div>
       </section>
