@@ -34,7 +34,7 @@ function AddressesContent() {
         <p className="text-base font-bold text-gray-800">{pickMode ? "Pilih Alamat" : "Alamat Tersimpan"}</p>
       </header>
 
-      <div className="flex flex-col gap-2 p-4">
+      <div className="flex flex-col gap-2 p-4 md:grid md:grid-cols-2">
         {addresses.data?.addresses.map((addr) => (
           <div
             key={addr.id}

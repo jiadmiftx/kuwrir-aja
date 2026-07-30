@@ -20,7 +20,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white">
-      <div className="mx-auto flex max-w-[480px] items-stretch justify-between">
+      <div className="mx-auto flex max-w-(--shell-width) items-stretch justify-between">
         {TABS.map((tab) => {
           const active = pathname === tab.href;
           return (

@@ -40,7 +40,7 @@ function OrdersContent() {
       {active.length > 0 && (
         <section className="px-4 py-3">
           <p className="mb-2 text-sm font-bold text-gray-800">Sedang Berlangsung</p>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-2">
             {active.map((o) => (
               <OrderRow key={o.id} onClick={() => router.push(`/orders/${o.id}`)} order={o} />
             ))}
@@ -51,7 +51,7 @@ function OrdersContent() {
       {past.length > 0 && (
         <section className="px-4 py-3">
           <p className="mb-2 text-sm font-bold text-gray-800">Riwayat</p>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-2">
             {past.map((o) => (
               <OrderRow key={o.id} onClick={() => router.push(`/orders/${o.id}`)} order={o} />
             ))}

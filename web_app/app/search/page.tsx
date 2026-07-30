@@ -58,7 +58,7 @@ function SearchContent() {
             {merchants.data && merchants.data.merchants.length === 0 && (
               <p className="px-4 pt-2 text-xs text-gray-400">Tidak ada toko ditemukan.</p>
             )}
-            <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
+            <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
               {merchants.data?.merchants.map((m) => (
                 <MerchantCard key={m.id} merchant={m} />
               ))}
@@ -71,7 +71,7 @@ function SearchContent() {
             {products.data && products.data.products.length === 0 && (
               <p className="px-4 pt-2 text-xs text-gray-400">Tidak ada produk ditemukan.</p>
             )}
-            <div className="mt-2 flex flex-wrap gap-3 px-4 pb-1">
+            <div className="mt-2 flex flex-wrap gap-3 px-4 pb-1 md:grid md:grid-cols-3 lg:grid-cols-4">
               {products.data?.products.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

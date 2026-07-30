@@ -7,7 +7,7 @@ export function ProductCard({ product }: { product: ProductSearchItem }) {
   return (
     <Link
       href={`/store/${product.merchant_id}`}
-      className="flex min-w-[150px] max-w-[150px] flex-col gap-1 rounded-xl border border-gray-100 bg-white p-2 shadow-sm"
+      className="flex min-w-[150px] max-w-[150px] flex-col gap-1 rounded-xl border border-gray-100 bg-white p-2 shadow-sm md:min-w-0 md:max-w-none md:w-full"
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
         {product.image_url ? (

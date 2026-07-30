@@ -28,7 +28,7 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-40 mx-auto max-w-[480px] px-4 pb-3">
+    <div className="fixed bottom-16 left-0 right-0 z-40 mx-auto max-w-(--shell-width) px-4 pb-3">
       <div className="flex items-start gap-3 rounded-xl bg-gray-900 p-3 text-white shadow-lg">
         <span className="text-xl">📲</span>
         <div className="flex-1 text-xs leading-relaxed">

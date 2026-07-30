@@ -78,7 +78,7 @@ function CartContent() {
             ))}
           </div>
 
-          <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-[480px] border-t border-gray-100 bg-white px-4 py-3">
+          <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-(--shell-width) border-t border-gray-100 bg-white px-4 py-3">
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>
               <span className="font-bold text-gray-800">{formatIDR(subtotal)}</span>

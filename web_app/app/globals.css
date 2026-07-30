@@ -10,6 +10,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Single source of truth for the app shell's max width — every fixed
+     bottom bar / overlay that pins itself under the shell (BottomNav,
+     InstallPrompt, ProductSheet, checkout/cart/topup action bars) reads
+     this instead of a hardcoded max-w-[480px] so they can't drift apart. */
+  --shell-width: 720px;
 }
 
 @media (prefers-color-scheme: dark) {

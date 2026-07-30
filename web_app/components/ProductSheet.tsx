@@ -57,7 +57,7 @@ export function ProductSheet({ product, merchantId, merchantName, onClose }: Pro
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40" onClick={onClose}>
       <div
-        className="mx-auto flex max-h-[85vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-2xl bg-white"
+        className="mx-auto flex max-h-[85vh] w-full max-w-(--shell-width) flex-col overflow-hidden rounded-t-2xl bg-white"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">

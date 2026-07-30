@@ -102,7 +102,7 @@ function HomeContent() {
       {geo.status === "granted" && nearbyMerchants.data && nearbyMerchants.data.merchants.length > 0 && (
         <section className="mt-5">
           <h2 className="px-4 text-sm font-bold text-gray-800">Terdekat dari kamu</h2>
-          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
+          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {nearbyMerchants.data.merchants.map((m) => (
               <MerchantCard key={m.id} merchant={m} />
             ))}
@@ -118,7 +118,7 @@ function HomeContent() {
       {popularProducts.data && popularProducts.data.products.length > 0 && (
         <section className="mt-5">
           <h2 className="px-4 text-sm font-bold text-gray-800">Sedang Rame</h2>
-          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
+          <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {popularProducts.data.products.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -128,7 +128,7 @@ function HomeContent() {
 
       <section className="mt-5">
         <h2 className="px-4 text-sm font-bold text-gray-800">Rating Tertinggi</h2>
-        <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1">
+        <div className="mt-2 flex gap-3 overflow-x-auto px-4 pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
           {popularMerchants.isLoading && <p className="px-4 text-xs text-gray-400">Memuat...</p>}
           {popularMerchants.data?.merchants.map((m) => (
             <MerchantCard key={m.id} merchant={m} />

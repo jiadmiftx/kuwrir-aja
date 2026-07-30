@@ -71,7 +71,7 @@ function StoreContent() {
         {products.data?.categories.map((cat) => (
           <section key={cat.id}>
             <h2 className="mb-2 text-sm font-bold text-gray-800">{cat.name}</h2>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 md:grid md:grid-cols-2 lg:grid-cols-3">
               {cat.products.map((p) => {
                 const hasDiscount = !!p.discount_price && p.discount_price > 0;
                 return (

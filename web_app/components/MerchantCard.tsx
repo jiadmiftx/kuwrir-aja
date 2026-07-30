@@ -5,7 +5,7 @@ export function MerchantCard({ merchant }: { merchant: Merchant }) {
   return (
     <Link
       href={`/store/${merchant.id}`}
-      className="flex min-w-[160px] max-w-[160px] flex-col gap-1.5 rounded-xl border border-gray-100 bg-white p-2 shadow-sm"
+      className="flex min-w-[160px] max-w-[160px] flex-col gap-1.5 rounded-xl border border-gray-100 bg-white p-2 shadow-sm md:min-w-0 md:max-w-none md:w-full"
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
         {merchant.logo_url ? (

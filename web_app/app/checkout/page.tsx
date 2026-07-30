@@ -274,7 +274,7 @@ function CheckoutContent() {
         </p>
       )}
 
-      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-[480px] border-t border-gray-100 bg-white px-4 py-3">
+      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-(--shell-width) border-t border-gray-100 bg-white px-4 py-3">
         <button
           disabled={!selectedAddress || !quote.data || place.isPending || !receiverName || !receiverPhone}
           onClick={() => place.mutate()}

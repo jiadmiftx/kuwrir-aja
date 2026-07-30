@@ -35,7 +35,6 @@ export const viewport: Viewport = {
   themeColor: "#059669",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -50,7 +49,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-gray-100">
         <Providers>
-          <div className="mx-auto min-h-screen max-w-[480px] bg-white pb-16 shadow-sm">
+          <div className="mx-auto min-h-screen max-w-(--shell-width) bg-white pb-16 shadow-sm">
             {children}
           </div>
           <BottomNav />
