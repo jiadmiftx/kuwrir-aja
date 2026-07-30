@@ -1105,4 +1105,4 @@ Total infrastruktur: ~$49/bulan
 
 ---
 
-*Dokumen ini merupakan gambaran menyeluruh sistem KUWRIR v1.0. Untuk detail teknis, lihat SPECIFICATION.md. Untuk riwayat perubahan, lihat CHANGELOG.md.*
+*Dokumen ini merupakan gambaran menyeluruh sistem KUWRIR v1.0. Untuk detail teknis, lihat SPECIFICATION.md.*

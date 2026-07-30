@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Checklist Alur & Marketing — Kuwrir Aja (Cocourir)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1c1f26;
+    --muted: #5b6270;
+    --border: #e3e6ea;
+    --accent: #2563eb;
+    --marketing-bg: #eef6ff;
+    --marketing-border: #93c5fd;
+    --warn-bg: #fff8ea;
+    --warn-border: #f5cf7d;
+    --done: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { margin: 0 0 6px; font-size: 1.4rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 780px; }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  nav a {
+    font-size: 0.82rem;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  nav a:hover { border-color: var(--accent); color: var(--accent); }
+  main { max-width: 820px; margin: 0 auto; padding: 24px 20px 80px; }
+  section.role { margin-bottom: 40px; }
+  .role-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid var(--text);
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .role-header h2 { margin: 0; font-size: 1.25rem; }
+  .progress {
+    font-size: 0.85rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .progress strong { color: var(--done); }
+  .legend {
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+  }
+  .legend span { display: inline-block; margin-right: 16px; }
+  .stage { margin-bottom: 22px; }
+  .stage h3 {
+    font-size: 1rem;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    accent-color: var(--done);
+    cursor: pointer;
+  }
+  .item label {
+    cursor: pointer;
+    font-size: 0.94rem;
+  }
+  .item.checked {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+  .item.checked label {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: #86efac;
+  }
+  .item-wrap { margin-bottom: 6px; }
+  .item-wrap .item { margin-bottom: 0; border-radius: 8px 8px 0 0; }
+  .note-field {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    background: #fbfbfc;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 7px 12px;
+    resize: vertical;
+    min-height: 30px;
+    margin: 0 0 6px;
+  }
+  .note-field::placeholder { color: #a7adb8; }
+  .note-field:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .callout {
+    border-radius: 8px;
+    padding: 9px 12px;
+    margin: 4px 0 6px 28px;
+    font-size: 0.88rem;
+  }
+  .callout.marketing {
+    background: var(--marketing-bg);
+    border: 1px solid var(--marketing-border);
+    color: #1e3a8a;
+  }
+  .callout.warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: #7a5b00;
+  }
+  .callout .tag {
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+    margin: 6px 0 0 28px;
+  }
+  .footer-note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .toolbar button {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+  }
+  .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+  @media print {
+    header, .toolbar { position: static; }
+    nav { display: none; }
+    .item input[type="checkbox"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Checklist Alur & Poin Marketing — Kuwrir Aja (Cocourir)</h1>
+  <p>Alur pemakaian nyata di app — dari login sampai logout, per role (Customer, Merchant, Driver). Centang tiap tahap yang sudah dicek/disepakati tim sebagai bahan pitching. Progress tersimpan otomatis di browser ini.</p>
+  <div class="toolbar">
+    <button onclick="resetAll()">Reset semua centang</button>
+  </div>
+  <nav>
+    <a href="#customer">1. Customer</a>
+    <a href="#merchant">2. Merchant</a>
+    <a href="#driver">3. Driver</a>
+    <a href="#cross">4. Lintas-Platform</a>
+    <a href="#discuss">5. Perlu Dibahas Tim</a>
+  </nav>
+</header>
+
+<main>
+
+  <div class="legend">
+    <span>☑️ checkbox = tahap sudah jalan di app, dicek langsung dari kode</span>
+    <span class="callout-inline">📣 = poin layak diangkat untuk marketing/pitching</span>
+    <span>⚠️ = catatan/keputusan yang masih perlu dibahas tim</span>
+  </div>
+
+  <!-- ============ 1. CUSTOMER ============ -->
+  <section class="role" id="customer">
+    <div class="role-header">
+      <h2>1. Customer Journey</h2>
+      <span class="progress" data-role="customer">0/0 dicentang</span>
+    </div>
+
+    <div class="stage">
+      <h3>1.1 Login & Registrasi</h3>
+      <div class="item"><input type="checkbox" id="c-1-1" data-role="customer"><label for="c-1-1">Buka app → verifikasi nomor HP pakai OTP via WhatsApp (bukan email/password)</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Daftar cukup nomor WhatsApp — nggak perlu bikin password, nggak perlu verifikasi email."</div>
+      <div class="callout warn"><span class="tag">⚠️</span>OTP dikirim lewat gateway WhatsApp yang kita host sendiri (bukan API resmi Meta) — ada resiko downtime (baru kejadian minggu ini gara-gara kebijakan WhatsApp berubah). Perlu diputuskan: tetap pakai ini, atau migrasi ke WhatsApp Business API resmi/SMS gateway sebagai cadangan.</div>
+      <div class="item"><input type="checkbox" id="c-1-2" data-role="customer"><label for="c-1-2">Lengkapi profil dasar</label></div>
+      <div class="item"><input type="checkbox" id="c-1-3" data-role="customer"><label for="c-1-3">Tambah alamat pengiriman (bisa lebih dari satu, pilih lewat peta)</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>1.2 Home & Discovery</h3>
+      <div class="item"><input type="checkbox" id="c-2-1" data-role="customer"><label for="c-2-1">Lihat carousel banner di halaman depan — gabungan dari 3 sumber: banner kurasi admin (promo platform), banner berbayar dari merchant (slot iklan), rotasi otomatis toko rating tertinggi (kalau slot iklan kosong)</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Toko dengan rating bagus otomatis tampil gratis di halaman depan — makin rajin jaga kualitas, makin sering muncul."</div>
+      <div class="item"><input type="checkbox" id="c-2-2" data-role="customer"><label for="c-2-2">Filter berdasarkan kategori makanan</label></div>
+      <div class="item"><input type="checkbox" id="c-2-3" data-role="customer"><label for="c-2-3">Cari toko/produk lewat pencarian</label></div>
+      <div class="item"><input type="checkbox" id="c-2-4" data-role="customer"><label for="c-2-4">Lihat produk & merchant populer</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>1.3 Pilih & Checkout</h3>
+      <div class="item"><input type="checkbox" id="c-3-1" data-role="customer"><label for="c-3-1">Buka halaman detail toko — menu, rating, produk yang lagi diskon</label></div>
+      <div class="item"><input type="checkbox" id="c-3-2" data-role="customer"><label for="c-3-2">Pilih produk + varian (ukuran, topping, dll)</label></div>
+      <div class="item"><input type="checkbox" id="c-3-3" data-role="customer"><label for="c-3-3">Masuk keranjang, atur jumlah</label></div>
+      <div class="item"><input type="checkbox" id="c-3-4" data-role="customer"><label for="c-3-4">Checkout: pilih/isi alamat pengiriman</label></div>
+      <div class="item"><input type="checkbox" id="c-3-5" data-role="customer"><label for="c-3-5">Masukkan kode promo — beneran motong harga saat checkout, bukan cuma tampil di katalog</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Kode promo beneran ngasih diskon nyata — bisa dari platform, atau langsung dari toko favoritmu."</div>
+      <div class="item"><input type="checkbox" id="c-3-6" data-role="customer"><label for="c-3-6">Pilih metode bayar: Cash (COD) atau online (QRIS, Virtual Account, e-wallet, kartu, gerai retail — lewat Duitku, dikelompokkan per kategori biar gampang dicari)</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"COD tetap ada buat yang belum nyaman bayar online — nggak dipaksa pakai dompet digital."</div>
+      <div class="item"><input type="checkbox" id="c-3-7" data-role="customer"><label for="c-3-7">Lihat rincian biaya lengkap sebelum konfirmasi: subtotal, ongkir, pajak, biaya layanan, diskon — semua kelihatan di awal, bukan muncul dadakan di akhir</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>1.4 Pembayaran Non-Tunai</h3>
+      <div class="item"><input type="checkbox" id="c-4-1" data-role="customer"><label for="c-4-1">Bayar langsung di dalam app (WebView) — nggak perlu keluar ke browser terpisah</label></div>
+      <div class="item"><input type="checkbox" id="c-4-2" data-role="customer"><label for="c-4-2">Setelah bayar sukses, otomatis balik ke halaman detail order dengan status ter-update</label></div>
+      <div class="item"><input type="checkbox" id="c-4-3" data-role="customer"><label for="c-4-3">Kalau belum bayar dan klik "Bayar Sekarang" lagi, pakai link pembayaran yang sama (selama belum kedaluwarsa) — nggak generate kode bayar baru tiap kali</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>1.5 Tracking & Komunikasi</h3>
+      <div class="item"><input type="checkbox" id="c-5-1" data-role="customer"><label for="c-5-1">Lacak status pesanan real-time (auto-update + bisa refresh manual)</label></div>
+      <div class="item"><input type="checkbox" id="c-5-2" data-role="customer"><label for="c-5-2">Chat langsung dengan driver dan/atau merchant dari dalam app</label></div>
+      <div class="item"><input type="checkbox" id="c-5-3" data-role="customer"><label for="c-5-3">Notifikasi push untuk setiap perubahan status penting</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Update pesanan real-time — nggak perlu buka app terus buat ngecek."</div>
+    </div>
+
+    <div class="stage">
+      <h3>1.6 Riwayat & Wallet</h3>
+      <div class="item"><input type="checkbox" id="c-6-1" data-role="customer"><label for="c-6-1">Lihat riwayat pesanan</label></div>
+      <div class="item"><input type="checkbox" id="c-6-2" data-role="customer"><label for="c-6-2">Wallet customer — bisa top up & tarik dana, tapi bukan metode bayar pesanan langsung (dipakai buat kebutuhan lain seperti refund)</label></div>
+      <div class="callout warn"><span class="tag">⚠️</span>Ini perlu dikomunikasikan jelas ke customer biar nggak salah paham "kenapa saldo wallet nggak bisa buat bayar order".</div>
+    </div>
+
+    <div class="stage">
+      <h3>1.7 Support & Profil</h3>
+      <div class="item"><input type="checkbox" id="c-7-1" data-role="customer"><label for="c-7-1">Chat support langsung ke admin dari dalam app</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Komplain direspons langsung oleh tim, bukan chatbot atau sistem tiket berlapis."</div>
+      <div class="item"><input type="checkbox" id="c-7-2" data-role="customer"><label for="c-7-2">Kelola profil pribadi</label></div>
+      <div class="item"><input type="checkbox" id="c-7-3" data-role="customer"><label for="c-7-3">Logout</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>1.8 Fitur yang Di-hold</h3>
+      <div class="callout warn"><span class="tag">⚠️</span>Ada alur pemesanan layanan jasa (booking & tracking untuk laundry/bengkel/salon dll) yang sudah dibangun di kode, tapi sedang tidak difokuskan — prioritas sekarang di order barang/makanan dulu. Jangan dipakai dalam materi marketing sampai tim putuskan dilanjutkan.</div>
+    </div>
+  </section>
+
+  <!-- ============ 2. MERCHANT ============ -->
+  <section class="role" id="merchant">
+    <div class="role-header">
+      <h2>2. Merchant Journey</h2>
+      <span class="progress" data-role="merchant">0/0 dicentang</span>
+    </div>
+
+    <div class="stage">
+      <h3>2.1 Registrasi & Verifikasi</h3>
+      <div class="item"><input type="checkbox" id="m-1-1" data-role="merchant"><label for="m-1-1">Daftar akun — isi data toko & upload dokumen pendukung</label></div>
+      <div class="item"><input type="checkbox" id="m-1-2" data-role="merchant"><label for="m-1-2">Preview & setujui perjanjian kemitraan sebelum submit</label></div>
+      <div class="item"><input type="checkbox" id="m-1-3" data-role="merchant"><label for="m-1-3">Submit, lalu menunggu verifikasi admin</label></div>
+      <div class="callout warn"><span class="tag">⚠️</span>SLA verifikasi belum didefinisikan secara resmi — perlu diputuskan angka pastinya (misal "maks. 2×24 jam") sebelum dijanjikan di materi marketing.</div>
+      <div class="item"><input type="checkbox" id="m-1-4" data-role="merchant"><label for="m-1-4">Kalau profil toko belum lengkap, diarahkan lanjut dari tahap yang kurang — bukan mulai ulang dari awal</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>2.2 Setup Toko</h3>
+      <div class="item"><input type="checkbox" id="m-2-1" data-role="merchant"><label for="m-2-1">Upload logo & banner toko</label></div>
+      <div class="item"><input type="checkbox" id="m-2-2" data-role="merchant"><label for="m-2-2">Isi info toko: nama, alamat, telepon, titik lokasi di peta</label></div>
+      <div class="item"><input type="checkbox" id="m-2-3" data-role="merchant"><label for="m-2-3">Atur kategori & daftar produk, termasuk varian, harga diskon, biaya kemasan, dan jam tayang produk (misal produk sarapan cuma tampil pagi)</label></div>
+      <div class="item"><input type="checkbox" id="m-2-4" data-role="merchant"><label for="m-2-4">Atur stok per produk (opsional, bisa nyala/mati per item)</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Setup dan kelola toko sepenuhnya sendiri, kapan aja — nggak perlu nunggu admin platform bantu input."</div>
+    </div>
+
+    <div class="stage">
+      <h3>2.3 Operasional Harian</h3>
+      <div class="item"><input type="checkbox" id="m-3-1" data-role="merchant"><label for="m-3-1">Terima notifikasi pesanan baru secara real-time</label></div>
+      <div class="item"><input type="checkbox" id="m-3-2" data-role="merchant"><label for="m-3-2">Kelola alur pesanan: terima → proses → siap</label></div>
+      <div class="item"><input type="checkbox" id="m-3-3" data-role="merchant"><label for="m-3-3">Pilih antar sendiri (atur ongkir sendiri) atau pakai driver platform</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Fleksibel — mau pakai armada Cocourir atau antar sendiri, dua-duanya didukung."</div>
+      <div class="item"><input type="checkbox" id="m-3-4" data-role="merchant"><label for="m-3-4">Buka/tutup toko kapan saja lewat toggle satu klik</label></div>
+      <div class="item"><input type="checkbox" id="m-3-5" data-role="merchant"><label for="m-3-5">Lihat ringkasan dashboard: pesanan hari ini, pendapatan, rating</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>2.4 Promosi Mandiri (Fitur Baru)</h3>
+      <div class="item"><input type="checkbox" id="m-4-1" data-role="merchant"><label for="m-4-1">Buat kode promo sendiri (persen, potongan tetap, atau gratis ongkir) — hanya berlaku di toko sendiri</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Bikin promo sendiri kapan aja tanpa nunggu admin platform bikinin — full kendali di tangan merchant."</div>
+      <div class="item"><input type="checkbox" id="m-4-2" data-role="merchant"><label for="m-4-2">Beli slot iklan banner di halaman depan customer, bayar per hari langsung dari saldo wallet</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Mau lebih menonjol di halaman depan? Bisa beli slot banner utama. Kalau nggak ada yang beli, toko rating terbaik otomatis dapat slot gratis — jadi selalu ada insentif buat jaga kualitas."</div>
+      <div class="callout warn"><span class="tag">⚠️</span>Harga slot banner per hari belum ditentukan tim — perlu disepakati sebelum fitur ini diumumkan ke merchant.</div>
+    </div>
+
+    <div class="stage">
+      <h3>2.5 POS / Kasir (Sering Terlewat, Padahal Pembeda Kuat)</h3>
+      <div class="item"><input type="checkbox" id="m-5-1" data-role="merchant"><label for="m-5-1">Terminal POS untuk transaksi tatap muka langsung di toko</label></div>
+      <div class="item"><input type="checkbox" id="m-5-2" data-role="merchant"><label for="m-5-2">Kelola piutang (pelanggan yang belum lunas bayar)</label></div>
+      <div class="item"><input type="checkbox" id="m-5-3" data-role="merchant"><label for="m-5-3">Kelola hutang ke supplier</label></div>
+      <div class="item"><input type="checkbox" id="m-5-4" data-role="merchant"><label for="m-5-4">Laporan penjualan</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Bukan cuma app pesan-antar — ada sistem kasir lengkap buat transaksi langsung di toko, semua kecatat dalam satu aplikasi yang sama."</div>
+      <div class="callout warn"><span class="tag">⚠️</span>Fitur ini belum pernah masuk materi marketing sama sekali, padahal GoFood/GrabFood/ShopeeFood nggak nyediain ini — <strong>worth jadi salah satu pembeda utama</strong> di pitch merchant.</div>
+    </div>
+
+    <div class="stage">
+      <h3>2.6 Keuangan</h3>
+      <div class="item"><input type="checkbox" id="m-6-1" data-role="merchant"><label for="m-6-1">Pantau saldo wallet real-time</label></div>
+      <div class="item"><input type="checkbox" id="m-6-2" data-role="merchant"><label for="m-6-2">Tarik dana ke rekening bank</label></div>
+      <div class="item"><input type="checkbox" id="m-6-3" data-role="merchant"><label for="m-6-3">Atur status pajak (PKP aktif/nonaktif, rate custom kalau perlu)</label></div>
+      <div class="item"><input type="checkbox" id="m-6-4" data-role="merchant"><label for="m-6-4">Chat langsung dengan customer soal pesanan</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>2.7 Logout</h3>
+      <div class="item"><input type="checkbox" id="m-7-1" data-role="merchant"><label for="m-7-1">Keluar akun</label></div>
+      <div class="callout warn"><span class="tag">⚠️</span>Opsi hapus akun sudah dibangun di kode tapi sengaja disembunyikan dari menu (masih under review) — jangan disebut di materi marketing dulu.</div>
+    </div>
+  </section>
+
+  <!-- ============ 3. DRIVER ============ -->
+  <section class="role" id="driver">
+    <div class="role-header">
+      <h2>3. Driver Journey</h2>
+      <span class="progress" data-role="driver">0/0 dicentang</span>
+    </div>
+
+    <div class="stage">
+      <h3>3.1 Registrasi & Verifikasi</h3>
+      <div class="item"><input type="checkbox" id="d-1-1" data-role="driver"><label for="d-1-1">Daftar akun</label></div>
+      <div class="item"><input type="checkbox" id="d-1-2" data-role="driver"><label for="d-1-2">Lengkapi data kendaraan, NIK, SIM, alamat</label></div>
+      <div class="item"><input type="checkbox" id="d-1-3" data-role="driver"><label for="d-1-3">Preview & setujui perjanjian kemitraan driver</label></div>
+      <div class="item"><input type="checkbox" id="d-1-4" data-role="driver"><label for="d-1-4">Submit, tunggu verifikasi admin</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>3.2 Cari & Ambil Order</h3>
+      <div class="item"><input type="checkbox" id="d-2-1" data-role="driver"><label for="d-2-1">Buka job board — lihat pesanan tersedia di sekitar</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Order baru langsung kelihatan dan dapat notifikasi — nggak perlu buka app terus-terusan buat mantengin."</div>
+      <div class="item"><input type="checkbox" id="d-2-2" data-role="driver"><label for="d-2-2">Terima notifikasi push real-time untuk job baru</label></div>
+      <div class="item"><input type="checkbox" id="d-2-3" data-role="driver"><label for="d-2-3">Terima (accept) order pilihan</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>3.3 Jalankan Order</h3>
+      <div class="item"><input type="checkbox" id="d-3-1" data-role="driver"><label for="d-3-1">Proses antar: ambil di merchant → antar ke customer</label></div>
+      <div class="item"><input type="checkbox" id="d-3-2" data-role="driver"><label for="d-3-2">Chat langsung dengan customer</label></div>
+      <div class="item"><input type="checkbox" id="d-3-3" data-role="driver"><label for="d-3-3">Kelola pembayaran tunai (COD) yang dipegang sampai disetor</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>3.4 Keuangan</h3>
+      <div class="item"><input type="checkbox" id="d-4-1" data-role="driver"><label for="d-4-1">Pantau saldo wallet real-time</label></div>
+      <div class="item"><input type="checkbox" id="d-4-2" data-role="driver"><label for="d-4-2">Tarik dana ke rekening bank kapan saja</label></div>
+      <div class="callout marketing"><span class="tag">📣</span>"Saldo langsung masuk begitu order selesai — bisa ditarik kapan aja, nggak nunggu jadwal pencairan tertentu."</div>
+    </div>
+
+    <div class="stage">
+      <h3>3.5 Logout</h3>
+      <div class="item"><input type="checkbox" id="d-5-1" data-role="driver"><label for="d-5-1">Keluar akun</label></div>
+    </div>
+
+    <div class="stage">
+      <h3>3.6 Fitur yang Di-hold</h3>
+      <div class="callout warn"><span class="tag">⚠️</span>Ada alur job untuk layanan jasa yang sudah dibangun tapi belum difokuskan — sama seperti sisi customer, ikut prioritas order barang/makanan dulu.</div>
+    </div>
+  </section>
+
+  <!-- ============ 4. CROSS-PLATFORM ============ -->
+  <section class="role" id="cross">
+    <div class="role-header">
+      <h2>4. Fitur Lintas-Platform (Berlaku di Ketiga App)</h2>
+      <span class="progress" data-role="cross">0/0 dicentang</span>
+    </div>
+    <div class="stage">
+      <div class="item"><input type="checkbox" id="x-1" data-role="cross"><label for="x-1">Login tanpa password — semua lewat OTP WhatsApp</label></div>
+      <div class="item"><input type="checkbox" id="x-2" data-role="cross"><label for="x-2">Notifikasi push real-time (order baru, perubahan status, pesan chat, dst)</label></div>
+      <div class="item"><input type="checkbox" id="x-3" data-role="cross"><label for="x-3">Chat in-app antar pihak — nggak perlu keluar ke WhatsApp/SMS eksternal</label></div>
+      <div class="item"><input type="checkbox" id="x-4" data-role="cross"><label for="x-4">Tracking status pesanan real-time</label></div>
+      <div class="item"><input type="checkbox" id="x-5" data-role="cross"><label for="x-5">Payment gateway lengkap: QRIS, Virtual Account, e-wallet, kartu, gerai retail, COD</label></div>
+      <div class="item"><input type="checkbox" id="x-6" data-role="cross"><label for="x-6">Ongkir berbasis zona — flat per area, bukan surge pricing dinamis</label></div>
+      <p class="note">(Dokumen ini fokus ke alurnya saja — perbandingan detail vs kompetitor per poin di atas belum ada dokumen terpisah, bisa disusun kalau tim butuh.)</p>
+    </div>
+  </section>
+
+  <!-- ============ 5. DISCUSSION ============ -->
+  <section class="role" id="discuss">
+    <div class="role-header">
+      <h2>5. Yang Perlu Dibahas Tim Sebelum Dipakai untuk Materi Marketing</h2>
+      <span class="progress" data-role="discuss">0/0 selesai dibahas</span>
+    </div>
+    <div class="stage">
+      <div class="item"><input type="checkbox" id="t-1" data-role="discuss"><label for="t-1"><strong>SLA verifikasi</strong> merchant & driver — berapa hari kerja maksimal, biar bisa dijanjikan dengan angka pasti.</label></div>
+      <div class="item"><input type="checkbox" id="t-2" data-role="discuss"><label for="t-2"><strong>Harga slot iklan banner</strong> per hari untuk merchant — belum ditentukan.</label></div>
+      <div class="item"><input type="checkbox" id="t-3" data-role="discuss"><label for="t-3"><strong>Ketergantungan WhatsApp gateway self-hosted</strong> untuk OTP — perlu opsi cadangan (SMS gateway atau WhatsApp Business API resmi) mengingat baru terjadi downtime akibat kebijakan WhatsApp berubah.</label></div>
+      <div class="item"><input type="checkbox" id="t-4" data-role="discuss"><label for="t-4"><strong>Fitur hapus akun</strong> (customer & merchant) — kapan diaktifkan kembali di menu.</label></div>
+      <div class="item"><input type="checkbox" id="t-5" data-role="discuss"><label for="t-5"><strong>Order layanan jasa</strong> (laundry/bengkel/salon) — kapan dilanjutkan pengembangannya, jangan disebut di materi marketing sebelum aktif lagi.</label></div>
+      <div class="item"><input type="checkbox" id="t-6" data-role="discuss"><label for="t-6"><strong>POS/Kasir merchant</strong> — fitur ini kuat secara kompetitif tapi belum pernah masuk materi marketing sama sekali. Rekomendasi: jadikan salah satu poin utama di pitch ke merchant baru.</label></div>
+    </div>
+  </section>
+
+  <div class="footer-note">Sumber: hasil audit langsung dari kode aplikasi (bukan dokumentasi lama). Progress checklist tersimpan otomatis di browser ini (localStorage) — kalau ganti device/browser, progress tidak ikut pindah.</div>
+
+</main>
+
+<script>
+  const STORAGE_KEY = 'kuwrir-marketing-checklist-v1';
+
+  function loadState() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function updateProgress() {
+    const roles = {};
+    document.querySelectorAll('input[type="checkbox"][data-role]').forEach(cb => {
+      const role = cb.dataset.role;
+      roles[role] = roles[role] || { total: 0, checked: 0 };
+      roles[role].total++;
+      if (cb.checked) roles[role].checked++;
+    });
+    Object.keys(roles).forEach(role => {
+      const el = document.querySelector('.progress[data-role="' + role + '"]');
+      if (el) {
+        const { checked, total } = roles[role];
+        el.innerHTML = '<strong>' + checked + '</strong>/' + total + (role === 'discuss' ? ' selesai dibahas' : ' dicentang');
+      }
+    });
+  }
+
+  function addNoteFields() {
+    document.querySelectorAll('.item').forEach(item => {
+      const cb = item.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'item-wrap';
+      item.parentNode.insertBefore(wrap, item);
+      wrap.appendChild(item);
+      const textarea = document.createElement('textarea');
+      textarea.className = 'note-field';
+      textarea.id = cb.id + '-note';
+      textarea.placeholder = 'Catatan tim...';
+      textarea.rows = 1;
+      wrap.appendChild(textarea);
+    });
+  }
+
+  function init() {
+    addNoteFields();
+    const state = loadState();
+    document.querySelectorAll('input[type="checkbox"][data-role]').forEach(cb => {
+      if (state[cb.id]) {
+        cb.checked = true;
+        cb.closest('.item').classList.add('checked');
+      }
+      cb.addEventListener('change', () => {
+        const s = loadState();
+        s[cb.id] = cb.checked;
+        saveState(s);
+        cb.closest('.item').classList.toggle('checked', cb.checked);
+        updateProgress();
+      });
+    });
+    document.querySelectorAll('.note-field').forEach(field => {
+      if (state[field.id]) field.value = state[field.id];
+      field.addEventListener('input', () => {
+        const s = loadState();
+        s[field.id] = field.value;
+        saveState(s);
+      });
+    });
+    updateProgress();
+  }
+
+  function resetAll() {
+    if (!confirm('Reset semua centang dan catatan di checklist ini?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('input[type="checkbox"][data-role]').forEach(cb => {
+      cb.checked = false;
+      cb.closest('.item').classList.remove('checked');
+    });
+    document.querySelectorAll('.note-field').forEach(field => { field.value = ''; });
+    updateProgress();
+  }
+
+  init();
+</script>
+
+</body>
+</html>

@@ -7,9 +7,9 @@ A full-stack food delivery platform for the Kuta, Lombok tourist area.
 
 | Document | Description |
 |---|---|
-| [Project Proposal](project_proposal.md) | Business scope, financial logic, infrastructure plan |
-| [Technical Specification](SPECIFICATION.md) | Architecture, DB schema, full API reference (37 endpoints) |
-| [Changelog](CHANGELOG.md) | Version history and detailed release notes |
+| [Technical Specification](SPECIFICATION.md) | Architecture, DB schema, full API reference |
+| [System Overview](SYSTEM_OVERVIEW.md) | Roles, financial model, payment rules & flows |
+| [System Flow](SYSTEM_FLOW.md) | DB schema detail, status machines, endpoint flows |
 
 ## 🏗️ Architecture
 

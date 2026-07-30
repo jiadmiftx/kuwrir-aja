@@ -130,9 +130,8 @@ kuwrir-aja/
 ├── shared/kuwrir_shared/               # Shared Dart package
 ├── finansial-mac/                      # Reference accounting app (Python/Flask)
 ├── SPECIFICATION.md
-├── CHANGELOG.md
 ├── SYSTEM_OVERVIEW.md                  # Business proposal + full system design
-└── project_proposal.md
+└── SYSTEM_FLOW.md                      # DB schema detail, status machines, endpoint flows
 ```
 
 ---
