@@ -176,6 +176,14 @@ func main() {
 		})
 	})
 
+	// Duitku redirects here after payment (duitku_return_url + "/" + orderID,
+	// see service.CreatePayment). customer_app's WebView intercepts this URL
+	// by substring match before it ever loads, so this only actually renders
+	// for a real browser tab — i.e. web_app's same-tab checkout redirect.
+	r.GET("/pay/thanks/:orderId", func(c *gin.Context) {
+		c.Redirect(302, "https://app.cocourir.com/orders/"+c.Param("orderId"))
+	})
+
 	// API v1 routes
 	v1 := r.Group("/api/v1")
 	{
