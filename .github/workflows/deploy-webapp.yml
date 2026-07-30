@@ -6,6 +6,7 @@ on:
     paths:
       - 'web_app/**'
       - '.github/workflows/deploy-webapp.yml'
+  workflow_dispatch: {}
 
 jobs:
   verify:
