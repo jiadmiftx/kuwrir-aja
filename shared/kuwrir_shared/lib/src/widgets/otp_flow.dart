@@ -68,6 +68,13 @@ class OtpFlow extends StatefulWidget {
   /// the app sends and what it displays consistent.
   final bool showCountryCode;
 
+  /// Rendered directly above the phone step's submit button (e.g. a terms
+  /// & conditions checkbox) — kept right next to the action it gates,
+  /// instead of the caller stacking it somewhere further down the page
+  /// where it can end up scrolled out of view or hidden behind the
+  /// keyboard once the phone field is focused. Null renders nothing extra.
+  final Widget? agreementSlot;
+
   const OtpFlow({
     super.key,
     required this.onVerify,
@@ -76,6 +83,7 @@ class OtpFlow extends StatefulWidget {
     this.verifyButtonLabel = 'Verifikasi',
     this.showHeaderIcon = true,
     this.showCountryCode = false,
+    this.agreementSlot,
   });
 
   @override
@@ -142,6 +150,7 @@ class _OtpFlowState extends State<OtpFlow> {
 
   Future<void> _requestOtp() async {
     if (_phoneCtrl.text.trim().isEmpty) return;
+    FocusScope.of(context).unfocus();
     final phone = _backendPhone();
     setState(() => _loading = true);
     try {
@@ -168,6 +177,7 @@ class _OtpFlowState extends State<OtpFlow> {
   Future<void> _verify() async {
     final code = _codeCtrl.text.trim();
     if (code.isEmpty) return;
+    FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
       await widget.onVerify(_backendPhone(), code);
@@ -341,6 +351,10 @@ class _OtpFlowState extends State<OtpFlow> {
               ],
             )
           : phoneField,
+      if (widget.agreementSlot != null) ...[
+        const SizedBox(height: 16),
+        widget.agreementSlot!,
+      ],
       const SizedBox(height: 24),
       SizedBox(
         height: 50,
