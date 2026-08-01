@@ -41,6 +41,7 @@ func (h *Handler) RegisterRoutes(public *gin.RouterGroup, customer *gin.RouterGr
 	customer.GET("/payment/methods", h.GetPaymentMethods)
 	customer.POST("/payment/:orderId/create", h.CreatePayment)
 	customer.GET("/payment/:orderId/status", h.GetPaymentStatus)
+	customer.GET("/payment/:orderId/stream", h.StreamPaymentStatus)
 
 	// Simulation endpoint — dev/sandbox only
 	if debugMode {
@@ -158,6 +159,70 @@ func (h *Handler) GetPaymentStatus(c *gin.Context) {
 	})
 }
 
+// isTerminalPaymentStatus reports whether a payment_status will never
+// change again on its own — once here, there's nothing left to stream.
+func isTerminalPaymentStatus(status string) bool {
+	return status == "paid" || status == "failed" || status == "expired"
+}
+
+// StreamPaymentStatus holds an SSE connection open for a single order and
+// pushes payment_status the instant Duitku's webhook (Callback, below)
+// updates it — replaces the client having to poll GetPaymentStatus every
+// few seconds while waiting for a payment to confirm.
+func (h *Handler) StreamPaymentStatus(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("orderId")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	// Tells nginx not to buffer this response, so events flush to the
+	// client immediately instead of waiting for the proxy's buffer to fill.
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	writeEvent := func(status string) {
+		c.SSEvent("payment_status", service.PaymentEvent{OrderID: order.ID.String(), PaymentStatus: status})
+		c.Writer.Flush()
+	}
+
+	// Send the current status right away — closes the race where payment
+	// already completed before the client opened the stream.
+	writeEvent(order.PaymentStatus)
+	if isTerminalPaymentStatus(order.PaymentStatus) {
+		return
+	}
+
+	events, unsubscribe := service.SubscribePaymentEvents(order.ID.String())
+	defer unsubscribe()
+
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case evt := <-events:
+			writeEvent(evt.PaymentStatus)
+			if isTerminalPaymentStatus(evt.PaymentStatus) {
+				return
+			}
+		case <-heartbeat.C:
+			// A bare SSE comment line — keeps the connection alive under
+			// nginx/Cloudflare's idle timeouts without the client having to
+			// treat it as a real event.
+			c.Writer.WriteString(": keep-alive\n\n")
+			c.Writer.Flush()
+		}
+	}
+}
+
 // Callback handles Duitku payment notifications (webhook).
 // Duitku POST-es to this endpoint after payment is completed/failed.
 func (h *Handler) Callback(c *gin.Context) {
@@ -197,8 +262,10 @@ func (h *Handler) Callback(c *gin.Context) {
 			"payment_status":        "paid",
 			"confirmation_deadline": &deadline,
 		})
+		service.PublishPaymentEvent(order.ID.String(), "paid")
 	} else {
 		h.db.Model(&order).Update("payment_status", "failed")
+		service.PublishPaymentEvent(order.ID.String(), "failed")
 	}
 
 	// Duitku expects plain "OK" text response
@@ -261,6 +328,7 @@ func (h *Handler) SimulatePaid(c *gin.Context) {
 		"payment_ref":           fmt.Sprintf("SIM-%s", order.OrderNumber),
 		"confirmation_deadline": &deadline,
 	})
+	service.PublishPaymentEvent(order.ID.String(), "paid")
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":        "Payment simulated successfully",

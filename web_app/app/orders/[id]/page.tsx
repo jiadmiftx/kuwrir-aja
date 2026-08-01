@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -11,6 +11,7 @@ import { formatIDR } from "@/lib/format";
 import { orderStatusLabel, isActiveOrder } from "@/lib/order-status";
 import { useAuthStore } from "@/lib/stores/auth";
 import { ApiError } from "@/lib/api/client";
+import { usePaymentStream } from "@/lib/hooks/usePaymentStream";
 
 function OrderDetailContent() {
   const params = useParams<{ id: string }>();
@@ -28,6 +29,21 @@ function OrderDetailContent() {
     queryFn: () => getOrder(params.id),
     refetchInterval: (query) => (query.state.data && isActiveOrder(query.state.data.order.status) ? 10_000 : false),
   });
+
+  // SSE instead of polling for the one thing that's actually latency-sensitive
+  // here: finding out the instant Duitku confirms payment. The 10s poll above
+  // keeps covering the rest of the order lifecycle (preparing/ready/etc).
+  const awaitingPayment =
+    !!order.data && order.data.order.payment_type !== "cash" && order.data.order.payment_status !== "paid";
+  const onPaymentStatus = useCallback(
+    (status: string) => {
+      if (status === "paid" || status === "failed") {
+        queryClient.invalidateQueries({ queryKey: ["order", params.id] });
+      }
+    },
+    [queryClient, params.id]
+  );
+  usePaymentStream(params.id, awaitingPayment, onPaymentStatus);
 
   const chat = useQuery({
     queryKey: ["order-chat", params.id],
