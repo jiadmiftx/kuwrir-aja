@@ -59,6 +59,13 @@ type CreatePaymentRequest struct {
 // GetPaymentMethods returns the live list of Duitku payment channels
 // enabled for this merchant at the given amount, so the checkout screen
 // renders real channels instead of a hardcoded guess.
+//
+// Only QRIS is surfaced to customers for now — Duitku's account for this
+// merchant routes QRIS through a single acquirer and names the channel
+// "LINKAJA QRIS" in paymentName, but customers should just see "QRIS".
+// Every other channel (VA, e-wallet, credit card, retail, PayLater) is
+// filtered out here rather than in each client, so customer_app and
+// web_app can't drift on which methods are actually offered.
 func (h *Handler) GetPaymentMethods(c *gin.Context) {
 	amount, err := strconv.ParseInt(c.Query("amount"), 10, 64)
 	if err != nil || amount <= 0 {
@@ -72,7 +79,15 @@ func (h *Handler) GetPaymentMethods(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"payment_methods": methods})
+	qrisOnly := make([]service.DuitkuPaymentMethod, 0, 1)
+	for _, m := range methods {
+		if strings.Contains(strings.ToUpper(m.PaymentName), "QRIS") {
+			m.PaymentName = "QRIS"
+			qrisOnly = append(qrisOnly, m)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"payment_methods": qrisOnly})
 }
 
 // CreatePayment creates a Duitku payment link for a pending order.
