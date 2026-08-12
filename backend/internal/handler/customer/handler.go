@@ -716,7 +716,11 @@ func (h *Handler) PlaceOrder(c *gin.Context) {
 	// Notify merchant owner about new order
 	var merchantOwner model.User
 	if h.db.Where("id = ?", merchant.UserID).First(&merchantOwner).Error == nil {
-		service.SendToUser(h.db, merchantOwner.ID,
+		// Data-only (SendAlarmToUser, not SendToUser) so merchant_app builds
+		// the notification itself in every app state — background/killed
+		// deliveries of a message with a `notification` block get shown
+		// directly by Android with no way to attach a full-screen intent.
+		service.SendAlarmToUser(h.db, merchantOwner.ID,
 			"Pesanan Baru! 🛍️",
 			fmt.Sprintf("Order #%s masuk — segera konfirmasi", order.OrderNumber),
 			map[string]string{"order_id": order.ID.String(), "type": "new_order"},

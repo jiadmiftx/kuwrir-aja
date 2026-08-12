@@ -1,7 +1,7 @@
 name: kuwrir_merchant
 description: KUWRIR Merchant App — Manage your store on KUWRIR platform
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 environment:
   sdk: ^3.11.1
 
@@ -26,6 +26,8 @@ dependencies:
   flutter_local_notifications: ^22.0.1
   local_auth: ^2.3.0
   flutter_svg: ^2.2.1
+  audioplayers: ^6.1.0
+  vibration: ^3.1.3
 
 dev_dependencies:
   flutter_test:
@@ -37,3 +39,4 @@ flutter:
   assets:
     - assets/images/app_icon.png
     - assets/images/cocourir_merchant_logo.svg
+    - assets/sounds/order_alarm.wav

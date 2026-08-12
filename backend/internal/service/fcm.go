@@ -80,10 +80,8 @@ func SendToUser(db *gorm.DB, userID uuid.UUID, title, body string, data map[stri
 			Title: title,
 			Body:  body,
 		},
-		Data: data,
-		Android: &messaging.AndroidConfig{
-			Priority: "high",
-		},
+		Data:    data,
+		Android: &messaging.AndroidConfig{Priority: "high"},
 	}
 
 	resp, err := fcmClient.Send(context.Background(), msg)
@@ -92,4 +90,51 @@ func SendToUser(db *gorm.DB, userID uuid.UUID, title, body string, data map[stri
 		return
 	}
 	log.Printf("FCM sent to user %s: %s", userID, resp)
+}
+
+// SendAlarmToUser sends a data-only push (no `notification` block) — used
+// for merchant_app's incoming-order alarm, where the client must build the
+// notification itself (full-screen intent, custom channel, looping sound)
+// rather than let Android auto-display a plain one. A message that carries
+// a `notification` block gets shown directly by the OS whenever the app is
+// backgrounded or killed, without ever running app code, so there's no way
+// to attach a full-screen intent to it — that can only happen when the
+// app's own background isolate builds the notification, which Android only
+// guarantees for data-only messages. `title`/`body` travel inside `data` so
+// the client has them to build the local notification from.
+func SendAlarmToUser(db *gorm.DB, userID uuid.UUID, title, body string, data map[string]string) {
+	if fcmClient == nil {
+		log.Printf("FCM alarm send skipped for user %s: fcmClient not initialized", userID)
+		return
+	}
+
+	var user model.User
+	if err := db.Select("fcm_token").Where("id = ?", userID).First(&user).Error; err != nil {
+		log.Printf("FCM alarm send skipped for user %s: user lookup failed: %v", userID, err)
+		return
+	}
+	if user.FCMToken == "" {
+		log.Printf("FCM alarm send skipped for user %s: no fcm_token on file", userID)
+		return
+	}
+
+	alarmData := make(map[string]string, len(data)+2)
+	for k, v := range data {
+		alarmData[k] = v
+	}
+	alarmData["title"] = title
+	alarmData["body"] = body
+
+	msg := &messaging.Message{
+		Token:   user.FCMToken,
+		Data:    alarmData,
+		Android: &messaging.AndroidConfig{Priority: "high"},
+	}
+
+	resp, err := fcmClient.Send(context.Background(), msg)
+	if err != nil {
+		log.Printf("FCM alarm send failed for user %s: %v", userID, err)
+		return
+	}
+	log.Printf("FCM alarm sent to user %s: %s", userID, resp)
 }

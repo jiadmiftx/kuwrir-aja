@@ -467,6 +467,15 @@ class ApiClient {
     await post('/merchant-orders/$id/accept', {});
   }
 
+  /// Rejects a pending order — refunds the customer's wallet automatically
+  /// server-side if it was already paid online (backend:
+  /// service.CancelOrderAndRefund), so nothing extra needed client-side.
+  Future<void> rejectOrder(String id, {String? reason}) async {
+    await post('/merchant-orders/$id/reject', {
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+  }
+
   Future<void> markPreparing(String id) async {
     await post('/merchant-orders/$id/preparing', {});
   }

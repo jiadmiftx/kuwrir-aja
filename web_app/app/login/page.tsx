@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -21,12 +21,23 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState("");
+  // Mirrors the 60s cooldown the backend itself enforces on
+  // POST /auth/otp/request (see backend otpResendCooldown) — kept in sync
+  // so the button doesn't invite a 429 the server would reject anyway.
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = setInterval(() => setResendSeconds((s) => s - 1), 1000);
+    return () => clearInterval(timer);
+  }, [resendSeconds]);
 
   const requestMutation = useMutation({
     mutationFn: () => requestOtp(phone),
     onSuccess: () => {
       setError("");
       setStep("otp");
+      setResendSeconds(60);
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : "Gagal mengirim kode OTP"),
   });
@@ -125,17 +136,35 @@ export default function LoginPage() {
             >
               {verifyMutation.isPending ? "Memverifikasi..." : "Verifikasi & Masuk"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStep("phone");
-                setCode("");
-                setError("");
-              }}
-              className="text-sm text-(--color-ink-faint) underline"
-            >
-              Ganti nomor
-            </button>
+            <div className="flex items-center justify-center gap-4 text-sm">
+              <button
+                type="button"
+                disabled={resendSeconds > 0 || requestMutation.isPending}
+                onClick={() => {
+                  setCode("");
+                  requestMutation.mutate();
+                }}
+                className="text-(--color-accent) underline disabled:text-(--color-ink-faint) disabled:no-underline"
+              >
+                {resendSeconds > 0
+                  ? `Kirim ulang dalam ${resendSeconds}s`
+                  : requestMutation.isPending
+                    ? "Mengirim..."
+                    : "Kirim ulang kode"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("phone");
+                  setCode("");
+                  setError("");
+                  setResendSeconds(0);
+                }}
+                className="text-(--color-ink-faint) underline"
+              >
+                Ganti nomor
+              </button>
+            </div>
           </form>
         )}
       </div>

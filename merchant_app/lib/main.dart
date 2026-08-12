@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +16,7 @@ import 'screens/menu_screen.dart';
 import 'screens/store_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/incoming_order_screen.dart';
 import 'cubits/store_orders_cubit.dart';
 import 'cubits/menu_cubit.dart';
 import 'cubits/store_cubit.dart';
@@ -23,10 +26,12 @@ import 'cubits/wallet_cubit.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  final notification = message.notification;
-  if (notification != null) {
-    await NotificationService.persist(notification.title ?? '', notification.body ?? '');
-  }
+  // Builds and shows the local notification here (not just persisting it) —
+  // required for the new-order alarm, sent data-only specifically so this
+  // background isolate is what runs (in every app state, including fully
+  // killed) rather than Android's own auto-display, which can't attach a
+  // full-screen intent. See NotificationService.handleBackgroundMessage.
+  await NotificationService.handleBackgroundMessage(message);
 }
 
 void main() async {
@@ -38,6 +43,12 @@ void main() async {
   NotificationService.setupForegroundHandler();
 }
 
+/// App-wide navigator key so the incoming-order alarm screen can be pushed
+/// from NotificationService's push listener, which fires outside any
+/// widget's BuildContext (foreground push arrives while the merchant could
+/// be on any screen, or the app could just be cold-starting).
+final navigatorKey = GlobalKey<NavigatorState>();
+
 class KuwrirMerchantApp extends StatelessWidget {
   const KuwrirMerchantApp({super.key});
 
@@ -48,10 +59,21 @@ class KuwrirMerchantApp extends StatelessWidget {
 
     // Push already tells us the moment a new order lands (backend sends it
     // on order creation) — use that as the primary refresh trigger instead
-    // of waiting on the slow poll fallback in StoreOrdersCubit.
+    // of waiting on the slow poll fallback in StoreOrdersCubit, and pop the
+    // incoming-order alarm screen on top so it can't be missed.
     NotificationService.onPushData.addListener(() {
-      if (NotificationService.onPushData.value?['type'] == 'new_order') {
-        storeOrdersCubit.load();
+      final data = NotificationService.onPushData.value;
+      if (data?['type'] != 'new_order') return;
+      storeOrdersCubit.load();
+      final orderId = data?['order_id'] as String?;
+      final nav = navigatorKey.currentState;
+      if (orderId != null && nav != null) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => IncomingOrderScreen(orderId: orderId),
+            fullscreenDialog: true,
+          ),
+        );
       }
     });
 
@@ -66,6 +88,7 @@ class KuwrirMerchantApp extends StatelessWidget {
           BlocProvider(create: (_) => MerchantWalletCubit(apiClient)),
         ],
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Cocourir Merchant',
           debugShowCheckedModeBanner: false,
           theme: KuwrirTheme.light,
@@ -73,11 +96,11 @@ class KuwrirMerchantApp extends StatelessWidget {
           themeMode: ThemeMode.light,
           home: const _SplashRouter(),
           routes: {
-            '/login':    (_) => const MerchantLoginScreen(),
+            '/login': (_) => const MerchantLoginScreen(),
             '/register': (_) => const MerchantRegisterScreen(),
-            '/pending':  (_) => const MerchantPendingScreen(),
-            '/home':     (_) => const AppLockGate(child: MerchantHome()),
-            '/wallet':   (_) => const WalletScreen(),
+            '/pending': (_) => const MerchantPendingScreen(),
+            '/home': (_) => const AppLockGate(child: MerchantHome()),
+            '/wallet': (_) => const WalletScreen(),
             '/notifications': (_) => const NotificationsScreen(),
           },
         ),
@@ -192,7 +215,9 @@ class _SplashRouterState extends State<_SplashRouter> {
       if (!hasMerchantProfile) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const MerchantRegisterScreen(startAtStep: 1)),
+          MaterialPageRoute(
+            builder: (_) => const MerchantRegisterScreen(startAtStep: 1),
+          ),
         );
         return;
       }
@@ -203,13 +228,37 @@ class _SplashRouterState extends State<_SplashRouter> {
       var approved = false;
       try {
         final statusRes = await api.get('/my-store/status');
-        approved = statusRes['status'] == 'approved' && statusRes['is_active'] == true;
+        approved =
+            statusRes['status'] == 'approved' && statusRes['is_active'] == true;
       } catch (_) {
         // Treat an unreachable status check as not-yet-approved rather
         // than silently granting Home access.
       }
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, approved ? '/home' : '/pending');
+
+      // Re-upload the FCM token on every app start, not just fresh login —
+      // login_screen.dart's upload only fires the moment credentials are
+      // entered, so a persisted session that skips straight to /home here
+      // (the common case: reopening the app, or a debug reinstall that got
+      // a new token) would otherwise never register a current token, and
+      // SendToUser on the backend silently no-ops when the stored token is
+      // empty/stale.
+      unawaited(NotificationService.uploadToken(api));
+
+      // Cold start via tapping the new-order full-screen notification while
+      // the app was fully killed — onMessageOpenedApp (used for the
+      // backgrounded-not-killed case) never fires for this path, so it
+      // needs its own check. Set after the /home navigation above so the
+      // onPushData listener (registered in KuwrirMerchantApp.build, which
+      // already ran before this async gap) is there to catch it.
+      if (approved) {
+        final initialMessage = await FirebaseMessaging.instance
+            .getInitialMessage();
+        if (initialMessage != null && initialMessage.data.isNotEmpty) {
+          NotificationService.onPushData.value = initialMessage.data;
+        }
+      }
     } catch (_) {
       await api.clearTokens();
       if (mounted) Navigator.pushReplacementNamed(context, '/login');
@@ -225,8 +274,10 @@ class _SplashRouterState extends State<_SplashRouter> {
           children: [
             Icon(Icons.store, size: 72, color: KuwrirColors.primary),
             SizedBox(height: 16),
-            Text('Cocourir Merchant',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              'Cocourir Merchant',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 24),
             CircularProgressIndicator(),
           ],
@@ -235,4 +286,3 @@ class _SplashRouterState extends State<_SplashRouter> {
     );
   }
 }
-
