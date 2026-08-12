@@ -13,6 +13,7 @@ import {
   Cash01Icon,
   CreditCardIcon,
   StickyNote01Icon,
+  ArrowDown01Icon,
 } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useCartStore } from "@/lib/stores/cart";
@@ -21,7 +22,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { createPayment, getAddresses, getPaymentMethods, placeOrder, quoteOrder } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
 import { ApiError } from "@/lib/api/client";
-import type { OrderItemRequest } from "@/lib/api/types";
+import type { OrderItemRequest, PaymentMethod } from "@/lib/api/types";
 
 function SectionCard({
   icon,
@@ -48,6 +49,32 @@ function SectionCard({
   );
 }
 
+function PaymentMethodOption({
+  method,
+  selected,
+  onSelect,
+}: {
+  method: PaymentMethod;
+  selected: boolean;
+  onSelect: (code: string) => void;
+}) {
+  return (
+    <label
+      className={`flex items-center justify-between gap-2 rounded-xl border p-3 text-sm transition-colors ${
+        selected ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-ink-soft)"
+      }`}
+    >
+      <span className="flex items-center gap-2.5">
+        <input type="radio" checked={selected} onChange={() => onSelect(method.paymentMethod)} className="accent-(--color-accent)" />
+        {method.paymentName}
+      </span>
+      {method.totalFee && Number(method.totalFee) > 0 && (
+        <span className="text-xs text-(--color-ink-faint)">+{formatIDR(Number(method.totalFee))}</span>
+      )}
+    </label>
+  );
+}
+
 function CheckoutContent() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -59,6 +86,7 @@ function CheckoutContent() {
 
   const [receiverName, setReceiverName] = useState(user?.name ?? "");
   const [receiverPhone, setReceiverPhone] = useState(user?.phone ?? "");
+  const [isEditingReceiver, setIsEditingReceiver] = useState(!user?.name || !user?.phone);
   const [notes, setNotes] = useState("");
   const [promoInput, setPromoInput] = useState("");
   const [promoCode, setPromoCode] = useState("");
@@ -67,6 +95,7 @@ function CheckoutContent() {
   // Flutter checkout screen, where the order's payment_type IS the exact
   // channel code the customer picked, not a generic "online" marker.
   const [paymentType, setPaymentType] = useState("cash");
+  const [showOtherMethods, setShowOtherMethods] = useState(false);
 
   useEffect(() => {
     if (lines.length === 0) router.replace("/cart");
@@ -104,6 +133,12 @@ function CheckoutContent() {
     queryFn: () => getPaymentMethods(Math.round(quote.data!.total)),
     enabled: !!quote.data && quote.data.total > 0,
   });
+  // QRIS surfaces as its own option (most-used channel); everything else
+  // (VA, e-wallet, card, retail, PayLater) sits behind "Metode pembayaran
+  // lain" so the default list stays short - Cash + QRIS - instead of
+  // dumping 15+ channels on the customer at once.
+  const qrisMethods = paymentMethods.data?.payment_methods.filter((m) => m.paymentName === "QRIS") ?? [];
+  const otherMethods = paymentMethods.data?.payment_methods.filter((m) => m.paymentName !== "QRIS") ?? [];
 
   const place = useMutation({
     mutationFn: async () => {
@@ -171,21 +206,46 @@ function CheckoutContent() {
           )}
         </SectionCard>
 
-        <SectionCard icon={UserIcon} title="Penerima">
-          <div className="flex flex-col gap-2">
-            <input
-              value={receiverName}
-              onChange={(e) => setReceiverName(e.target.value)}
-              placeholder="Nama penerima"
-              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
-            />
-            <input
-              value={receiverPhone}
-              onChange={(e) => setReceiverPhone(e.target.value)}
-              placeholder="No. HP penerima"
-              className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
-            />
-          </div>
+        <SectionCard
+          icon={UserIcon}
+          title="Penerima"
+          action={
+            !isEditingReceiver && (
+              <button onClick={() => setIsEditingReceiver(true)} className="text-xs font-medium text-(--color-accent)">
+                Ubah
+              </button>
+            )
+          }
+        >
+          {isEditingReceiver ? (
+            <div className="flex flex-col gap-2">
+              <input
+                value={receiverName}
+                onChange={(e) => setReceiverName(e.target.value)}
+                placeholder="Nama penerima"
+                className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+              />
+              <input
+                value={receiverPhone}
+                onChange={(e) => setReceiverPhone(e.target.value)}
+                placeholder="No. HP penerima"
+                className="rounded-xl border border-(--color-border) px-3.5 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+              />
+              {receiverName && receiverPhone && (
+                <button
+                  onClick={() => setIsEditingReceiver(false)}
+                  className="self-start text-xs font-medium text-(--color-accent)"
+                >
+                  Selesai
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl bg-(--color-surface) p-3">
+              <p className="text-sm font-medium text-(--color-ink)">{receiverName}</p>
+              <p className="text-xs text-(--color-ink-faint)">{receiverPhone}</p>
+            </div>
+          )}
         </SectionCard>
 
         <SectionCard icon={Discount01Icon} title="Kode Promo">
@@ -226,29 +286,34 @@ function CheckoutContent() {
             </label>
 
             {paymentMethods.isLoading && <p className="text-xs text-(--color-ink-faint)">Memuat metode pembayaran online...</p>}
-            {paymentMethods.data?.payment_methods.map((m) => (
-              <label
-                key={m.paymentMethod}
-                className={`flex items-center justify-between gap-2 rounded-xl border p-3 text-sm transition-colors ${
-                  paymentType === m.paymentMethod
-                    ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
-                    : "border-(--color-border) text-(--color-ink-soft)"
-                }`}
-              >
-                <span className="flex items-center gap-2.5">
-                  <input
-                    type="radio"
-                    checked={paymentType === m.paymentMethod}
-                    onChange={() => setPaymentType(m.paymentMethod)}
-                    className="accent-(--color-accent)"
-                  />
-                  {m.paymentName}
-                </span>
-                {m.totalFee && Number(m.totalFee) > 0 && (
-                  <span className="text-xs text-(--color-ink-faint)">+{formatIDR(Number(m.totalFee))}</span>
-                )}
-              </label>
+            {qrisMethods.map((m) => (
+              <PaymentMethodOption key={m.paymentMethod} method={m} selected={paymentType === m.paymentMethod} onSelect={setPaymentType} />
             ))}
+
+            {otherMethods.length > 0 && (
+              <div className="rounded-xl border border-(--color-border)">
+                <button
+                  type="button"
+                  onClick={() => setShowOtherMethods((v) => !v)}
+                  className="flex w-full items-center justify-between p-3 text-sm text-(--color-ink-soft)"
+                >
+                  <span>Metode pembayaran lain</span>
+                  <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    size={16}
+                    strokeWidth={1.5}
+                    className={`transition-transform ${showOtherMethods ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {showOtherMethods && (
+                  <div className="flex flex-col gap-2 border-t border-(--color-border) p-3 pt-2">
+                    {otherMethods.map((m) => (
+                      <PaymentMethodOption key={m.paymentMethod} method={m} selected={paymentType === m.paymentMethod} onSelect={setPaymentType} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </SectionCard>
 

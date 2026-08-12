@@ -19,7 +19,9 @@ function CartContent() {
         <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center text-(--color-ink-soft) md:hidden" aria-label="Kembali">
           <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={1.5} />
         </button>
-        <p className="text-base font-semibold text-(--color-ink) md:text-xl">Keranjang</p>
+        <p className="text-base font-semibold text-(--color-ink) md:text-xl">
+          Keranjang{lines.length > 0 && <span className="font-normal text-(--color-ink-faint)"> · {lines.length} item</span>}
+        </p>
       </div>
 
       {lines.length === 0 ? (
@@ -90,10 +92,11 @@ function CartContent() {
           </div>
 
           <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-2xl border-t border-(--color-border) bg-(--color-surface-raised) px-4 py-3 md:static md:mt-6 md:max-w-2xl md:rounded-2xl md:border md:px-5">
-            <div className="mb-2 flex items-center justify-between text-sm">
+            <div className="mb-1 flex items-center justify-between text-sm">
               <span className="text-(--color-ink-faint)">Subtotal</span>
               <span className="font-semibold text-(--color-ink)">{formatIDR(subtotal)}</span>
             </div>
+            <p className="mb-2 text-xs text-(--color-ink-faint)">Ongkir & total dihitung di langkah berikutnya</p>
             <button
               onClick={() => router.push("/checkout")}
               className="w-full rounded-full bg-(--color-accent) py-3 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
