@@ -282,7 +282,7 @@ func main() {
 			supportH.RegisterCustomerRoutes(custRoutes)
 
 			// Driver order routes
-			driverOrderH := customerHandler.NewDriverOrderHandler(db)
+			driverOrderH := customerHandler.NewDriverOrderHandler(db, cfg)
 			driverRoutes := protected.Group("")
 			driverRoutes.Use(middleware.RoleMiddleware("driver"))
 			driverOrderH.RegisterRoutes(driverRoutes)

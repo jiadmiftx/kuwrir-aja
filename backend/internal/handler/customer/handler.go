@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/kuwrir-platform/backend/internal/config"
 	"github.com/kuwrir-platform/backend/internal/model"
 	"github.com/kuwrir-platform/backend/internal/pricing"
 	"github.com/kuwrir-platform/backend/internal/service"
@@ -964,11 +965,12 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 // --- Driver Order Handlers ---
 
 type DriverOrderHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg *config.Config
 }
 
-func NewDriverOrderHandler(db *gorm.DB) *DriverOrderHandler {
-	return &DriverOrderHandler{db: db}
+func NewDriverOrderHandler(db *gorm.DB, cfg *config.Config) *DriverOrderHandler {
+	return &DriverOrderHandler{db: db, cfg: cfg}
 }
 
 func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
@@ -984,7 +986,46 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/:id/deliver", h.MarkDelivered)
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
+		orders.GET("/:id/road-route", h.GetRoadRoute)
 	}
+}
+
+// GetRoadRoute returns the road-following distance/duration (merchant -> dropoff) for the
+// driver's map, via OpenRouteService. Display only — delivery-fee pricing keeps using the
+// straight-line haversine distance already on the order. Falls back to that same haversine
+// value (source: "straight_line") if ORS isn't configured or the call fails, rather than
+// erroring the whole request over a display-only feature.
+func (h *DriverOrderHandler) GetRoadRoute(c *gin.Context) {
+	orderID := c.Param("id")
+	userID := c.GetString("user_id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND driver_id = ?", orderID, driver.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	route, err := service.GetRoadRoute(h.cfg.ORS, order.PickupLat, order.PickupLng, order.DropoffLat, order.DropoffLng)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"distance_km":  order.DistanceKm,
+			"duration_min": nil,
+			"source":       "straight_line",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"distance_km":  route.DistanceKm,
+		"duration_min": route.DurationMin,
+		"source":       "road",
+	})
 }
 
 // SetDriverStatus sets the driver online/offline and updates availability.

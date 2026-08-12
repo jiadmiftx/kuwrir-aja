@@ -3,8 +3,30 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../cubits/active_delivery_cubit.dart';
 import 'chat_screen.dart';
+
+/// Opens the device's Google Maps app (or a browser fallback) with a driving
+/// route from the merchant to the customer. Plain https deep link — Google
+/// Maps computes the route itself, so this needs no API key and no billing,
+/// unlike the paid Directions API.
+Future<void> _openInGoogleMaps({
+  required double originLat,
+  required double originLng,
+  required double destLat,
+  required double destLng,
+}) async {
+  final uri = Uri.parse(
+    'https://www.google.com/maps/dir/?api=1'
+    '&origin=$originLat,$originLng'
+    '&destination=$destLat,$destLng'
+    '&travelmode=driving',
+  );
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
 
 class ActiveDeliveryScreen extends StatelessWidget {
   const ActiveDeliveryScreen({super.key});
@@ -17,8 +39,9 @@ class ActiveDeliveryScreen extends StatelessWidget {
           _showDoneDialog(context, state.result);
         }
         if (state is ActiveDeliveryError) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(state.message)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
       builder: (context, state) {
@@ -27,7 +50,10 @@ class ActiveDeliveryScreen extends StatelessWidget {
             backgroundColor: KuwrirColors.background,
             appBar: AppBar(title: const Text('Pengiriman Aktif')),
             body: Center(
-              child: Text('Tidak ada pengiriman aktif', style: TextStyle(color: KuwrirColors.textSecondary)),
+              child: Text(
+                'Tidak ada pengiriman aktif',
+                style: TextStyle(color: KuwrirColors.textSecondary),
+              ),
             ),
           );
         }
@@ -65,13 +91,18 @@ class ActiveDeliveryScreen extends StatelessWidget {
   }
 
   Widget _buildScreen(
-      BuildContext context, Map<String, dynamic> order, bool isLoading) {
+    BuildContext context,
+    Map<String, dynamic> order,
+    bool isLoading,
+  ) {
     final status = order['status'] as String? ?? 'confirmed';
     final isPickedUp = status == 'picked_up';
     final orderId = order['id'] as String? ?? '';
     final orderNumber = order['order_number'] as String? ?? '';
-    final merchantName = order['merchant_name'] as String? ??
-        (order['merchant'] as Map?)?['name'] as String? ?? 'Merchant';
+    final merchantName =
+        order['merchant_name'] as String? ??
+        (order['merchant'] as Map?)?['name'] as String? ??
+        'Merchant';
     final pickupAddress = order['pickup_address'] as String? ?? '';
     final dropoffAddress = order['dropoff_address'] as String? ?? '';
     final receiverName = order['receiver_name'] as String? ?? 'Customer';
@@ -87,6 +118,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
     final dropoffLng = (order['dropoff_lng'] as num?)?.toDouble() ?? 116.3516;
     final focusLat = isPickedUp ? dropoffLat : pickupLat;
     final focusLng = isPickedUp ? dropoffLng : pickupLng;
+    final fallbackDistanceKm = (order['distance_km'] as num?)?.toDouble() ?? 0;
 
     return Scaffold(
       backgroundColor: KuwrirColors.background,
@@ -100,7 +132,8 @@ class ActiveDeliveryScreen extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatScreen(orderId: orderId, orderNumber: orderNumber),
+                builder: (_) =>
+                    ChatScreen(orderId: orderId, orderNumber: orderNumber),
               ),
             ),
           ),
@@ -111,50 +144,83 @@ class ActiveDeliveryScreen extends StatelessWidget {
           // Live delivery map
           Expanded(
             flex: 2,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: LatLng(focusLat, focusLng),
-                initialZoom: 15,
-              ),
+            child: Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.kuwrir.driver',
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(pickupLat, pickupLng),
-                      width: 48,
-                      height: 48,
-                      child: Tooltip(
-                        message: 'Merchant (Pickup)',
-                        child: Icon(Icons.storefront, color: KuwrirColors.warning, size: 40),
-                      ),
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: LatLng(focusLat, focusLng),
+                    initialZoom: 15,
+                    onTap: (tapPosition, point) => _openInGoogleMaps(
+                      originLat: pickupLat,
+                      originLng: pickupLng,
+                      destLat: dropoffLat,
+                      destLng: dropoffLng,
                     ),
-                    Marker(
-                      point: LatLng(dropoffLat, dropoffLng),
-                      width: 48,
-                      height: 48,
-                      child: Tooltip(
-                        message: 'Customer (Dropoff)',
-                        child: Icon(Icons.location_pin, color: KuwrirColors.error, size: 40),
-                      ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.kuwrir.driver',
                     ),
-                  ],
-                ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: [
-                        LatLng(pickupLat, pickupLng),
-                        LatLng(dropoffLat, dropoffLng),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(pickupLat, pickupLng),
+                          width: 48,
+                          height: 48,
+                          child: Tooltip(
+                            message: 'Merchant (Pickup)',
+                            child: Icon(
+                              Icons.storefront,
+                              color: KuwrirColors.warning,
+                              size: 40,
+                            ),
+                          ),
+                        ),
+                        Marker(
+                          point: LatLng(dropoffLat, dropoffLng),
+                          width: 48,
+                          height: 48,
+                          child: Tooltip(
+                            message: 'Customer (Dropoff)',
+                            child: Icon(
+                              Icons.location_pin,
+                              color: KuwrirColors.error,
+                              size: 40,
+                            ),
+                          ),
+                        ),
                       ],
-                      color: KuwrirColors.primary,
-                      strokeWidth: 3,
-                      pattern: StrokePattern.dashed(segments: const [12, 8]),
+                    ),
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: [
+                            LatLng(pickupLat, pickupLng),
+                            LatLng(dropoffLat, dropoffLng),
+                          ],
+                          color: KuwrirColors.primary,
+                          strokeWidth: 3,
+                          pattern: StrokePattern.dashed(
+                            segments: const [12, 8],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
+                ),
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: _OpenMapsButton(
+                    onTap: () => _openInGoogleMaps(
+                      originLat: pickupLat,
+                      originLng: pickupLng,
+                      destLat: dropoffLat,
+                      destLng: dropoffLng,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -164,10 +230,15 @@ class ActiveDeliveryScreen extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: KuwrirColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               boxShadow: [
                 BoxShadow(
-                    color: KuwrirColors.textPrimary.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))
+                  color: KuwrirColors.textPrimary.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
               ],
             ),
             padding: const EdgeInsets.all(20),
@@ -182,19 +253,33 @@ class ActiveDeliveryScreen extends StatelessWidget {
                     Text(
                       isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant',
                       style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: KuwrirColors.primary),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: KuwrirColors.primary,
+                      ),
                     ),
-                    Text('#$orderNumber',
-                        style: TextStyle(color: KuwrirColors.textHint, fontSize: 12)),
+                    Text(
+                      '#$orderNumber',
+                      style: TextStyle(
+                        color: KuwrirColors.textHint,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Penghasilan: Rp ${_fmt(driverEarning)}',
                   style: const TextStyle(
-                      color: KuwrirColors.success, fontWeight: FontWeight.w700, fontSize: 13.5),
+                    color: KuwrirColors.success,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _RoadDistanceLabel(
+                  orderId: orderId,
+                  fallbackKm: fallbackDistanceKm,
                 ),
                 const SizedBox(height: 14),
                 Divider(height: 1, color: KuwrirColors.border),
@@ -234,14 +319,19 @@ class ActiveDeliveryScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.payments_outlined, color: KuwrirColors.warning, size: 18),
+                        Icon(
+                          Icons.payments_outlined,
+                          color: KuwrirColors.warning,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Tagih COD: Rp ${_fmt(total)}',
                           style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: KuwrirColors.warning,
-                              fontSize: 14),
+                            fontWeight: FontWeight.w700,
+                            color: KuwrirColors.warning,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -261,13 +351,19 @@ class ActiveDeliveryScreen extends StatelessWidget {
                         backgroundColor: KuwrirColors.warning,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      onPressed: () =>
-                          context.read<ActiveDeliveryCubit>().markPickedUp(orderId),
-                      child: const Text('Sudah Diambil',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      onPressed: () => context
+                          .read<ActiveDeliveryCubit>()
+                          .markPickedUp(orderId),
+                      child: const Text(
+                        'Sudah Diambil',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   )
                 else
@@ -279,13 +375,19 @@ class ActiveDeliveryScreen extends StatelessWidget {
                         backgroundColor: KuwrirColors.success,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      onPressed: () =>
-                          context.read<ActiveDeliveryCubit>().markDelivered(orderId),
-                      child: const Text('Selesai Diantarkan',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      onPressed: () => context
+                          .read<ActiveDeliveryCubit>()
+                          .markDelivered(orderId),
+                      child: const Text(
+                        'Selesai Diantarkan',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -311,14 +413,19 @@ class ActiveDeliveryScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (cashCollected > 0)
-              Text('Uang COD diterima: Rp ${_fmt(cashCollected)}',
-                  style: const TextStyle(fontSize: 14.5)),
+              Text(
+                'Uang COD diterima: Rp ${_fmt(cashCollected)}',
+                style: const TextStyle(fontSize: 14.5),
+              ),
             const SizedBox(height: 6),
-            Text('Penghasilan: Rp ${_fmt(driverEarning)}',
-                style: const TextStyle(
-                    fontSize: 15,
-                    color: KuwrirColors.success,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              'Penghasilan: Rp ${_fmt(driverEarning)}',
+              style: const TextStyle(
+                fontSize: 15,
+                color: KuwrirColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -330,14 +437,19 @@ class ActiveDeliveryScreen extends StatelessWidget {
                 backgroundColor: KuwrirColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               onPressed: () {
                 Navigator.of(ctx).pop();
                 context.read<ActiveDeliveryCubit>().reset();
                 Navigator.of(context).pop();
               },
-              child: const Text('Kembali ke Job Board', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text(
+                'Kembali ke Job Board',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],
@@ -345,8 +457,103 @@ class ActiveDeliveryScreen extends StatelessWidget {
     );
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+}
+
+/// Small pill overlay on the map, bottom-right, so "open in Google Maps" is a
+/// discoverable action instead of relying on an implicit tap-anywhere gesture.
+class _OpenMapsButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _OpenMapsButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: KuwrirColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 3,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.map_outlined, size: 16, color: KuwrirColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Buka di Google Maps',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: KuwrirColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Road-following distance/duration for this delivery. Shows the straight-line
+/// `fallbackKm` immediately (no blocking spinner on first paint), then swaps
+/// to the OpenRouteService road value once `/driver-orders/:id/road-route`
+/// resolves — or stays on the fallback, honestly, if that call fails.
+class _RoadDistanceLabel extends StatefulWidget {
+  final String orderId;
+  final double fallbackKm;
+  const _RoadDistanceLabel({required this.orderId, required this.fallbackKm});
+
+  @override
+  State<_RoadDistanceLabel> createState() => _RoadDistanceLabelState();
+}
+
+class _RoadDistanceLabelState extends State<_RoadDistanceLabel> {
+  double? _roadKm;
+  double? _durationMin;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final api = context.read<ApiClient>();
+      final result = await api.getDriverRoadRoute(widget.orderId);
+      if (!mounted || result['source'] != 'road') return;
+      setState(() {
+        _roadKm = (result['distance_km'] as num?)?.toDouble();
+        _durationMin = (result['duration_min'] as num?)?.toDouble();
+      });
+    } catch (_) {
+      // Stay on the straight-line fallback — this is a display-only nicety,
+      // not worth surfacing an error for.
+    }
+  }
+
+  String _fmtKm(double v) => v.toStringAsFixed(1).replaceAll('.0', '');
+
+  @override
+  Widget build(BuildContext context) {
+    final km = _roadKm ?? widget.fallbackKm;
+    final label = _durationMin != null
+        ? '≈ ${_fmtKm(km)} km · ${_durationMin!.round()} menit'
+        : '≈ ${_fmtKm(km)} km';
+    return Text(
+      label,
+      style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 12.5),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -355,11 +562,12 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String sub;
 
-  const _InfoRow(
-      {required this.icon,
-      required this.color,
-      required this.label,
-      required this.sub});
+  const _InfoRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.sub,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -381,12 +589,21 @@ class _InfoRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14)),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
               if (sub.isNotEmpty)
-                Text(sub,
-                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 12)),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    color: KuwrirColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
             ],
           ),
         ),

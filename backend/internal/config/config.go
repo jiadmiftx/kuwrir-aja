@@ -15,6 +15,7 @@ type Config struct {
 	Valhalla ValhallaConfig
 	Duitku   DuitkuConfig
 	WhatsApp WhatsAppConfig
+	ORS      OpenRouteServiceConfig
 }
 
 type ServerConfig struct {
@@ -54,6 +55,14 @@ type R2Config struct {
 
 type ValhallaConfig struct {
 	BaseURL string // e.g., http://localhost:8002
+}
+
+// OpenRouteServiceConfig — hosted routing API used for driver-facing road distance/duration
+// (display only, not delivery-fee pricing). Free tier, no self-hosted routing infra needed —
+// see ValhallaConfig's comment for why that stays dormant instead.
+type OpenRouteServiceConfig struct {
+	APIKey  string
+	BaseURL string // e.g., https://api.openrouteservice.org
 }
 
 type DuitkuConfig struct {
@@ -120,6 +129,10 @@ func Load() *Config {
 		WhatsApp: WhatsAppConfig{
 			GatewayURL: getEnv("WHATSAPP_GATEWAY_URL", ""),
 			APIKey:     getEnv("WHATSAPP_API_KEY", ""),
+		},
+		ORS: OpenRouteServiceConfig{
+			APIKey:  getEnv("ORS_API_KEY", ""),
+			BaseURL: getEnv("ORS_BASE_URL", "https://api.openrouteservice.org"),
 		},
 	}
 }

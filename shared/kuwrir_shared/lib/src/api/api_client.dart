@@ -25,8 +25,8 @@ class ApiClient {
   static const _secureStorage = FlutterSecureStorage();
 
   ApiClient({String? baseUrl})
-      : baseUrl = baseUrl ?? ApiConfig.baseUrl,
-        _client = http.Client();
+    : baseUrl = baseUrl ?? ApiConfig.baseUrl,
+      _client = http.Client();
 
   /// One-time move off SharedPreferences (plaintext) onto secure storage —
   /// safe to call repeatedly, it's a no-op once migrated.
@@ -74,7 +74,10 @@ class ApiClient {
   }
 
   Future<void> setBiometricLockEnabled(bool enabled) async {
-    await _secureStorage.write(key: 'biometric_lock_enabled', value: enabled.toString());
+    await _secureStorage.write(
+      key: 'biometric_lock_enabled',
+      value: enabled.toString(),
+    );
   }
 
   /// Exchanges the stored refresh token for a new access+refresh pair.
@@ -88,18 +91,25 @@ class ApiClient {
         'POST',
         '/auth/refresh',
         body: {'refresh_token': '(redacted)'},
-        send: () => _client
-            .post(
-              Uri.parse('$baseUrl/auth/refresh'),
-              headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-              body: jsonEncode({'refresh_token': refreshToken}),
-            )
-            .timeout(_kTimeout),
+        send:
+            () => _client
+                .post(
+                  Uri.parse('$baseUrl/auth/refresh'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  body: jsonEncode({'refresh_token': refreshToken}),
+                )
+                .timeout(_kTimeout),
       );
       if (response.statusCode < 200 || response.statusCode >= 300) return false;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (body['token'] == null) return false;
-      await saveToken(body['token'] as String, body['refresh_token'] as String? ?? '');
+      await saveToken(
+        body['token'] as String,
+        body['refresh_token'] as String? ?? '',
+      );
       return true;
     } catch (_) {
       return false;
@@ -174,10 +184,12 @@ class ApiClient {
     final response = await _logged(
       'GET',
       endpoint,
-      send: () => _sendWithRetry(
-        (headers) => _client.get(Uri.parse('$baseUrl$endpoint'), headers: headers),
-        auth: auth,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) =>
+                _client.get(Uri.parse('$baseUrl$endpoint'), headers: headers),
+            auth: auth,
+          ),
     );
     return _handleResponse(response);
   }
@@ -192,10 +204,15 @@ class ApiClient {
       'POST',
       endpoint,
       body: body,
-      send: () => _sendWithRetry(
-        (headers) => _client.post(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-        auth: auth,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) => _client.post(
+              Uri.parse('$baseUrl$endpoint'),
+              headers: headers,
+              body: jsonEncode(body),
+            ),
+            auth: auth,
+          ),
     );
     return _handleResponse(response);
   }
@@ -210,10 +227,15 @@ class ApiClient {
       'PUT',
       endpoint,
       body: body,
-      send: () => _sendWithRetry(
-        (headers) => _client.put(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-        auth: auth,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) => _client.put(
+              Uri.parse('$baseUrl$endpoint'),
+              headers: headers,
+              body: jsonEncode(body),
+            ),
+            auth: auth,
+          ),
     );
     return _handleResponse(response);
   }
@@ -228,10 +250,15 @@ class ApiClient {
       'PATCH',
       endpoint,
       body: body,
-      send: () => _sendWithRetry(
-        (headers) => _client.patch(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body)),
-        auth: auth,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) => _client.patch(
+              Uri.parse('$baseUrl$endpoint'),
+              headers: headers,
+              body: jsonEncode(body),
+            ),
+            auth: auth,
+          ),
     );
     return _handleResponse(response);
   }
@@ -256,14 +283,19 @@ class ApiClient {
     final query = category != null ? '?category=$category' : '';
     final data = await get('/merchants$query');
     final list = data['merchants'] as List<dynamic>? ?? [];
-    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => Merchant.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Merchant>> getPopularMerchants({String? foodCategoryId}) async {
-    final query = foodCategoryId != null ? '?food_category_id=$foodCategoryId' : '';
+    final query =
+        foodCategoryId != null ? '?food_category_id=$foodCategoryId' : '';
     final data = await get('/merchants/popular$query', auth: false);
     final list = data['merchants'] as List<dynamic>? ?? [];
-    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => Merchant.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Merchant>> getNearbyMerchants({
@@ -278,34 +310,50 @@ class ApiClient {
       'radius=$radiusKm',
       if (foodCategoryId != null) 'food_category_id=$foodCategoryId',
     ];
-    final data = await get('/merchants/nearby?${params.join('&')}', auth: false);
+    final data = await get(
+      '/merchants/nearby?${params.join('&')}',
+      auth: false,
+    );
     final list = data['merchants'] as List<dynamic>? ?? [];
-    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => Merchant.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<FoodCategory>> getFoodCategories() async {
     final data = await get('/food-categories', auth: false);
     final list = data['food_categories'] as List<dynamic>? ?? [];
-    return list.map((c) => FoodCategory.fromJson(c as Map<String, dynamic>)).toList();
+    return list
+        .map((c) => FoodCategory.fromJson(c as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Promotion>> getActivePromotions() async {
     final data = await get('/promotions/active', auth: false);
     final list = data['promotions'] as List<dynamic>? ?? [];
-    return list.map((p) => Promotion.fromJson(p as Map<String, dynamic>)).toList();
+    return list
+        .map((p) => Promotion.fromJson(p as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<PromoBanner>> getActiveBanners() async {
     final data = await get('/banners/active', auth: false);
     final list = data['banners'] as List<dynamic>? ?? [];
-    return list.map((b) => PromoBanner.fromJson(b as Map<String, dynamic>)).toList();
+    return list
+        .map((b) => PromoBanner.fromJson(b as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Merchant>> searchMerchants(String q) async {
     if (q.isEmpty) return [];
-    final data = await get('/merchants/search?q=${Uri.encodeQueryComponent(q)}', auth: false);
+    final data = await get(
+      '/merchants/search?q=${Uri.encodeQueryComponent(q)}',
+      auth: false,
+    );
     final list = data['merchants'] as List<dynamic>? ?? [];
-    return list.map((m) => Merchant.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => Merchant.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<ProductSearchResult>> searchProducts({
@@ -323,13 +371,17 @@ class ApiClient {
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     final data = await get('/products/search$query', auth: false);
     final list = data['products'] as List<dynamic>? ?? [];
-    return list.map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>)).toList();
+    return list
+        .map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<ProductSearchResult>> getPopularProducts() async {
     final data = await get('/products/popular', auth: false);
     final list = data['products'] as List<dynamic>? ?? [];
-    return list.map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>)).toList();
+    return list
+        .map((p) => ProductSearchResult.fromJson(p as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Merchant> getMerchant(String id) async {
@@ -341,7 +393,9 @@ class ApiClient {
     final data = await get('/merchants/$merchantId/products');
     final list = data['categories'] as List<dynamic>?;
     if (list != null) {
-      return list.map((c) => ProductCategory.fromJson(c as Map<String, dynamic>)).toList();
+      return list
+          .map((c) => ProductCategory.fromJson(c as Map<String, dynamic>))
+          .toList();
     }
     // Fallback: flat products list grouped by category
     final products = data['products'] as List<dynamic>? ?? [];
@@ -424,7 +478,9 @@ class ApiClient {
   Future<List<ProductCategory>> getMyStoreMenu() async {
     final data = await get('/my-store/categories');
     final list = data['categories'] as List<dynamic>? ?? [];
-    return list.map((c) => ProductCategory.fromJson(c as Map<String, dynamic>)).toList();
+    return list
+        .map((c) => ProductCategory.fromJson(c as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> createCategory(String name) async {
@@ -439,10 +495,14 @@ class ApiClient {
     final response = await _logged(
       'DELETE',
       '/my-store/categories/$catId',
-      send: () => _sendWithRetry(
-        (headers) => _client.delete(Uri.parse('$baseUrl/my-store/categories/$catId'), headers: headers),
-        auth: true,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) => _client.delete(
+              Uri.parse('$baseUrl/my-store/categories/$catId'),
+              headers: headers,
+            ),
+            auth: true,
+          ),
     );
     _handleResponse(response);
   }
@@ -454,14 +514,20 @@ class ApiClient {
 
   /// Sends a single-file multipart POST, logging it like every other
   /// request. Used by the three image/logo/banner upload endpoints.
-  Future<http.Response> _loggedMultipart(String endpoint, File imageFile) async {
+  Future<http.Response> _loggedMultipart(
+    String endpoint,
+    File imageFile,
+  ) async {
     final url = '$baseUrl$endpoint';
     ApiLogger.request(method: 'POST', url: url, body: {'file': imageFile.path});
     final token = await _getToken();
     final uri = Uri.parse(url);
-    final req = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    final req =
+        http.MultipartRequest('POST', uri)
+          ..headers['Authorization'] = 'Bearer $token'
+          ..files.add(
+            await http.MultipartFile.fromPath('image', imageFile.path),
+          );
     final sw = Stopwatch()..start();
     final streamed = await req.send().timeout(_kTimeout);
     final response = await http.Response.fromStream(streamed);
@@ -479,12 +545,18 @@ class ApiClient {
   /// Uploads a photo for a product owned by the calling merchant.
   /// Returns the new image URL.
   Future<String> uploadProductImage(String productId, File imageFile) async {
-    final body = await _loggedMultipart('/my-store/products/$productId/image', imageFile);
+    final body = await _loggedMultipart(
+      '/my-store/products/$productId/image',
+      imageFile,
+    );
     final data = _handleResponse(body);
     return data['image_url'] as String;
   }
 
-  Future<void> updateProduct(String productId, Map<String, dynamic> body) async {
+  Future<void> updateProduct(
+    String productId,
+    Map<String, dynamic> body,
+  ) async {
     await put('/my-store/products/$productId', body);
   }
 
@@ -523,10 +595,11 @@ class ApiClient {
     await _logged(
       'DELETE',
       '/my-store/promotions/$id',
-      send: () async => _client.delete(
-        Uri.parse('$baseUrl/my-store/promotions/$id'),
-        headers: await _headers(),
-      ),
+      send:
+          () async => _client.delete(
+            Uri.parse('$baseUrl/my-store/promotions/$id'),
+            headers: await _headers(),
+          ),
     );
   }
 
@@ -548,7 +621,10 @@ class ApiClient {
   }
 
   Future<String> uploadMyBannerImage(String bannerId, File imageFile) async {
-    final body = await _loggedMultipart('/my-store/banners/$bannerId/image', imageFile);
+    final body = await _loggedMultipart(
+      '/my-store/banners/$bannerId/image',
+      imageFile,
+    );
     final data = _handleResponse(body);
     return data['image_url'] as String;
   }
@@ -557,18 +633,27 @@ class ApiClient {
     await _logged(
       'DELETE',
       '/my-store/products/$productId',
-      send: () async => _client.delete(
-        Uri.parse('$baseUrl/my-store/products/$productId'),
-        headers: await _headers(),
-      ),
+      send:
+          () async => _client.delete(
+            Uri.parse('$baseUrl/my-store/products/$productId'),
+            headers: await _headers(),
+          ),
     );
   }
 
-  Future<void> toggleProductAvailability(String productId, bool available) async {
-    await put('/my-store/products/$productId/toggle', {'is_available': available});
+  Future<void> toggleProductAvailability(
+    String productId,
+    bool available,
+  ) async {
+    await put('/my-store/products/$productId/toggle', {
+      'is_available': available,
+    });
   }
 
-  Future<ProductVariant> createVariant(String productId, Map<String, dynamic> body) async {
+  Future<ProductVariant> createVariant(
+    String productId,
+    Map<String, dynamic> body,
+  ) async {
     final data = await post('/my-store/products/$productId/variants', body);
     return ProductVariant.fromJson(data['variant'] as Map<String, dynamic>);
   }
@@ -577,10 +662,11 @@ class ApiClient {
     await _logged(
       'DELETE',
       '/my-store/variants/$variantId',
-      send: () async => _client.delete(
-        Uri.parse('$baseUrl/my-store/variants/$variantId'),
-        headers: await _headers(),
-      ),
+      send:
+          () async => _client.delete(
+            Uri.parse('$baseUrl/my-store/variants/$variantId'),
+            headers: await _headers(),
+          ),
     );
   }
 
@@ -596,18 +682,22 @@ class ApiClient {
     await put('/my-store/self-delivery-fee', {'self_delivery_fee': fee});
   }
 
-  Future<void> updateTaxSettings({required bool taxEnabled, double? taxRate}) async {
-    await put('/my-store', {
-      'tax_enabled': taxEnabled,
-      'tax_rate': taxRate,
-    });
+  Future<void> updateTaxSettings({
+    required bool taxEnabled,
+    double? taxRate,
+  }) async {
+    await put('/my-store', {'tax_enabled': taxEnabled, 'tax_rate': taxRate});
   }
 
   Future<void> toggleFreeDelivery(bool enabled) async {
     await put('/my-store', {'is_free_delivery': enabled});
   }
 
-  Future<void> updateMerchantDetails({String? name, String? phone, String? address}) async {
+  Future<void> updateMerchantDetails({
+    String? name,
+    String? phone,
+    String? address,
+  }) async {
     await put('/my-store', {
       if (name != null) 'name': name,
       if (phone != null) 'phone': phone,
@@ -657,6 +747,14 @@ class ApiClient {
     return await get('/driver/wallet');
   }
 
+  /// Road-following distance/duration (merchant -> dropoff) for the active-delivery map,
+  /// via OpenRouteService server-side. Response always has `distance_km`; `duration_min` and
+  /// `source` ("road" vs "straight_line") let the caller show an honest label if ORS wasn't
+  /// reachable and the backend fell back to the straight-line haversine distance.
+  Future<Map<String, dynamic>> getDriverRoadRoute(String orderId) async {
+    return await get('/driver-orders/$orderId/road-route');
+  }
+
   // --- Merchant wallet ---
 
   Future<Wallet> getMerchantWallet() async {
@@ -667,7 +765,9 @@ class ApiClient {
   Future<List<WalletTransaction>> getMerchantWalletTransactions() async {
     final data = await get('/my-store/wallet/transactions');
     final list = data['transactions'] as List<dynamic>? ?? [];
-    return list.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+    return list
+        .map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> withdrawMerchant({
@@ -693,7 +793,9 @@ class ApiClient {
   Future<List<WalletTransaction>> getDriverWalletTransactions() async {
     final data = await get('/driver/wallet/transactions');
     final list = data['transactions'] as List<dynamic>? ?? [];
-    return list.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+    return list
+        .map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> withdrawDriver({
@@ -732,7 +834,9 @@ class ApiClient {
   Future<List<WalletTransaction>> getCustomerWalletTransactions() async {
     final data = await get('/customer/wallet/transactions');
     final list = data['transactions'] as List<dynamic>? ?? [];
-    return list.map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+    return list
+        .map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> withdrawCustomer({
@@ -839,7 +943,9 @@ class ApiClient {
   Future<List<SupportMessage>> getSupportMessages() async {
     final data = await get('/support/messages');
     final list = data['messages'] as List? ?? [];
-    return list.map((m) => SupportMessage.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => SupportMessage.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> sendSupportMessage(String text) async {
@@ -856,7 +962,9 @@ class ApiClient {
   Future<List<SupportMessage>> getAdminUserMessages(String userId) async {
     final data = await get('/admin/support/users/$userId/messages');
     final list = data['messages'] as List? ?? [];
-    return list.map((m) => SupportMessage.fromJson(m as Map<String, dynamic>)).toList();
+    return list
+        .map((m) => SupportMessage.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> sendAdminReply(String userId, String text) async {
@@ -874,7 +982,12 @@ class ApiClient {
   /// null and defaults to customer). [agreeTerms] is required when this call
   /// ends up auto-registering a brand-new customer account — the backend
   /// rejects with `requires_terms: true` otherwise.
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code, {String? role, bool agreeTerms = false}) async {
+  Future<Map<String, dynamic>> verifyOtp(
+    String phone,
+    String code, {
+    String? role,
+    bool agreeTerms = false,
+  }) async {
     return await post('/auth/otp/verify', {
       'phone': phone,
       'code': code,
@@ -892,7 +1005,10 @@ class ApiClient {
   /// authenticated account. Throws [ApiException] on invalid/expired code
   /// or if the phone is already used on a different account.
   Future<User> verifyMyPhone(String phone, String code) async {
-    final data = await post('/auth/verify-phone', {'phone': phone, 'code': code});
+    final data = await post('/auth/verify-phone', {
+      'phone': phone,
+      'code': code,
+    });
     return User.fromJson(data['user'] as Map<String, dynamic>);
   }
 
@@ -915,10 +1031,12 @@ class ApiClient {
     final response = await _logged(
       'DELETE',
       '/auth/me',
-      send: () => _sendWithRetry(
-        (headers) => _client.delete(Uri.parse('$baseUrl/auth/me'), headers: headers),
-        auth: true,
-      ),
+      send:
+          () => _sendWithRetry(
+            (headers) =>
+                _client.delete(Uri.parse('$baseUrl/auth/me'), headers: headers),
+            auth: true,
+          ),
     );
     _handleResponse(response);
   }
@@ -928,7 +1046,9 @@ class ApiClient {
   Future<List<SavedAddress>> getAddresses() async {
     final data = await get('/addresses');
     final list = data['addresses'] as List<dynamic>? ?? [];
-    return list.map((a) => SavedAddress.fromJson(a as Map<String, dynamic>)).toList();
+    return list
+        .map((a) => SavedAddress.fromJson(a as Map<String, dynamic>))
+        .toList();
   }
 
   Future<SavedAddress> createAddress({
@@ -974,10 +1094,14 @@ class ApiClient {
     await _logged(
       'DELETE',
       '/addresses/$id',
-      send: () async => _sendWithRetry(
-        (headers) => _client.delete(Uri.parse('$baseUrl/addresses/$id'), headers: headers),
-        auth: true,
-      ),
+      send:
+          () async => _sendWithRetry(
+            (headers) => _client.delete(
+              Uri.parse('$baseUrl/addresses/$id'),
+              headers: headers,
+            ),
+            auth: true,
+          ),
     );
   }
 
