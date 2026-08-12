@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -35,8 +33,28 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
   }
 
   Future<void> _startAlarm() async {
+    // Default audio context plays on the MEDIA stream, which goes silent
+    // whenever the device is locked or media volume is turned down — an
+    // incoming-order alert needs to cut through that the same way a real
+    // alarm clock does, so it's pinned to Android's alarm stream/usage
+    // instead (independent of media volume, and not silenced on lock).
+    await _player.setAudioContext(
+      AudioContext(
+        android: AudioContextAndroid(
+          usageType: AndroidUsageType.alarm,
+          contentType: AndroidContentType.sonification,
+          audioFocus: AndroidAudioFocus.gain,
+          stayAwake: true,
+        ),
+      ),
+    );
     await _player.setReleaseMode(ReleaseMode.loop);
-    unawaited(_player.play(AssetSource('sounds/order_alarm.wav'), volume: 1.0));
+    try {
+      await _player.play(AssetSource('sounds/order_alarm.wav'), volume: 1.0);
+    } catch (_) {
+      // Alarm sound is a nicety on top of vibration, not load-bearing for
+      // the merchant being able to accept/reject — never block on it.
+    }
     if (await Vibration.hasVibrator()) {
       // Repeats the pattern until cancel() is called.
       Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400], repeat: 0);
