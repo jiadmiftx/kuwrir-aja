@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/support_chat_cubit.dart';
@@ -50,9 +51,7 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Chat dengan Admin'),
-        ),
+        appBar: AppBar(title: const Text('Chat dengan Admin')),
         body: Column(
           children: [
             Expanded(
@@ -71,18 +70,26 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.support_agent_outlined,
-                                size: 72, color: Colors.grey[300]),
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedCustomerService01,
+                              size: 72,
+                              color: Colors.grey[300],
+                            ),
                             const SizedBox(height: 16),
-                            const Text('Belum ada pesan',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey)),
+                            const Text(
+                              'Belum ada pesan',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            const Text('Kirim pesan untuk menghubungi tim support kami',
-                                style: TextStyle(color: Colors.grey),
-                                textAlign: TextAlign.center),
+                            const Text(
+                              'Kirim pesan untuk menghubungi tim support kami',
+                              style: TextStyle(color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       );
@@ -119,17 +126,16 @@ class _SupportBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.72,
+        ),
         decoration: BoxDecoration(
           color: isMe ? KuwrirColors.primary : Colors.grey.shade200,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft:
-                isMe ? const Radius.circular(16) : Radius.zero,
-            bottomRight:
-                isMe ? Radius.zero : const Radius.circular(16),
+            bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
+            bottomRight: isMe ? Radius.zero : const Radius.circular(16),
           ),
         ),
         child: Column(
@@ -167,8 +173,7 @@ class _InputBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06), blurRadius: 8)
+          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8),
         ],
       ),
       child: Row(
@@ -179,8 +184,10 @@ class _InputBar extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: 'Ketik pesan...',
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -195,7 +202,11 @@ class _InputBar extends StatelessWidget {
           CircleAvatar(
             backgroundColor: KuwrirColors.primary,
             child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+              icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedSent,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: onSend,
             ),
           ),

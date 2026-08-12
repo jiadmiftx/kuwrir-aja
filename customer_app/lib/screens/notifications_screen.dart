@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
 
@@ -50,94 +51,132 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _notifications.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: KuwrirColors.primary.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.notifications_none_rounded, size: 36, color: KuwrirColors.primary),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text('Belum ada notifikasi',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary)),
-                        const SizedBox(height: 6),
-                        Text('Kabar pesanan dan promo akan muncul di sini',
-                            style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13),
-                            textAlign: TextAlign.center),
-                      ],
-                    ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: _notifications.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) {
-                    final n = _notifications[i];
-                    return Container(
-                      padding: const EdgeInsets.all(14),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
                       decoration: BoxDecoration(
-                        color: KuwrirColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: KuwrirColors.border),
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedNotification01,
+                        size: 36,
+                        color: KuwrirColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Belum ada notifikasi',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Kabar pesanan dan promo akan muncul di sini',
+                      style: TextStyle(
+                        color: KuwrirColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: _notifications.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final n = _notifications[i];
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: KuwrirColors.border),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedNotification01,
+                          color: KuwrirColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(n.title,
-                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                                Expanded(
+                                  child: Text(
+                                    n.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
                                     ),
-                                    if (!n.read)
-                                      Container(
-                                        width: 7,
-                                        height: 7,
-                                        margin: const EdgeInsets.only(left: 6, top: 3),
-                                        decoration: const BoxDecoration(
-                                          color: KuwrirColors.primary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                  ],
+                                  ),
                                 ),
-                                const SizedBox(height: 3),
-                                Text(n.body,
-                                    style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary, height: 1.35)),
-                                const SizedBox(height: 6),
-                                Text(_timeAgo(n.receivedAt),
-                                    style: TextStyle(fontSize: 11, color: KuwrirColors.textHint)),
+                                if (!n.read)
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    margin: const EdgeInsets.only(
+                                      left: 6,
+                                      top: 3,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      color: KuwrirColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
                               ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 3),
+                            Text(
+                              n.body,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: KuwrirColors.textSecondary,
+                                height: 1.35,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _timeAgo(n.receivedAt),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: KuwrirColors.textHint,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  },
-                ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 }

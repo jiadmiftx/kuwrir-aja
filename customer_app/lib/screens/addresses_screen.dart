@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -39,11 +40,11 @@ class _AddressesScreenState extends State<AddressesScreen> {
     widget.onPickAdHoc!(address, latlng.latitude, latlng.longitude);
   }
 
-  IconData _iconFor(String label) {
+  List<List<dynamic>> _iconFor(String label) {
     final l = label.toLowerCase();
-    if (l.contains('rumah')) return Icons.home_outlined;
-    if (l.contains('kantor')) return Icons.work_outline;
-    return Icons.location_on_outlined;
+    if (l.contains('rumah')) return HugeIcons.strokeRoundedHome01;
+    if (l.contains('kantor')) return HugeIcons.strokeRoundedBriefcase01;
+    return HugeIcons.strokeRoundedLocation01;
   }
 
   Future<void> _confirmDelete(SavedAddress a) async {
@@ -103,8 +104,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
                           color: KuwrirColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(
-                          Icons.map_outlined,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedMaping,
                           color: KuwrirColors.primary,
                           size: 20,
                         ),
@@ -119,7 +120,10 @@ class _AddressesScreenState extends State<AddressesScreen> {
                           ),
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedArrowRight01,
+                        color: KuwrirColors.textHint,
+                      ),
                     ],
                   ),
                 ),
@@ -166,8 +170,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
                               ),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
-                              Icons.location_on_outlined,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedLocation01,
                               size: 36,
                               color: KuwrirColors.primary,
                             ),
@@ -225,8 +229,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
                             color: KuwrirColors.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(
-                            _iconFor(a.label),
+                          child: HugeIcon(
+                            icon: _iconFor(a.label),
                             color: KuwrirColors.primary,
                             size: 20,
                           ),
@@ -295,13 +299,13 @@ class _AddressesScreenState extends State<AddressesScreen> {
                           ],
                         ),
                         trailing: widget.onPick != null
-                            ? Icon(
-                                Icons.chevron_right,
+                            ? HugeIcon(
+                                icon: HugeIcons.strokeRoundedArrowRight01,
                                 color: KuwrirColors.textHint,
                               )
                             : PopupMenuButton<String>(
-                                icon: Icon(
-                                  Icons.more_vert,
+                                icon: HugeIcon(
+                                  icon: HugeIcons.strokeRoundedMoreVertical,
                                   size: 18,
                                   color: KuwrirColors.textHint,
                                 ),
@@ -354,7 +358,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         ),
         backgroundColor: KuwrirColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
+        icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
         label: const Text('Tambah Alamat'),
       ),
     );

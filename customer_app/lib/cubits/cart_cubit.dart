@@ -5,8 +5,14 @@ class CartState {
   final List<CartItem> items;
   final String? merchantId;
   final String? merchantName;
+  final String? merchantImageUrl;
 
-  const CartState({this.items = const [], this.merchantId, this.merchantName});
+  const CartState({
+    this.items = const [],
+    this.merchantId,
+    this.merchantName,
+    this.merchantImageUrl,
+  });
 
   double get subtotal => items.fold(0, (sum, i) => sum + i.lineTotal);
   double get packagingFeeTotal =>
@@ -18,10 +24,12 @@ class CartState {
     List<CartItem>? items,
     String? merchantId,
     String? merchantName,
+    String? merchantImageUrl,
   }) => CartState(
     items: items ?? this.items,
     merchantId: merchantId ?? this.merchantId,
     merchantName: merchantName ?? this.merchantName,
+    merchantImageUrl: merchantImageUrl ?? this.merchantImageUrl,
   );
 }
 
@@ -40,6 +48,7 @@ class CartCubit extends Cubit<CartState> {
     Product product, {
     String? merchantId,
     String? merchantName,
+    String? merchantImageUrl,
     List<ProductVariant> selectedVariants = const [],
     int quantity = 1,
   }) {
@@ -58,6 +67,7 @@ class CartCubit extends Cubit<CartState> {
           ],
           merchantId: merchantId,
           merchantName: merchantName,
+          merchantImageUrl: merchantImageUrl,
         ),
       );
       return;
@@ -85,6 +95,7 @@ class CartCubit extends Cubit<CartState> {
           ],
           merchantId: merchantId,
           merchantName: merchantName,
+          merchantImageUrl: merchantImageUrl,
         ),
       );
     }

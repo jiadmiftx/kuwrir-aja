@@ -1,9 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
@@ -35,11 +37,25 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   final notification = message.notification;
   if (notification != null) {
-    await NotificationService.persist(
-      notification.title ?? '',
-      notification.body ?? '',
-    );
+    await NotificationService.persist(notification.title ?? '', notification.body ?? '');
   }
+}
+
+// Customer-app-only typography: `KuwrirTheme` (shared/kuwrir_shared) declares
+// `fontFamily: 'Inter'` but never bundles the font, so it silently falls
+// back to the platform default everywhere across all 3 apps. Rather than
+// touch the shared theme (driver_app/merchant_app aren't part of this
+// redesign), layer Plus Jakarta Sans on top here via `copyWith` — a
+// geometric, slightly more distinctive face than Inter that reads as
+// premium rather than "default SaaS", without a font-asset pipeline.
+ThemeData _customerTheme(ThemeData base) {
+  final textTheme = GoogleFonts.plusJakartaSansTextTheme(base.textTheme);
+  return base.copyWith(
+    textTheme: textTheme,
+    appBarTheme: base.appBarTheme.copyWith(
+      titleTextStyle: GoogleFonts.plusJakartaSans(color: KuwrirColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 void main() async {
@@ -76,61 +92,42 @@ class KuwrirCustomerApp extends StatelessWidget {
         child: MaterialApp(
           title: 'Cocourir',
           debugShowCheckedModeBanner: false,
-          theme: KuwrirTheme.light,
-          darkTheme: KuwrirTheme.dark,
+          theme: _customerTheme(KuwrirTheme.light),
+          darkTheme: _customerTheme(KuwrirTheme.dark),
           themeMode: ThemeMode.light,
           home: const _SplashRouter(),
           onGenerateRoute: (settings) {
             switch (settings.name) {
               case '/login':
-                return MaterialPageRoute(
-                  builder: (_) => const CustomerLoginScreen(),
-                );
+                return MaterialPageRoute(builder: (_) => const CustomerLoginScreen());
               case '/home':
                 final homeArgs = settings.arguments as Map<String, dynamic>?;
                 return MaterialPageRoute(
-                  builder: (_) => AppLockGate(
-                    child: CustomerHome(
-                      initialTab: homeArgs?['tab'] as int? ?? 0,
-                    ),
-                  ),
+                  builder: (_) => AppLockGate(child: CustomerHome(initialTab: homeArgs?['tab'] as int? ?? 0)),
                 );
               case '/search':
                 return MaterialPageRoute(builder: (_) => const SearchScreen());
               case '/merchant':
                 final args = settings.arguments as Map<String, dynamic>;
                 return MaterialPageRoute(
-                  builder: (_) => MerchantDetailScreen(
-                    merchantId: args['id'] as String,
-                    merchantName: args['name'] as String,
-                  ),
+                  builder: (_) => MerchantDetailScreen(merchantId: args['id'] as String, merchantName: args['name'] as String),
                 );
               case '/cart':
                 return MaterialPageRoute(builder: (_) => const CartScreen());
               case '/tracking':
                 final args = settings.arguments as Map<String, dynamic>;
-                return MaterialPageRoute(
-                  builder: (ctx) =>
-                      OrderTrackingScreen(orderId: args['order_id'] as String),
-                );
+                return MaterialPageRoute(builder: (ctx) => OrderTrackingScreen(orderId: args['order_id'] as String));
               case '/chat':
                 final args = settings.arguments as Map<String, dynamic>;
                 return MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    orderId: args['order_id'] as String,
-                    orderNumber: args['order_number'] as String,
-                  ),
+                  builder: (_) => ChatScreen(orderId: args['order_id'] as String, orderNumber: args['order_number'] as String),
                 );
               case '/profile':
                 return MaterialPageRoute(builder: (_) => const ProfileScreen());
               case '/notifications':
-                return MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
-                );
+                return MaterialPageRoute(builder: (_) => const NotificationsScreen());
               case '/addresses':
-                return MaterialPageRoute(
-                  builder: (_) => const AddressesScreen(),
-                );
+                return MaterialPageRoute(builder: (_) => const AddressesScreen());
               case '/wallet':
                 return MaterialPageRoute(builder: (_) => const WalletScreen());
               default:
@@ -188,14 +185,7 @@ class _SplashRouterState extends State<_SplashRouter> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64),
-            const SizedBox(height: 24),
-            const CircularProgressIndicator(),
-          ],
-        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64), const SizedBox(height: 24), const CircularProgressIndicator()]),
       ),
     );
   }
@@ -215,15 +205,7 @@ class _CustomerHomeState extends State<CustomerHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _idx,
-        children: const [
-          HomeScreen(),
-          _PromoScreen(),
-          _OrdersScreen(),
-          _ChatListScreen(),
-        ],
-      ),
+      body: IndexedStack(index: _idx, children: const [HomeScreen(), _PromoScreen(), _OrdersScreen(), _ChatListScreen()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) async {
@@ -234,23 +216,23 @@ class _CustomerHomeState extends State<CustomerHome> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedHome01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedHome01),
             label: 'Beranda',
           ),
           NavigationDestination(
-            icon: Icon(Icons.local_offer_outlined),
-            selectedIcon: Icon(Icons.local_offer),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
             label: 'Promo',
           ),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
             label: 'Orders',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedChat),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedChat01),
             label: 'Chat',
           ),
         ],
@@ -309,24 +291,13 @@ class _OrdersScreenState extends State<_OrdersScreen> {
     if (_orders.isEmpty) {
       return Scaffold(
         backgroundColor: KuwrirColors.background,
-        appBar: AppBar(
-          title: const Text('Pesanan Saya'),
-          backgroundColor: KuwrirColors.background,
-        ),
-        body: _EmptyState(
-          icon: Icons.receipt_long_outlined,
-          title: 'Belum ada pesanan',
-          subtitle: 'Pesanan yang kamu buat akan muncul di sini',
-          onRefresh: _load,
-        ),
+        appBar: AppBar(title: const Text('Pesanan Saya'), backgroundColor: KuwrirColors.background),
+        body: _EmptyState(icon: HugeIcons.strokeRoundedInvoice01, title: 'Belum ada pesanan', subtitle: 'Pesanan yang kamu buat akan muncul di sini', onRefresh: _load),
       );
     }
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(
-        title: const Text('Pesanan Saya'),
-        backgroundColor: KuwrirColors.background,
-      ),
+      appBar: AppBar(title: const Text('Pesanan Saya'), backgroundColor: KuwrirColors.background),
       body: RefreshIndicator(
         onRefresh: _load,
         color: KuwrirColors.primary,
@@ -335,11 +306,7 @@ class _OrdersScreenState extends State<_OrdersScreen> {
           itemCount: _orders.length,
           itemBuilder: (_, i) => _OrderCard(
             order: _orders[i],
-            onTap: () => Navigator.pushNamed(
-              context,
-              '/tracking',
-              arguments: {'order_id': _orders[i].id},
-            ),
+            onTap: () => Navigator.pushNamed(context, '/tracking', arguments: {'order_id': _orders[i].id}),
           ),
         ),
       ),
@@ -352,8 +319,7 @@ class _OrderCard extends StatelessWidget {
   final VoidCallback onTap;
   const _OrderCard({required this.order, required this.onTap});
 
-  String _fmt(double v) => v.toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 
   String get _itemSummary {
     if (order.items.isEmpty) return order.merchantName ?? order.senderName ?? '-';
@@ -396,24 +362,29 @@ class _OrderCard extends StatelessWidget {
                     Container(
                       width: 40,
                       height: 40,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: Icon(Icons.storefront_outlined, color: KuwrirColors.primary, size: 19),
+                      decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(11)),
+                      clipBehavior: Clip.antiAlias,
+                      child: order.merchantLogoUrl != null && order.merchantLogoUrl!.isNotEmpty
+                          ? Image.network(
+                              order.merchantLogoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => HugeIcon(icon: HugeIcons.strokeRoundedStore01, color: KuwrirColors.primary, size: 17),
+                            )
+                          : HugeIcon(icon: HugeIcons.strokeRoundedStore01, color: KuwrirColors.primary, size: 17),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(order.merchantName ?? order.senderName ?? 'Pesanan',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                          Text(
+                            order.merchantName ?? order.senderName ?? 'Pesanan',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                          ),
                           const SizedBox(height: 2),
-                          Text('#${order.orderNumber}${_dateLabel != null ? ' · ${_dateLabel!}' : ''}',
-                              style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
+                          Text('#${order.orderNumber}${_dateLabel != null ? ' · ${_dateLabel!}' : ''}', style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
                         ],
                       ),
                     ),
@@ -426,14 +397,18 @@ class _OrderCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(_itemSummary,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary)),
+                      child: Text(
+                        _itemSummary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Text('Rp ${_fmt(order.total)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: KuwrirColors.primary)),
+                    Text(
+                      'Rp ${_fmt(order.total)}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: KuwrirColors.primary),
+                    ),
                   ],
                 ),
               ],
@@ -448,16 +423,11 @@ class _OrderCard extends StatelessWidget {
 /// Consistent flat-tinted-surface empty state — replaces raw grey icon +
 /// text pairs scattered per screen with one reusable, on-brand treatment.
 class _EmptyState extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String title;
   final String subtitle;
   final VoidCallback? onRefresh;
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onRefresh,
-  });
+  const _EmptyState({required this.icon, required this.title, required this.subtitle, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -470,20 +440,13 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 88,
               height: 88,
-              decoration: BoxDecoration(
-                color: KuwrirColors.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 36, color: KuwrirColors.primary),
+              decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), shape: BoxShape.circle),
+              child: HugeIcon(icon: icon, size: 36, color: KuwrirColors.primary),
             ),
             const SizedBox(height: 20),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: KuwrirColors.textPrimary,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -492,10 +455,7 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary),
               textAlign: TextAlign.center,
             ),
-            if (onRefresh != null) ...[
-              const SizedBox(height: 16),
-              TextButton(onPressed: onRefresh, child: const Text('Muat Ulang')),
-            ],
+            if (onRefresh != null) ...[const SizedBox(height: 16), TextButton(onPressed: onRefresh, child: const Text('Muat Ulang'))],
           ],
         ),
       ),
@@ -514,14 +474,7 @@ class _SoftListTile extends StatelessWidget {
   final VoidCallback onTap;
   final EdgeInsets margin;
 
-  const _SoftListTile({
-    required this.leading,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-    required this.onTap,
-    this.margin = EdgeInsets.zero,
-  });
+  const _SoftListTile({required this.leading, required this.title, required this.subtitle, this.trailing, required this.onTap, this.margin = EdgeInsets.zero});
 
   @override
   Widget build(BuildContext context) {
@@ -552,20 +505,14 @@ class _SoftListTile extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14.5,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: KuwrirColors.textSecondary,
-                        ),
+                        style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary),
                       ),
                     ],
                   ),
@@ -631,10 +578,7 @@ class _StatusBadge extends StatelessWidget {
     final c = _color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(7),
-      ),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(7)),
       child: Text(
         _label,
         style: TextStyle(fontSize: 10.5, color: c, fontWeight: FontWeight.w700),
@@ -671,10 +615,7 @@ class _PromoScreenState extends State<_PromoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(
-        title: const Text('Promo'),
-        backgroundColor: KuwrirColors.background,
-      ),
+      appBar: AppBar(title: const Text('Promo'), backgroundColor: KuwrirColors.background),
       body: RefreshIndicator(
         onRefresh: _refresh,
         color: KuwrirColors.primary,
@@ -691,11 +632,7 @@ class _PromoScreenState extends State<_PromoScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: _EmptyState(
-                      icon: Icons.local_offer_outlined,
-                      title: 'Belum ada promo aktif',
-                      subtitle: 'Pantau terus untuk penawaran terbaik',
-                    ),
+                    child: _EmptyState(icon: HugeIcons.strokeRoundedDiscountTag01, title: 'Belum ada promo aktif', subtitle: 'Pantau terus untuk penawaran terbaik'),
                   ),
                 ),
               );
@@ -717,18 +654,18 @@ class _PromoScreenState extends State<_PromoScreen> {
 /// instead of one flat green treatment for every card.
 class _PromoStyle {
   final Color color;
-  final IconData icon;
+  final List<List<dynamic>> icon;
   const _PromoStyle(this.color, this.icon);
 }
 
 _PromoStyle _promoStyle(String type) {
   switch (type) {
     case 'fixed':
-      return const _PromoStyle(KuwrirColors.accent, Icons.savings_outlined);
+      return const _PromoStyle(KuwrirColors.accent, HugeIcons.strokeRoundedSavings);
     case 'free_delivery':
-      return const _PromoStyle(KuwrirColors.warning, Icons.delivery_dining_outlined);
+      return const _PromoStyle(KuwrirColors.warning, HugeIcons.strokeRoundedDeliveryBox01);
     default:
-      return const _PromoStyle(KuwrirColors.primary, Icons.percent_rounded);
+      return const _PromoStyle(KuwrirColors.primary, HugeIcons.strokeRoundedPercent);
   }
 }
 
@@ -749,20 +686,14 @@ class _PromoCard extends StatelessWidget {
     }
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 
   Future<void> _copyCode(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: promo.code));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kode ${promo.code} disalin'),
-          backgroundColor: KuwrirColors.primaryDark,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Kode ${promo.code} disalin'), backgroundColor: KuwrirColors.primaryDark, behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)));
     }
   }
 
@@ -776,9 +707,7 @@ class _PromoCard extends StatelessWidget {
         color: KuwrirColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: KuwrirColors.border),
-        boxShadow: [
-          BoxShadow(color: KuwrirColors.textPrimary.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 4)),
-        ],
+        boxShadow: [BoxShadow(color: KuwrirColors.textPrimary.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,21 +727,20 @@ class _PromoCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_valueLabel,
-                    style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, color: style.color)),
+                Text(
+                  _valueLabel,
+                  style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, color: style.color),
+                ),
                 const SizedBox(height: 4),
-                Text(promo.title,
-                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13, height: 1.35)),
+                Text(promo.title, style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13, height: 1.35)),
                 if (promo.minOrder > 0 || (promo.type == 'percentage' && promo.maxDiscount > 0)) ...[
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      if (promo.minOrder > 0)
-                        _PromoInfoChip(text: 'Min. belanja Rp ${_fmt(promo.minOrder)}'),
-                      if (promo.type == 'percentage' && promo.maxDiscount > 0)
-                        _PromoInfoChip(text: 'Maks. Rp ${_fmt(promo.maxDiscount)}'),
+                      if (promo.minOrder > 0) _PromoInfoChip(text: 'Min. belanja Rp ${_fmt(promo.minOrder)}'),
+                      if (promo.type == 'percentage' && promo.maxDiscount > 0) _PromoInfoChip(text: 'Maks. Rp ${_fmt(promo.maxDiscount)}'),
                     ],
                   ),
                 ],
@@ -844,7 +772,10 @@ class _PromoInfoChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         border: Border.all(color: KuwrirColors.border),
       ),
-      child: Text(text, style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
@@ -869,13 +800,15 @@ class DottedCodeChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.confirmation_number_outlined, size: 16, color: color),
+          HugeIcon(icon: HugeIcons.strokeRoundedTicket01, size: 16, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(code,
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5)),
+            child: Text(
+              code,
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5),
+            ),
           ),
-          Icon(Icons.copy_rounded, size: 15, color: color.withValues(alpha: 0.7)),
+          HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: 15, color: color.withValues(alpha: 0.7)),
         ],
       ),
     );
@@ -892,13 +825,11 @@ class _PromoHeroFallback extends StatelessWidget {
       height: 92,
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [style.color.withValues(alpha: 0.16), style.color.withValues(alpha: 0.05)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: LinearGradient(colors: [style.color.withValues(alpha: 0.16), style.color.withValues(alpha: 0.05)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       ),
-      child: Center(child: Icon(style.icon, size: 34, color: style.color)),
+      child: Center(
+        child: HugeIcon(icon: style.icon, size: 34, color: style.color),
+      ),
     );
   }
 }
@@ -923,9 +854,7 @@ class _ChatListScreenState extends State<_ChatListScreen> {
       final api = context.read<ApiClient>();
       if (await api.isAuthenticated()) {
         final orders = await api.getMyOrders();
-        _activeOrders = orders
-            .where((o) => _chatStatuses.contains(o.status))
-            .toList();
+        _activeOrders = orders.where((o) => _chatStatuses.contains(o.status)).toList();
       }
     } catch (_) {}
     _loaded = true;
@@ -939,10 +868,7 @@ class _ChatListScreenState extends State<_ChatListScreen> {
     }
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(
-        title: const Text('Chat'),
-        backgroundColor: KuwrirColors.background,
-      ),
+      appBar: AppBar(title: const Text('Chat'), backgroundColor: KuwrirColors.background),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -955,47 +881,23 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                     leading: Container(
                       width: 44,
                       height: 44,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.support_agent,
-                        color: KuwrirColors.primary,
-                        size: 20,
-                      ),
+                      decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedCustomerService01, color: KuwrirColors.primary, size: 20),
                     ),
                     title: 'Bantuan & Support',
                     subtitle: 'Chat dengan tim admin Cocourir',
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: KuwrirColors.textHint,
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SupportChatScreen(),
-                      ),
-                    ),
+                    trailing: HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, color: KuwrirColors.textHint),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())),
                   ),
                   if (_activeOrders.isEmpty) ...[
                     const SizedBox(height: 40),
-                    _EmptyState(
-                      icon: Icons.chat_bubble_outline,
-                      title: 'Tidak ada chat pesanan aktif',
-                      subtitle: 'Chat muncul saat pesanan sedang diproses',
-                    ),
+                    _EmptyState(icon: HugeIcons.strokeRoundedChat, title: 'Tidak ada chat pesanan aktif', subtitle: 'Chat muncul saat pesanan sedang diproses'),
                   ] else ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
                       child: Text(
                         'PESANAN AKTIF',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: KuwrirColors.textHint,
-                        ),
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint),
                       ),
                     ),
                     for (final o in _activeOrders)
@@ -1005,17 +907,8 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                           leading: Container(
                             width: 44,
                             height: 44,
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.warning.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.delivery_dining,
-                              color: KuwrirColors.warning,
-                              size: 20,
-                            ),
+                            decoration: BoxDecoration(color: KuwrirColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                            child: HugeIcon(icon: HugeIcons.strokeRoundedDeliveryBox01, color: KuwrirColors.warning, size: 20),
                           ),
                           title: '#${o.orderNumber}',
                           subtitle: o.merchantName ?? o.senderName ?? '-',
@@ -1023,10 +916,7 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                orderId: o.id,
-                                orderNumber: o.orderNumber,
-                              ),
+                              builder: (_) => ChatScreen(orderId: o.id, orderNumber: o.orderNumber),
                             ),
                           ),
                         ),

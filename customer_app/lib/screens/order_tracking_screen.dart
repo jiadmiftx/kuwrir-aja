@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'chat_screen.dart';
@@ -118,7 +119,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             actions: [
               if (canChat)
                 IconButton(
-                  icon: const Icon(Icons.chat_bubble_outline),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedChat),
                   tooltip: 'Chat dengan Driver',
                   onPressed: () => Navigator.push(
                     context,
@@ -143,94 +144,125 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Status card
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Icon(
-                            isAwaitingPayment
-                                ? Icons.hourglass_top_rounded
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 28,
+                    ),
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: KuwrirColors.textPrimary.withValues(
+                            alpha: 0.05,
+                          ),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color:
+                                (isAwaitingPayment
+                                        ? KuwrirColors.warning
+                                        : isDelivered
+                                        ? KuwrirColors.success
+                                        : KuwrirColors.primary)
+                                    .withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: HugeIcon(
+                            icon: isAwaitingPayment
+                                ? HugeIcons.strokeRoundedHourglass
                                 : isDelivered
-                                ? Icons.check_circle
-                                : Icons.delivery_dining,
-                            size: 48,
+                                ? HugeIcons.strokeRoundedCheckmarkCircle02
+                                : HugeIcons.strokeRoundedDeliveryBox01,
+                            size: 30,
                             color: isAwaitingPayment
                                 ? KuwrirColors.warning
                                 : isDelivered
                                 ? KuwrirColors.success
                                 : KuwrirColors.primary,
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            isAwaitingPayment
-                                ? 'Menunggu Pembayaran'
-                                : _statusLabel(order.status),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          isAwaitingPayment
+                              ? 'Menunggu Pembayaran'
+                              : _statusLabel(order.status),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
                           ),
-                          if (order.merchantName != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              order.merchantName!,
-                              style: TextStyle(
-                                color: KuwrirColors.textSecondary,
-                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (order.merchantName != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            order.merchantName!,
+                            style: TextStyle(
+                              color: KuwrirColors.textSecondary,
+                              fontSize: 13.5,
                             ),
-                          ],
-                          if (isAwaitingPayment &&
-                              order.paymentExpiredAt != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'Bayar sebelum ${_fmtDeadline(order.paymentExpiredAt!)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: KuwrirColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                          if (!isDelivered) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: KuwrirColors.warning.withValues(
-                                  alpha: 0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: KuwrirColors.warning,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Memperbarui setiap 12 detik...',
-                                    style: const TextStyle(
-                                      color: KuwrirColors.warning,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
                         ],
-                      ),
+                        if (isAwaitingPayment &&
+                            order.paymentExpiredAt != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Bayar sebelum ${_fmtDeadline(order.paymentExpiredAt!)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: KuwrirColors.textHint,
+                            ),
+                          ),
+                        ],
+                        if (!isDelivered) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.warning.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: KuwrirColors.warning,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Memperbarui setiap 12 detik...',
+                                  style: const TextStyle(
+                                    color: KuwrirColors.warning,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -289,13 +321,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             ),
                             const SizedBox(height: 12),
                             _InfoRow(
-                              icon: Icons.location_on_outlined,
+                              icon: HugeIcons.strokeRoundedLocation01,
                               label: 'Alamat',
                               value: order.dropoffAddress!,
                             ),
                             if (order.receiverName != null)
                               _InfoRow(
-                                icon: Icons.person_outline,
+                                icon: HugeIcons.strokeRoundedUser,
                                 label: 'Penerima',
                                 value: order.receiverName!,
                               ),
@@ -342,10 +374,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(
-                                order.paymentType == 'cash'
-                                    ? Icons.payments_outlined
-                                    : Icons.qr_code,
+                              HugeIcon(
+                                icon: order.paymentType == 'cash'
+                                    ? HugeIcons.strokeRoundedPayment01
+                                    : HugeIcons.strokeRoundedQrCode01,
                                 size: 16,
                                 color: KuwrirColors.warning,
                               ),
@@ -385,7 +417,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Icon(Icons.payment),
+                            : const HugeIcon(
+                                icon: HugeIcons.strokeRoundedPayment01,
+                              ),
                         label: const Text('Bayar Sekarang'),
                       ),
                     ),
@@ -501,8 +535,10 @@ class _TimelineStep extends StatelessWidget {
                     : Colors.grey[300],
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                isCompleted ? Icons.check : Icons.circle,
+              child: HugeIcon(
+                icon: isCompleted
+                    ? HugeIcons.strokeRoundedTick01
+                    : HugeIcons.strokeRoundedCircle,
                 size: 14,
                 color: Colors.white,
               ),
@@ -539,7 +575,7 @@ class _TimelineStep extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
   final String value;
 
@@ -556,7 +592,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: KuwrirColors.textSecondary),
+          HugeIcon(icon: icon, size: 16, color: KuwrirColors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Column(

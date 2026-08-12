@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -59,9 +60,10 @@ class _SearchScreenState extends State<SearchScreen>
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    final updated = [trimmed, ..._recentSearches.where((s) => s != trimmed)]
-        .take(8)
-        .toList();
+    final updated = [
+      trimmed,
+      ..._recentSearches.where((s) => s != trimmed),
+    ].take(8).toList();
     await prefs.setStringList(_kRecentSearchesKey, updated);
     if (mounted) setState(() => _recentSearches = updated);
   }
@@ -98,21 +100,29 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           child: TextField(
             controller: _controller,
-            autofocus: widget.initialCategoryId == null &&
+            autofocus:
+                widget.initialCategoryId == null &&
                 !widget.initialDiscount &&
                 !widget.initialFreeDelivery,
             decoration: InputDecoration(
               hintText: 'Cari makanan atau warung...',
               border: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              hintStyle:
-                  TextStyle(color: KuwrirColors.textHint, fontSize: 14),
-              prefixIcon: Icon(Icons.search,
-                  color: KuwrirColors.textHint, size: 20),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              hintStyle: TextStyle(color: KuwrirColors.textHint, fontSize: 14),
+              prefixIcon: HugeIcon(
+                icon: HugeIcons.strokeRoundedSearch01,
+                color: KuwrirColors.textHint,
+                size: 20,
+              ),
               suffixIcon: _hasQuery
                   ? IconButton(
-                      icon: const Icon(Icons.close, size: 18),
+                      icon: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancel01,
+                        size: 18,
+                      ),
                       color: KuwrirColors.textSecondary,
                       onPressed: () => _controller.clear(),
                     )
@@ -185,7 +195,8 @@ class _FilterBar extends StatefulWidget {
   final String? categoryId;
   final bool discountOnly;
   final bool freeDeliveryOnly;
-  final void Function(String? categoryId, bool discount, bool freeDelivery) onChanged;
+  final void Function(String? categoryId, bool discount, bool freeDelivery)
+  onChanged;
 
   const _FilterBar({
     required this.categoryId,
@@ -230,18 +241,24 @@ class _FilterBarState extends State<_FilterBar> {
               children: [
                 _FilterChip(
                   label: 'Diskon',
-                  icon: Icons.local_offer_outlined,
+                  icon: HugeIcons.strokeRoundedDiscountTag01,
                   selected: widget.discountOnly,
                   onTap: () => widget.onChanged(
-                      widget.categoryId, !widget.discountOnly, widget.freeDeliveryOnly),
+                    widget.categoryId,
+                    !widget.discountOnly,
+                    widget.freeDeliveryOnly,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Gratis Ongkir',
-                  icon: Icons.delivery_dining_outlined,
+                  icon: HugeIcons.strokeRoundedDeliveryBox01,
                   selected: widget.freeDeliveryOnly,
                   onTap: () => widget.onChanged(
-                      widget.categoryId, widget.discountOnly, !widget.freeDeliveryOnly),
+                    widget.categoryId,
+                    widget.discountOnly,
+                    !widget.freeDeliveryOnly,
+                  ),
                 ),
               ],
             ),
@@ -260,7 +277,10 @@ class _FilterBarState extends State<_FilterBar> {
                       label: '${c.icon ?? ''} ${c.name}'.trim(),
                       selected: selected,
                       onTap: () => widget.onChanged(
-                          selected ? null : c.id, widget.discountOnly, widget.freeDeliveryOnly),
+                        selected ? null : c.id,
+                        widget.discountOnly,
+                        widget.freeDeliveryOnly,
+                      ),
                     ),
                   );
                 }).toList(),
@@ -277,7 +297,7 @@ class _FilterBarState extends State<_FilterBar> {
 
 class _FilterChip extends StatelessWidget {
   final String label;
-  final IconData? icon;
+  final List<List<dynamic>>? icon;
   final bool selected;
   final VoidCallback onTap;
 
@@ -306,7 +326,11 @@ class _FilterChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 14, color: selected ? Colors.white : KuwrirColors.textSecondary),
+              HugeIcon(
+                icon: icon!,
+                size: 14,
+                color: selected ? Colors.white : KuwrirColors.textSecondary,
+              ),
               const SizedBox(width: 4),
             ],
             Text(
@@ -348,8 +372,11 @@ class _DeliveryAddressBar extends StatelessWidget {
                   color: KuwrirColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.location_on,
-                    color: KuwrirColors.primary, size: 16),
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedLocation01,
+                  color: KuwrirColors.primary,
+                  size: 16,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -380,8 +407,7 @@ class _DeliveryAddressBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: KuwrirColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
@@ -453,9 +479,9 @@ class _EmptyStateState extends State<_EmptyState> {
                 Text(
                   'Pencarian Terakhir',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: KuwrirColors.textPrimary,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: KuwrirColors.textPrimary,
+                  ),
                 ),
                 TextButton(
                   onPressed: widget.onClearRecent,
@@ -465,7 +491,10 @@ class _EmptyStateState extends State<_EmptyState> {
                     padding: EdgeInsets.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Hapus semua', style: TextStyle(fontSize: 12)),
+                  child: const Text(
+                    'Hapus semua',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -478,8 +507,10 @@ class _EmptyStateState extends State<_EmptyState> {
                   onTap: () => widget.onTap(search),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: KuwrirColors.surface,
                       borderRadius: BorderRadius.circular(20),
@@ -488,13 +519,19 @@ class _EmptyStateState extends State<_EmptyState> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.history,
-                            size: 14, color: KuwrirColors.textSecondary),
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedClock01,
+                          size: 14,
+                          color: KuwrirColors.textSecondary,
+                        ),
                         const SizedBox(width: 5),
-                        Text(search,
-                            style: TextStyle(
-                                fontSize: 13,
-                                color: KuwrirColors.textPrimary)),
+                        Text(
+                          search,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: KuwrirColors.textPrimary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -506,22 +543,25 @@ class _EmptyStateState extends State<_EmptyState> {
           Text(
             'Populer di Mataram',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: KuwrirColors.textPrimary,
-                ),
+              fontWeight: FontWeight.w700,
+              color: KuwrirColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 12),
           if (_loadingPopular)
             const Center(
-                child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(),
-            ))
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: CircularProgressIndicator(),
+              ),
+            )
           else if (_popular.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text('Belum ada merchant populer',
-                  style: TextStyle(color: KuwrirColors.textSecondary)),
+              child: Text(
+                'Belum ada merchant populer',
+                style: TextStyle(color: KuwrirColors.textSecondary),
+              ),
             )
           else
             ..._popular.map((m) => _PopularMerchantTile(merchant: m)),
@@ -544,8 +584,11 @@ class _PopularMerchantTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.pushNamed(context, '/merchant',
-              arguments: {'id': merchant.id, 'name': merchant.name}),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/merchant',
+            arguments: {'id': merchant.id, 'name': merchant.name},
+          ),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
@@ -557,31 +600,53 @@ class _PopularMerchantTile extends StatelessWidget {
                     color: KuwrirColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.storefront, color: KuwrirColors.primary),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedStore01,
+                    color: KuwrirColors.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(merchant.name,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        merchant.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 2),
-                      Text(merchant.address,
-                          style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        merchant.address,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
                 Row(
                   children: [
-                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                    const HugeIcon(
+                      icon: HugeIcons.strokeRoundedStar,
+                      size: 14,
+                      color: Color(0xFFF59E0B),
+                    ),
                     const SizedBox(width: 2),
-                    Text(merchant.rating.toStringAsFixed(1),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(
+                      merchant.rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -624,7 +689,9 @@ class _SearchResults extends StatelessWidget {
             labelColor: KuwrirColors.primary,
             unselectedLabelColor: KuwrirColors.textSecondary,
             labelStyle: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
             unselectedLabelStyle: const TextStyle(fontSize: 13),
             tabs: const [
               Tab(text: 'Restoran'),
@@ -637,7 +704,10 @@ class _SearchResults extends StatelessWidget {
           child: TabBarView(
             controller: tabController,
             children: [
-              _RestaurantResultList(query: query, freeDeliveryOnly: freeDeliveryOnly),
+              _RestaurantResultList(
+                query: query,
+                freeDeliveryOnly: freeDeliveryOnly,
+              ),
               _MenuItemResultList(
                 query: query,
                 categoryId: categoryId,
@@ -657,7 +727,10 @@ class _SearchResults extends StatelessWidget {
 class _RestaurantResultList extends StatefulWidget {
   final String query;
   final bool freeDeliveryOnly;
-  const _RestaurantResultList({required this.query, required this.freeDeliveryOnly});
+  const _RestaurantResultList({
+    required this.query,
+    required this.freeDeliveryOnly,
+  });
 
   @override
   State<_RestaurantResultList> createState() => _RestaurantResultListState();
@@ -677,7 +750,8 @@ class _RestaurantResultListState extends State<_RestaurantResultList> {
   @override
   void didUpdateWidget(covariant _RestaurantResultList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.query != widget.query || oldWidget.freeDeliveryOnly != widget.freeDeliveryOnly) {
+    if (oldWidget.query != widget.query ||
+        oldWidget.freeDeliveryOnly != widget.freeDeliveryOnly) {
       _load();
     }
   }
@@ -708,13 +782,18 @@ class _RestaurantResultListState extends State<_RestaurantResultList> {
     }
     if (_error != null) {
       return Center(
-        child: Text(_error!, style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          _error!,
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     if (_results.isEmpty) {
       return Center(
-        child: Text('Tidak ada warung yang cocok',
-            style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          'Tidak ada warung yang cocok',
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     return ListView.builder(
@@ -739,8 +818,11 @@ class _RestaurantResultCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => Navigator.pushNamed(context, '/merchant',
-              arguments: {'id': merchant.id, 'name': merchant.name}),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/merchant',
+            arguments: {'id': merchant.id, 'name': merchant.name},
+          ),
           child: Column(
             children: [
               // Image area
@@ -755,13 +837,23 @@ class _RestaurantResultCard extends StatelessWidget {
                             merchant.logoUrl!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(
-                              color: KuwrirColors.primary.withValues(alpha: 0.12),
-                              child: Icon(Icons.storefront, size: 48, color: KuwrirColors.primary),
+                              color: KuwrirColors.primary.withValues(
+                                alpha: 0.12,
+                              ),
+                              child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedStore01,
+                                size: 48,
+                                color: KuwrirColors.primary,
+                              ),
                             ),
                           )
                         : Container(
                             color: KuwrirColors.primary.withValues(alpha: 0.12),
-                            child: Icon(Icons.storefront, size: 48, color: KuwrirColors.primary),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedStore01,
+                              size: 48,
+                              color: KuwrirColors.primary,
+                            ),
                           ),
                     Positioned(
                       top: 10,
@@ -774,7 +866,9 @@ class _RestaurantResultCard extends StatelessWidget {
                         right: 10,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: KuwrirColors.primary,
                             borderRadius: BorderRadius.circular(6),
@@ -834,15 +928,22 @@ class _RestaurantResultCard extends StatelessWidget {
                         // Rating pill
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFFF59E0B,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.star_rounded,
-                                  size: 13, color: Color(0xFFF59E0B)),
+                              const HugeIcon(
+                                icon: HugeIcons.strokeRoundedStar,
+                                size: 13,
+                                color: Color(0xFFF59E0B),
+                              ),
                               const SizedBox(width: 2),
                               Text(
                                 merchant.rating.toStringAsFixed(1),
@@ -864,15 +965,18 @@ class _RestaurantResultCard extends StatelessWidget {
                       children: [
                         if (merchant.distanceKm != null)
                           _MetaChip(
-                            icon: Icons.location_on_outlined,
-                            label: '${merchant.distanceKm!.toStringAsFixed(1)} km',
+                            icon: HugeIcons.strokeRoundedLocation01,
+                            label:
+                                '${merchant.distanceKm!.toStringAsFixed(1)} km',
                           ),
                         const Spacer(),
                         Row(
                           children: [
-                            Icon(Icons.reviews_outlined,
-                                size: 12,
-                                color: KuwrirColors.textSecondary),
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedStarHalf,
+                              size: 12,
+                              color: KuwrirColors.textSecondary,
+                            ),
                             const SizedBox(width: 3),
                             Text(
                               '${merchant.totalReviews} ulasan',
@@ -938,7 +1042,7 @@ class _OpenBadge extends StatelessWidget {
 }
 
 class _MetaChip extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
 
   const _MetaChip({required this.icon, required this.label});
@@ -948,7 +1052,7 @@ class _MetaChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: KuwrirColors.textSecondary),
+        HugeIcon(icon: icon, size: 13, color: KuwrirColors.textSecondary),
         const SizedBox(width: 3),
         Text(
           label,
@@ -1030,13 +1134,18 @@ class _MenuItemResultListState extends State<_MenuItemResultList> {
     }
     if (_error != null) {
       return Center(
-        child: Text(_error!, style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          _error!,
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     if (_results.isEmpty) {
       return Center(
-        child: Text('Tidak ada menu yang cocok',
-            style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          'Tidak ada menu yang cocok',
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     return ListView.builder(
@@ -1062,7 +1171,8 @@ class _MenuItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = result.product;
-    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
+    final hasDiscount =
+        product.discountPrice != null && product.discountPrice! > 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -1070,8 +1180,11 @@ class _MenuItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => Navigator.pushNamed(context, '/merchant',
-              arguments: {'id': result.merchantId, 'name': result.merchantName}),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/merchant',
+            arguments: {'id': result.merchantId, 'name': result.merchantName},
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -1093,10 +1206,15 @@ class _MenuItemCard extends StatelessWidget {
                           ? Image.network(
                               product.imageUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Icon(Icons.restaurant, color: KuwrirColors.primary),
+                              errorBuilder: (_, __, ___) => HugeIcon(
+                                icon: HugeIcons.strokeRoundedRestaurant02,
+                                color: KuwrirColors.primary,
+                              ),
                             )
-                          : Icon(Icons.restaurant, color: KuwrirColors.primary),
+                          : HugeIcon(
+                              icon: HugeIcons.strokeRoundedRestaurant02,
+                              color: KuwrirColors.primary,
+                            ),
                     ),
                     if (hasDiscount)
                       Positioned(
@@ -1104,7 +1222,9 @@ class _MenuItemCard extends StatelessWidget {
                         left: -4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: KuwrirColors.primary,
                             borderRadius: BorderRadius.circular(5),
@@ -1141,9 +1261,11 @@ class _MenuItemCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(Icons.storefront_outlined,
-                              size: 11,
-                              color: KuwrirColors.textSecondary),
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedStore01,
+                            size: 11,
+                            color: KuwrirColors.textSecondary,
+                          ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
@@ -1185,7 +1307,11 @@ class _MenuItemCard extends StatelessWidget {
                             ),
                           if (hasDiscount) const SizedBox(width: 4),
                           Text(
-                            _formatPrice(hasDiscount ? product.discountPrice! : product.price),
+                            _formatPrice(
+                              hasDiscount
+                                  ? product.discountPrice!
+                                  : product.price,
+                            ),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
@@ -1195,13 +1321,21 @@ class _MenuItemCard extends StatelessWidget {
                           const Spacer(),
                           if (!result.merchantIsOpen)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
                                 borderRadius: BorderRadius.circular(100),
                               ),
-                              child: const Text('Tutup',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey)),
+                              child: const Text(
+                                'Tutup',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
                             ),
                         ],
                       ),

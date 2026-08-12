@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
 import '../cubits/location_cubit.dart';
+import '../cubits/session_cubit.dart';
+import '../widgets/checkout_widgets.dart';
 import 'location_picker_screen.dart';
 import 'addresses_screen.dart';
 import 'order_summary_screen.dart';
@@ -22,6 +25,7 @@ class _CartScreenState extends State<CartScreen> {
   final _phoneCtrl = TextEditingController();
   double _dropoffLat = 0;
   double _dropoffLng = 0;
+  bool _editingReceiver = false;
 
   @override
   void initState() {
@@ -33,6 +37,14 @@ class _CartScreenState extends State<CartScreen> {
       _dropoffLat = loc.lat!;
       _dropoffLng = loc.lng!;
     }
+    // Pre-fill receiver name/phone from the account profile — most orders
+    // are for the account owner, so default to a read-only summary and only
+    // open the fields for editing if the profile is incomplete or the
+    // customer explicitly taps "Ubah" (e.g. ordering for someone else).
+    final user = context.read<SessionCubit>().state.user;
+    _receiverCtrl.text = user?.name ?? '';
+    _phoneCtrl.text = user?.phone ?? '';
+    _editingReceiver = _receiverCtrl.text.isEmpty || _phoneCtrl.text.isEmpty;
   }
 
   @override
@@ -113,6 +125,7 @@ class _CartScreenState extends State<CartScreen> {
         builder: (_) => OrderSummaryScreen(
           merchantId: cart.merchantId!,
           merchantName: cart.merchantName ?? '',
+          merchantImageUrl: cart.merchantImageUrl,
           items: cart.items,
           dropoffAddress: _addressCtrl.text.trim(),
           dropoffLat: _dropoffLat,
@@ -132,646 +145,658 @@ class _CartScreenState extends State<CartScreen> {
         return Scaffold(
           backgroundColor: KuwrirColors.background,
           appBar: AppBar(
-            title: const Text('Keranjang'),
+            title: Text(
+              cart.isEmpty
+                  ? 'Keranjang'
+                  : 'Keranjang · ${cart.items.length} item',
+            ),
             backgroundColor: KuwrirColors.background,
             actions: [
               if (!cart.isEmpty)
                 IconButton(
-                  icon: Icon(Icons.delete_outline, color: KuwrirColors.error),
+                  icon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedDelete02,
+                    color: KuwrirColors.error,
+                  ),
                   tooltip: 'Kosongkan keranjang',
                   onPressed: _confirmClearCart,
                 ),
             ],
           ),
-          body: cart.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: KuwrirColors.primary.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.shopping_cart_outlined,
-                            size: 36,
-                            color: KuwrirColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Keranjang kosong',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            color: KuwrirColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Yuk mulai belanja dari warung favoritmu',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    // Merchant label
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.surface,
-                        border: Border(
-                          bottom: BorderSide(color: KuwrirColors.border),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.storefront_outlined,
-                              size: 17,
-                              color: KuwrirColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              cart.merchantName ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Item list
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PESANAN',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.6,
-                                color: KuwrirColors.textHint,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // Items
-                            ...cart.items.map(
-                              (item) => Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: KuwrirColors.surface,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: KuwrirColors.border,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: KuwrirColors.textPrimary
-                                          .withValues(alpha: 0.04),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  item.product.name,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 14.5,
-                                                  ),
-                                                ),
-                                                if (item
-                                                    .selectedVariants
-                                                    .isNotEmpty) ...[
-                                                  const SizedBox(height: 3),
-                                                  Text(
-                                                    item.selectedVariants
-                                                        .map((v) => v.name)
-                                                        .join(', '),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: KuwrirColors
-                                                          .textSecondary,
-                                                    ),
-                                                  ),
-                                                ],
-                                                const SizedBox(height: 5),
-                                                Text(
-                                                  'Rp ${_fmt(item.unitPrice)}',
-                                                  style: const TextStyle(
-                                                    color: KuwrirColors.primary,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: KuwrirColors.background,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: KuwrirColors.border,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                _QtyBtn(
-                                                  icon: Icons.remove,
-                                                  onTap: () => context
-                                                      .read<CartCubit>()
-                                                      .decrementItem(
-                                                        item.product.id,
-                                                        variantKey:
-                                                            item.variantKey,
-                                                      ),
-                                                ),
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                      ),
-                                                  child: Text(
-                                                    '${item.quantity}',
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.w800,
-                                                      fontSize: 14.5,
-                                                    ),
-                                                  ),
-                                                ),
-                                                _QtyBtn(
-                                                  icon: Icons.add,
-                                                  onTap: () => context
-                                                      .read<CartCubit>()
-                                                      .addItem(
-                                                        item.product,
-                                                        merchantId:
-                                                            cart.merchantId,
-                                                        merchantName:
-                                                            cart.merchantName,
-                                                        selectedVariants: item
-                                                            .selectedVariants,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Divider(height: 1, color: KuwrirColors.border),
-                                      const SizedBox(height: 8),
-                                      InkWell(
-                                        onTap: () => _editItemNotes(item),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 2,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.edit_note,
-                                                size: 16,
-                                                color: KuwrirColors.textHint,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  item.notes != null &&
-                                                          item.notes!
-                                                              .trim()
-                                                              .isNotEmpty
-                                                      ? item.notes!
-                                                      : 'Tambah catatan untuk item ini',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color:
-                                                        item.notes != null &&
-                                                            item.notes!
-                                                                .trim()
-                                                                .isNotEmpty
-                                                        ? KuwrirColors
-                                                              .textSecondary
-                                                        : KuwrirColors.textHint,
-                                                    fontStyle:
-                                                        item.notes != null &&
-                                                            item.notes!
-                                                                .trim()
-                                                                .isNotEmpty
-                                                        ? FontStyle.italic
-                                                        : FontStyle.normal,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 22),
-                            // Delivery address
-                            Text(
-                              'ALAMAT PENGIRIMAN',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.6,
-                                color: KuwrirColors.textHint,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: KuwrirColors.surface,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: KuwrirColors.border),
-                              ),
-                              child: TextField(
-                                controller: _addressCtrl,
-                                style: const TextStyle(fontSize: 13.5),
-                                decoration: InputDecoration(
-                                  prefixIcon: Icon(
-                                    Icons.location_on_outlined,
-                                    color: KuwrirColors.primary,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: false,
-                                  hintText: 'Masukkan alamat pengiriman',
-                                  hintStyle: TextStyle(color: KuwrirColors.textHint),
-                                ),
-                                maxLines: 2,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      if (!await ensureLoggedIn(context) ||
-                                          !mounted)
-                                        return;
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => AddressesScreen(
-                                            onPick: (a) {
-                                              setState(() {
-                                                _addressCtrl.text = a.address;
-                                                _dropoffLat = a.latitude;
-                                                _dropoffLng = a.longitude;
-                                              });
-                                              context
-                                                  .read<LocationCubit>()
-                                                  .setLocation(
-                                                    a.latitude,
-                                                    a.longitude,
-                                                    a.address,
-                                                  );
-                                              Navigator.pop(context);
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      side: BorderSide(color: KuwrirColors.border),
-                                      foregroundColor: KuwrirColors.textPrimary,
-                                    ),
-                                    icon: Icon(
-                                      Icons.bookmark_border,
-                                      size: 18,
-                                      color: KuwrirColors.primary,
-                                    ),
-                                    label: const Text('Alamat Tersimpan'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final initial = _dropoffLat != 0
-                                          ? LatLng(_dropoffLat, _dropoffLng)
-                                          : null;
-                                      final result =
-                                          await Navigator.push<
-                                            Map<String, dynamic>
-                                          >(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  LocationPickerScreen(
-                                                    initial: initial,
-                                                  ),
-                                            ),
-                                          );
-                                      if (result != null && mounted) {
-                                        final latlng =
-                                            result['latlng'] as LatLng;
-                                        final addr =
-                                            result['address'] as String;
-                                        setState(() {
-                                          _dropoffLat = latlng.latitude;
-                                          _dropoffLng = latlng.longitude;
-                                          _addressCtrl.text = addr;
-                                        });
-                                        // Update saved location too
-                                        if (mounted) {
-                                          context
-                                              .read<LocationCubit>()
-                                              .setLocation(
-                                                latlng.latitude,
-                                                latlng.longitude,
-                                                addr,
-                                              );
-                                        }
-                                      }
-                                    },
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      side: BorderSide(color: KuwrirColors.border),
-                                      foregroundColor: KuwrirColors.textPrimary,
-                                    ),
-                                    icon: Icon(
-                                      Icons.map_outlined,
-                                      size: 18,
-                                      color: KuwrirColors.primary,
-                                    ),
-                                    label: const Text('Pilih di Peta'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 22),
-                            Text(
-                              'PENERIMA',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.6,
-                                color: KuwrirColors.textHint,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: KuwrirColors.surface,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: KuwrirColors.border),
-                                    ),
-                                    child: TextField(
-                                      controller: _receiverCtrl,
-                                      style: const TextStyle(fontSize: 13.5),
-                                      decoration: InputDecoration(
-                                        prefixIcon: Icon(
-                                          Icons.person_outline,
-                                          color: KuwrirColors.textHint,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(14),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        hintText: 'Nama penerima',
-                                        hintStyle: TextStyle(color: KuwrirColors.textHint),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: KuwrirColors.surface,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: KuwrirColors.border),
-                                    ),
-                                    child: TextField(
-                                      controller: _phoneCtrl,
-                                      keyboardType: TextInputType.phone,
-                                      style: const TextStyle(fontSize: 13.5),
-                                      decoration: InputDecoration(
-                                        prefixIcon: Icon(
-                                          Icons.phone_outlined,
-                                          color: KuwrirColors.textHint,
-                                        ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(14),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        hintText: 'No. HP penerima',
-                                        hintStyle: TextStyle(color: KuwrirColors.textHint),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Summary + Continue
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.surface,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(24),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: KuwrirColors.textPrimary.withValues(alpha: 0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, -4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          _PriceRow(
-                            label: 'Subtotal menu',
-                            amount: cart.subtotal - cart.packagingFeeTotal,
-                          ),
-                          if (cart.packagingFeeTotal > 0) ...[
-                            const SizedBox(height: 6),
-                            _PriceRow(
-                              label: 'Biaya kemasan (dari merchant)',
-                              amount: cart.packagingFeeTotal,
-                            ),
-                          ],
-                          const SizedBox(height: 6),
-                          _PriceRow(label: 'Ongkir (estimasi)', amount: 15000),
-                          const SizedBox(height: 10),
-                          Divider(height: 1, color: KuwrirColors.border),
-                          const SizedBox(height: 10),
-                          _PriceRow(
-                            label: 'Est. total',
-                            amount: cart.subtotal + 15000,
-                            isBold: true,
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: KuwrirColors.primary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              onPressed: cart.isEmpty
-                                  ? null
-                                  : () => _goToSummary(cart),
-                              child: const Text(
-                                'Checkout',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+          body: cart.isEmpty ? _EmptyCart() : _buildCart(cart),
         );
       },
     );
   }
 
-  String _fmt(double price) => price
-      .toStringAsFixed(0)
-      .replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
+  Widget _buildCart(CartState cart) {
+    return Column(
+      children: [
+        // Merchant header
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+          decoration: BoxDecoration(
+            color: KuwrirColors.surface,
+            boxShadow: [
+              BoxShadow(
+                color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: KuwrirColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child:
+                    cart.merchantImageUrl != null &&
+                        cart.merchantImageUrl!.isNotEmpty
+                    ? Image.network(
+                        cart.merchantImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => HugeIcon(
+                          icon: HugeIcons.strokeRoundedStore01,
+                          size: 26,
+                          color: KuwrirColors.primary,
+                        ),
+                      )
+                    : HugeIcon(
+                        icon: HugeIcons.strokeRoundedStore01,
+                        size: 26,
+                        color: KuwrirColors.primary,
+                      ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pesanan dari',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: KuwrirColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cart.merchantName ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionLabel('Pesanan'),
+                ...cart.items.map(
+                  (item) => _CartItemCard(
+                    item: item,
+                    onEditNotes: () => _editItemNotes(item),
+                    onIncrement: () => context.read<CartCubit>().addItem(
+                      item.product,
+                      merchantId: cart.merchantId,
+                      merchantName: cart.merchantName,
+                      selectedVariants: item.selectedVariants,
+                    ),
+                    onDecrement: () => context.read<CartCubit>().decrementItem(
+                      item.product.id,
+                      variantKey: item.variantKey,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 26),
+                const SectionLabel('Alamat Pengiriman'),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedLocation01,
+                          size: 16,
+                          color: KuwrirColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _addressCtrl,
+                          style: const TextStyle(fontSize: 13.5),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 6,
+                            ),
+                            border: InputBorder.none,
+                            filled: false,
+                            hintText: 'Masukkan alamat pengiriman',
+                            hintStyle: TextStyle(color: KuwrirColors.textHint),
+                          ),
+                          maxLines: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            if (!await ensureLoggedIn(context) || !mounted)
+                              return;
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddressesScreen(
+                                  onPick: (a) {
+                                    setState(() {
+                                      _addressCtrl.text = a.address;
+                                      _dropoffLat = a.latitude;
+                                      _dropoffLng = a.longitude;
+                                    });
+                                    context.read<LocationCubit>().setLocation(
+                                      a.latitude,
+                                      a.longitude,
+                                      a.address,
+                                    );
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: KuwrirColors.border),
+                            foregroundColor: KuwrirColors.textPrimary,
+                          ),
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedBookmark01,
+                            size: 16,
+                            color: KuwrirColors.primary,
+                          ),
+                          label: const Text(
+                            'Alamat Tersimpan',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final initial = _dropoffLat != 0
+                                ? LatLng(_dropoffLat, _dropoffLng)
+                                : null;
+                            final result =
+                                await Navigator.push<Map<String, dynamic>>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        LocationPickerScreen(initial: initial),
+                                  ),
+                                );
+                            if (result != null && mounted) {
+                              final latlng = result['latlng'] as LatLng;
+                              final addr = result['address'] as String;
+                              setState(() {
+                                _dropoffLat = latlng.latitude;
+                                _dropoffLng = latlng.longitude;
+                                _addressCtrl.text = addr;
+                              });
+                              if (mounted) {
+                                context.read<LocationCubit>().setLocation(
+                                  latlng.latitude,
+                                  latlng.longitude,
+                                  addr,
+                                );
+                              }
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: KuwrirColors.border),
+                            foregroundColor: KuwrirColors.textPrimary,
+                          ),
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedMaping,
+                            size: 16,
+                            color: KuwrirColors.primary,
+                          ),
+                          label: const Text(
+                            'Pilih di Peta',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 26),
+                SectionLabel(
+                  'Penerima',
+                  trailing: !_editingReceiver
+                      ? GestureDetector(
+                          onTap: () => setState(() => _editingReceiver = true),
+                          child: Text(
+                            'Ubah',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: KuwrirColors.primary,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                if (_editingReceiver) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: KuwrirColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: TextField(
+                            controller: _receiverCtrl,
+                            style: const TextStyle(fontSize: 13.5),
+                            decoration: InputDecoration(
+                              prefixIcon: HugeIcon(
+                                icon: HugeIcons.strokeRoundedUser,
+                                size: 18,
+                                color: KuwrirColors.textHint,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              hintText: 'Nama penerima',
+                              hintStyle: TextStyle(
+                                color: KuwrirColors.textHint,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: KuwrirColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: TextField(
+                            controller: _phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            style: const TextStyle(fontSize: 13.5),
+                            decoration: InputDecoration(
+                              prefixIcon: HugeIcon(
+                                icon: HugeIcons.strokeRoundedCall,
+                                size: 18,
+                                color: KuwrirColors.textHint,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              hintText: 'No. HP penerima',
+                              hintStyle: TextStyle(
+                                color: KuwrirColors.textHint,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_receiverCtrl.text.isNotEmpty &&
+                      _phoneCtrl.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _editingReceiver = false),
+                        child: Text(
+                          'Selesai',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: KuwrirColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ] else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: KuwrirColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _receiverCtrl.text,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _phoneCtrl.text,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: KuwrirColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // Summary + Continue
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          decoration: BoxDecoration(
+            color: KuwrirColors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: KuwrirColors.textPrimary.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              PriceRow(
+                label: 'Subtotal',
+                amount: cart.subtotal - cart.packagingFeeTotal,
+              ),
+              if (cart.packagingFeeTotal > 0)
+                PriceRow(
+                  label: 'Biaya kemasan',
+                  amount: cart.packagingFeeTotal,
+                ),
+              const SizedBox(height: 2),
+              Text(
+                'Ongkir & total dihitung di langkah berikutnya',
+                style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: KuwrirColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: cart.isEmpty ? null : () => _goToSummary(cart),
+                  child: const Text(
+                    'Checkout',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _QtyBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _QtyBtn({required this.icon, required this.onTap});
-
+class _EmptyCart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: KuwrirColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(6),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: KuwrirColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedShoppingCart01,
+                size: 36,
+                color: KuwrirColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Keranjang kosong',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: KuwrirColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Yuk mulai belanja dari warung favoritmu',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: KuwrirColors.textHint, fontSize: 13),
+            ),
+          ],
         ),
-        child: Icon(icon, size: 18, color: KuwrirColors.primary),
       ),
     );
   }
 }
 
-class _PriceRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final bool isBold;
-
-  const _PriceRow({
-    required this.label,
-    required this.amount,
-    this.isBold = false,
+class _CartItemCard extends StatelessWidget {
+  final CartItem item;
+  final VoidCallback onEditNotes;
+  final VoidCallback onIncrement;
+  final VoidCallback? onDecrement;
+  const _CartItemCard({
+    required this.item,
+    required this.onEditNotes,
+    required this.onIncrement,
+    this.onDecrement,
   });
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontSize: isBold ? 16.5 : 13.5,
-      fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
-      color: isBold ? KuwrirColors.textPrimary : KuwrirColors.textSecondary,
-    );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: style),
-        Text(
-          'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-          style: style.copyWith(color: isBold ? KuwrirColors.primary : KuwrirColors.textSecondary),
+    final hasNotes = item.notes != null && item.notes!.trim().isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.product.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                        ),
+                      ),
+                      if (item.selectedVariants.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          item.selectedVariants.map((v) => v.name).join(', '),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: KuwrirColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 5),
+                      Text(
+                        'Rp ${formatRupiah(item.unitPrice)}',
+                        style: const TextStyle(
+                          color: KuwrirColors.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      QtyStepButton(
+                        icon: HugeIcons.strokeRoundedRemove01,
+                        onTap: onDecrement,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          '${item.quantity}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                      ),
+                      QtyStepButton(
+                        icon: HugeIcons.strokeRoundedAdd01,
+                        onTap: onIncrement,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Divider(height: 1, color: KuwrirColors.divider),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: onEditNotes,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedNote03,
+                      size: 16,
+                      color: KuwrirColors.textHint,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        hasNotes
+                            ? item.notes!
+                            : 'Tambah catatan untuk item ini',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: hasNotes
+                              ? KuwrirColors.textSecondary
+                              : KuwrirColors.textHint,
+                          fontStyle: hasNotes
+                              ? FontStyle.italic
+                              : FontStyle.normal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

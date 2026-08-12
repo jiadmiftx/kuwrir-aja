@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/chat_cubit.dart';
@@ -8,7 +9,11 @@ class ChatScreen extends StatefulWidget {
   final String orderId;
   final String orderNumber;
 
-  const ChatScreen({super.key, required this.orderId, required this.orderNumber});
+  const ChatScreen({
+    super.key,
+    required this.orderId,
+    required this.orderNumber,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -22,7 +27,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _cubit = ChatCubit(context.read<ApiClient>(), orderId: widget.orderId)..start();
+    _cubit = ChatCubit(context.read<ApiClient>(), orderId: widget.orderId)
+      ..start();
     NotificationService.onPushData.addListener(_onPush);
   }
 
@@ -64,9 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Chat - #${widget.orderNumber}'),
-        ),
+        appBar: AppBar(title: Text('Chat - #${widget.orderNumber}')),
         body: Column(
           children: [
             Expanded(
@@ -82,15 +86,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (state is ChatLoaded) {
                     if (state.messages.isEmpty) {
                       return const Center(
-                        child: Text('Belum ada pesan. Mulai chat dengan driver!',
-                            style: TextStyle(color: Colors.grey)),
+                        child: Text(
+                          'Belum ada pesan. Mulai chat dengan driver!',
+                          style: TextStyle(color: Colors.grey),
+                        ),
                       );
                     }
                     return ListView.builder(
                       controller: _scrollCtrl,
                       padding: const EdgeInsets.all(12),
                       itemCount: state.messages.length,
-                      itemBuilder: (_, i) => _MessageBubble(msg: state.messages[i]),
+                      itemBuilder: (_, i) =>
+                          _MessageBubble(msg: state.messages[i]),
                     );
                   }
                   return const SizedBox();
@@ -117,7 +124,9 @@ class _MessageBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.72,
+        ),
         decoration: BoxDecoration(
           color: isMe ? KuwrirColors.primary : Colors.grey.shade200,
           borderRadius: BorderRadius.only(
@@ -162,7 +171,9 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8),
+        ],
       ),
       child: Row(
         children: [
@@ -172,7 +183,10 @@ class _InputBar extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: 'Ketik pesan...',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -187,7 +201,11 @@ class _InputBar extends StatelessWidget {
           CircleAvatar(
             backgroundColor: KuwrirColors.primary,
             child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+              icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedSent,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: onSend,
             ),
           ),

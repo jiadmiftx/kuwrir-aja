@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
@@ -18,7 +19,10 @@ class FloatingCartButton extends StatelessWidget {
 
   static String _formatPrice(double price) => price
       .toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,10 @@ class FloatingCartButton extends StatelessWidget {
               onTap: () => Navigator.pushNamed(context, '/cart'),
               borderRadius: BorderRadius.circular(30),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: KuwrirColors.primary,
                   borderRadius: BorderRadius.circular(30),
@@ -56,28 +63,54 @@ class FloatingCartButton extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
+                      child: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedShoppingBag01,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(
                       '${cart.totalQuantity} item',
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 10),
-                    Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.3)),
+                    Container(
+                      width: 1,
+                      height: 16,
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'IDR ${_formatPrice(cart.subtotal)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('Lihat Keranjang',
-                        style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'Lihat Keranjang',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+                    const HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
+                      color: Colors.white,
+                      size: 12,
+                    ),
                   ],
                 ),
               ),

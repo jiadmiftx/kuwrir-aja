@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/session_cubit.dart';
@@ -10,7 +11,11 @@ import '../cubits/session_cubit.dart';
 class PhoneVerificationGate extends StatelessWidget {
   const PhoneVerificationGate({super.key});
 
-  Future<void> _handleVerify(BuildContext context, String phone, String code) async {
+  Future<void> _handleVerify(
+    BuildContext context,
+    String phone,
+    String code,
+  ) async {
     final client = ApiClient();
     await client.verifyMyPhone(phone, code);
     if (!context.mounted) return;
@@ -30,11 +35,17 @@ class PhoneVerificationGate extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 32),
-                Icon(Icons.verified_user_outlined, size: 48, color: KuwrirColors.primary),
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedShieldUser,
+                  size: 48,
+                  color: KuwrirColors.primary,
+                ),
                 const SizedBox(height: 12),
-                const Text('Verifikasi Nomor HP Wajib',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center),
+                const Text(
+                  'Verifikasi Nomor HP Wajib',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Untuk keamanan akun dan komunikasi terkait pesanan, verifikasi nomor HP kamu dulu sebelum melanjutkan.',
@@ -43,9 +54,11 @@ class PhoneVerificationGate extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 OtpFlow(
-                  onVerify: (phone, code) => _handleVerify(context, phone, code),
+                  onVerify: (phone, code) =>
+                      _handleVerify(context, phone, code),
                   headerTitle: 'Masukkan nomor HP kamu',
-                  headerSubtitle: 'Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
+                  headerSubtitle:
+                      'Kode OTP akan dikirim lewat WhatsApp ke nomor ini',
                   verifyButtonLabel: 'Verifikasi Nomor',
                 ),
               ],

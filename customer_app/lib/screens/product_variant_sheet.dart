@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 /// What the customer picked, handed back to the caller when they confirm.
 class VariantSelectionResult {
   final List<ProductVariant> selectedVariants;
   final int quantity;
-  const VariantSelectionResult({required this.selectedVariants, required this.quantity});
+  const VariantSelectionResult({
+    required this.selectedVariants,
+    required this.quantity,
+  });
 }
 
 /// Bottom sheet for customizing a product with variant groups before adding
@@ -43,9 +47,12 @@ class _VariantSelectionSheetState extends State<VariantSelectionSheet> {
 
   double get _unitPrice {
     final base = widget.product.discountPrice ?? widget.product.price;
-    final variantsSum = _groups.values.expand((g) => g).where((v) {
-      return _selectedByGroup[v.groupName]?.contains(v.id) ?? false;
-    }).fold(0.0, (sum, v) => sum + v.price);
+    final variantsSum = _groups.values
+        .expand((g) => g)
+        .where((v) {
+          return _selectedByGroup[v.groupName]?.contains(v.id) ?? false;
+        })
+        .fold(0.0, (sum, v) => sum + v.price);
     return base + variantsSum;
   }
 
@@ -70,7 +77,10 @@ class _VariantSelectionSheetState extends State<VariantSelectionSheet> {
 
   String _formatIdr(double price) => price
       .toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -90,23 +100,37 @@ class _VariantSelectionSheetState extends State<VariantSelectionSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(widget.product.name,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        widget.product.name,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      icon: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancel01,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ],
                 ),
                 if (widget.product.description != null) ...[
                   const SizedBox(height: 4),
-                  Text(widget.product.description!, style: TextStyle(color: KuwrirColors.textSecondary)),
+                  Text(
+                    widget.product.description!,
+                    style: TextStyle(color: KuwrirColors.textSecondary),
+                  ),
                 ],
                 const SizedBox(height: 16),
-                for (final entry in groups.entries) _VariantGroupSection(
-                  groupName: entry.key,
-                  options: entry.value,
-                  selectedIds: _selectedByGroup[entry.key] ?? const {},
-                  onToggle: _toggle,
-                ),
+                for (final entry in groups.entries)
+                  _VariantGroupSection(
+                    groupName: entry.key,
+                    options: entry.value,
+                    selectedIds: _selectedByGroup[entry.key] ?? const {},
+                    onToggle: _toggle,
+                  ),
               ],
             ),
           ),
@@ -131,16 +155,30 @@ class _VariantSelectionSheetState extends State<VariantSelectionSheet> {
                           ? () {
                               final selected = groups.values
                                   .expand((g) => g)
-                                  .where((v) => _selectedByGroup[v.groupName]?.contains(v.id) ?? false)
+                                  .where(
+                                    (v) =>
+                                        _selectedByGroup[v.groupName]?.contains(
+                                          v.id,
+                                        ) ??
+                                        false,
+                                  )
                                   .toList();
                               Navigator.pop(
                                 context,
-                                VariantSelectionResult(selectedVariants: selected, quantity: _quantity),
+                                VariantSelectionResult(
+                                  selectedVariants: selected,
+                                  quantity: _quantity,
+                                ),
                               );
                             }
                           : null,
-                      child: Text('Tambah — IDR ${_formatIdr(_unitPrice * _quantity)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Tambah — IDR ${_formatIdr(_unitPrice * _quantity)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -181,8 +219,20 @@ class _VariantGroupSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(groupName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              Text(hint, style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+              Text(
+                groupName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: KuwrirColors.textSecondary,
+                ),
+              ),
             ],
           ),
           for (final o in options)
@@ -195,7 +245,9 @@ class _VariantGroupSection extends StatelessWidget {
                     rule.maxSelect <= 1
                         ? Radio<String>(
                             value: o.id,
-                            groupValue: selectedIds.isEmpty ? null : selectedIds.first,
+                            groupValue: selectedIds.isEmpty
+                                ? null
+                                : selectedIds.first,
                             onChanged: (_) => onToggle(o),
                             activeColor: KuwrirColors.primary,
                           )
@@ -204,10 +256,17 @@ class _VariantGroupSection extends StatelessWidget {
                             onChanged: (_) => onToggle(o),
                             activeColor: KuwrirColors.primary,
                           ),
-                    Expanded(child: Text(o.name, style: const TextStyle(fontSize: 14))),
+                    Expanded(
+                      child: Text(o.name, style: const TextStyle(fontSize: 14)),
+                    ),
                     if (o.price > 0)
-                      Text('+IDR ${o.price.toStringAsFixed(0)}',
-                          style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
+                      Text(
+                        '+IDR ${o.price.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -234,12 +293,18 @@ class _QtyStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: const Icon(Icons.remove, size: 18),
+            icon: const HugeIcon(
+              icon: HugeIcons.strokeRoundedRemove01,
+              size: 18,
+            ),
             onPressed: quantity > 1 ? () => onChanged(quantity - 1) : null,
           ),
-          Text('$quantity', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            '$quantity',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           IconButton(
-            icon: const Icon(Icons.add, size: 18),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: 18),
             onPressed: () => onChanged(quantity + 1),
           ),
         ],

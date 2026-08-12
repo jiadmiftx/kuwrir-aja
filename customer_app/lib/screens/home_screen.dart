@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/home_cubit.dart';
@@ -47,7 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openNotifications() async {
     if (!await ensureLoggedIn(context) || !mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
     _refreshUnreadCount();
   }
 
@@ -62,7 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!user.isPhoneVerified) {
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PhoneVerificationGate(), fullscreenDialog: true),
+        MaterialPageRoute(
+          builder: (_) => const PhoneVerificationGate(),
+          fullscreenDialog: true,
+        ),
       );
       if (!mounted) return;
       user = session.state.user;
@@ -70,7 +77,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (user != null && !user.isProfileComplete) {
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ProfileCompletionGate(), fullscreenDialog: true),
+        MaterialPageRoute(
+          builder: (_) => const ProfileCompletionGate(),
+          fullscreenDialog: true,
+        ),
       );
     }
   }
@@ -115,7 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
   /// instead of the raw geocoded address once that saved place is active.
   static const _sameLocationEpsilon = 0.0006; // ~ 60m
 
-  SavedAddress? _matchingSavedAddress(List<SavedAddress> addresses, LocationState loc) {
+  SavedAddress? _matchingSavedAddress(
+    List<SavedAddress> addresses,
+    LocationState loc,
+  ) {
     if (!loc.hasLocation) return null;
     for (final a in addresses) {
       if ((a.latitude - loc.lat!).abs() < _sameLocationEpsilon &&
@@ -130,7 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return BlocListener<LocationCubit, LocationState>(
       listenWhen: (prev, curr) => !prev.hasLocation && curr.hasLocation,
-      listener: (context, loc) => context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng),
+      listener: (context, loc) =>
+          context.read<HomeCubit>().load(lat: loc.lat, lng: loc.lng),
       child: Scaffold(
         backgroundColor: KuwrirColors.surface,
         body: Stack(
@@ -140,72 +154,92 @@ class _HomeScreenState extends State<HomeScreen> {
               color: KuwrirColors.primary,
               child: CustomScrollView(
                 slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
-              BlocBuilder<HomeCubit, HomeState>(
-                builder: (context, state) {
-                  if (state is HomeLoading || state is HomeInitial) {
-                    return const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.all(48),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    );
-                  }
-                  if (state is HomeError) {
-                    return SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(Icons.wifi_off, size: 48, color: KuwrirColors.textHint),
-                            const SizedBox(height: 16),
-                            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
-                            const SizedBox(height: 12),
-                            TextButton(onPressed: _refresh, child: const Text('Coba lagi')),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  final loaded = state as HomeLoaded;
-                  return SliverList(
-                    delegate: SliverChildListDelegate([
-                      if (loaded.banners.isNotEmpty)
-                        _BannerCarousel(
-                          banners: loaded.banners,
-                          onTapBanner: (b) => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => BannerDetailScreen(banner: b)),
+                  SliverToBoxAdapter(child: _buildHeader()),
+                  BlocBuilder<HomeCubit, HomeState>(
+                    builder: (context, state) {
+                      if (state is HomeLoading || state is HomeInitial) {
+                        return const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(48),
+                            child: Center(child: CircularProgressIndicator()),
                           ),
-                        ),
-                      if (loaded.categories.isNotEmpty)
-                        _CategorySection(
-                          categories: loaded.categories,
-                          selectedId: loaded.selectedCategoryId,
-                          onSelect: (id) => context.read<HomeCubit>().selectCategory(id),
-                        ),
-                      if (loaded.trending.isNotEmpty) ...[
-                        const _SectionHeader(title: 'Sedang Rame Dipesan', emoji: '🔥'),
-                        _TrendingSection(products: loaded.trending),
-                        const SizedBox(height: 8),
-                      ],
-                      _SectionHeader(
-                        title: 'Warung Terdekat',
-                        onSeeAll: () => Navigator.pushNamed(context, '/search'),
-                      ),
-                      _NearbySection(merchants: loaded.nearby),
-                      const SizedBox(height: 8),
-                      _SectionHeader(
-                        title: 'Warung Rating Tertinggi',
-                        onSeeAll: () => Navigator.pushNamed(context, '/search'),
-                      ),
-                      _PopularSection(merchants: loaded.popular),
-                      const SizedBox(height: 24),
-                    ]),
-                  );
-                },
-              ),
-            ],
+                        );
+                      }
+                      if (state is HomeError) {
+                        return SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                HugeIcon(
+                                  icon: HugeIcons.strokeRoundedWifiOff01,
+                                  size: 48,
+                                  color: KuwrirColors.textHint,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  state.message,
+                                  style: TextStyle(
+                                    color: KuwrirColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: _refresh,
+                                  child: const Text('Coba lagi'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      final loaded = state as HomeLoaded;
+                      return SliverList(
+                        delegate: SliverChildListDelegate([
+                          if (loaded.banners.isNotEmpty)
+                            _BannerCarousel(
+                              banners: loaded.banners,
+                              onTapBanner: (b) => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BannerDetailScreen(banner: b),
+                                ),
+                              ),
+                            ),
+                          if (loaded.categories.isNotEmpty)
+                            _CategorySection(
+                              categories: loaded.categories,
+                              selectedId: loaded.selectedCategoryId,
+                              onSelect: (id) =>
+                                  context.read<HomeCubit>().selectCategory(id),
+                            ),
+                          if (loaded.trending.isNotEmpty) ...[
+                            const _SectionHeader(
+                              title: 'Sedang Rame Dipesan',
+                              emoji: '🔥',
+                            ),
+                            _TrendingSection(products: loaded.trending),
+                            const SizedBox(height: 8),
+                          ],
+                          _SectionHeader(
+                            title: 'Warung Terdekat',
+                            onSeeAll: () =>
+                                Navigator.pushNamed(context, '/search'),
+                          ),
+                          _NearbySection(merchants: loaded.nearby),
+                          const SizedBox(height: 8),
+                          _SectionHeader(
+                            title: 'Warung Rating Tertinggi',
+                            onSeeAll: () =>
+                                Navigator.pushNamed(context, '/search'),
+                          ),
+                          _PopularSection(merchants: loaded.popular),
+                          const SizedBox(height: 24),
+                        ]),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
             const FloatingCartButton(),
@@ -244,36 +278,51 @@ class _HomeScreenState extends State<HomeScreen> {
                         final matched = _matchingSavedAddress(addresses, loc);
                         final displayAddress = matched?.label ?? loc.address;
                         return GestureDetector(
-                      onTap: () => _openLocationPicker(loc),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: KuwrirColors.primary, width: 1.6),
-                            ),
-                            child: const Icon(Icons.location_on_outlined,
-                                color: KuwrirColors.primary, size: 14),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: loc.detecting
-                                ? Text('Mendeteksi lokasi...',
-                                    style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 14))
-                                : Text(
-                                    displayAddress,
-                                    style: const TextStyle(
-                                        color: KuwrirColors.textPrimary,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                          onTap: () => _openLocationPicker(loc),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: KuwrirColors.primary,
+                                    width: 1.6,
                                   ),
+                                ),
+                                child: const HugeIcon(
+                                  icon: HugeIcons.strokeRoundedLocation01,
+                                  color: KuwrirColors.primary,
+                                  size: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: loc.detecting
+                                    ? Text(
+                                        'Mendeteksi lokasi...',
+                                        style: TextStyle(
+                                          color: KuwrirColors.textSecondary,
+                                          fontSize: 14,
+                                        ),
+                                      )
+                                    : Text(
+                                        displayAddress,
+                                        style: const TextStyle(
+                                          color: KuwrirColors.textPrimary,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                              ),
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedArrowDown01,
+                                color: KuwrirColors.textSecondary,
+                              ),
+                            ],
                           ),
-                          Icon(Icons.keyboard_arrow_down_rounded, color: KuwrirColors.textSecondary),
-                        ],
-                      ),
                         );
                       },
                     );
@@ -295,7 +344,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       CircleAvatar(
                         radius: 17,
                         backgroundColor: KuwrirColors.background,
-                        child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 19),
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedNotification01,
+                          color: KuwrirColors.primary,
+                          size: 19,
+                        ),
                       ),
                       if (_unreadNotifications > 0)
                         Positioned(
@@ -307,7 +360,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             decoration: BoxDecoration(
                               color: KuwrirColors.error,
                               shape: BoxShape.circle,
-                              border: Border.all(color: KuwrirColors.surface, width: 1.5),
+                              border: Border.all(
+                                color: KuwrirColors.surface,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -331,7 +387,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const CircleAvatar(
                     radius: 17,
                     backgroundColor: KuwrirColors.background,
-                    child: Icon(Icons.person, color: KuwrirColors.primary, size: 19),
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedUser,
+                      color: KuwrirColors.primary,
+                      size: 19,
+                    ),
                   ),
                 ),
               ),
@@ -349,10 +409,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.search, color: KuwrirColors.textHint, size: 20),
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedSearch01,
+                    color: KuwrirColors.textHint,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
-                  Text('Cari warung atau menu...',
-                      style: TextStyle(color: KuwrirColors.textHint, fontSize: 14)),
+                  Text(
+                    'Cari warung atau menu...',
+                    style: TextStyle(
+                      color: KuwrirColors.textHint,
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -398,7 +467,10 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     if (widget.banners.length < 2) return;
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_controller.hasClients) return;
-      _controller.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
     });
   }
 
@@ -417,7 +489,9 @@ class _BannerCarouselState extends State<_BannerCarousel> {
           height: 192,
           child: PageView.builder(
             controller: _controller,
-            itemCount: widget.banners.isEmpty ? 0 : _kInfiniteMultiplier * widget.banners.length,
+            itemCount: widget.banners.isEmpty
+                ? 0
+                : _kInfiniteMultiplier * widget.banners.length,
             onPageChanged: (i) {
               setState(() => _page = i);
               _startAutoPlay(); // restart the countdown so a manual swipe doesn't get cut short
@@ -478,23 +552,29 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(banner.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.15)),
+                            Text(
+                              banner.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                                height: 1.15,
+                              ),
+                            ),
                             if (banner.subtitle?.isNotEmpty == true) ...[
                               const SizedBox(height: 4),
-                              Text(banner.subtitle!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.85),
-                                      fontSize: 12.5,
-                                      height: 1.15)),
+                              Text(
+                                banner.subtitle!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 12.5,
+                                  height: 1.15,
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -506,19 +586,25 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 90),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(100),
                               ),
-                              child: Text(banner.ctaText,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      color: KuwrirColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12.5)),
+                              child: Text(
+                                banner.ctaText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: KuwrirColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12.5,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -540,7 +626,9 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                 width: i == _page % widget.banners.length ? 18 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _page % widget.banners.length ? KuwrirColors.primary : KuwrirColors.border,
+                  color: i == _page % widget.banners.length
+                      ? KuwrirColors.primary
+                      : KuwrirColors.border,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -571,7 +659,11 @@ class _CategorySection extends StatelessWidget {
   final String? selectedId;
   final ValueChanged<String?> onSelect;
 
-  const _CategorySection({required this.categories, required this.selectedId, required this.onSelect});
+  const _CategorySection({
+    required this.categories,
+    required this.selectedId,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -600,24 +692,40 @@ class _CategorySection extends StatelessWidget {
                       height: 64,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: selected ? swatch : swatch.withValues(alpha: 0.12),
-                        border: selected ? Border.all(color: swatch, width: 2) : null,
+                        color: selected
+                            ? swatch
+                            : swatch.withValues(alpha: 0.12),
+                        border: selected
+                            ? Border.all(color: swatch, width: 2)
+                            : null,
                         boxShadow: selected
-                            ? [BoxShadow(color: swatch.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4))]
+                            ? [
+                                BoxShadow(
+                                  color: swatch.withValues(alpha: 0.28),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
                             : null,
                       ),
                       child: Center(
-                        child: Text(c.icon?.isNotEmpty == true ? c.icon! : '🍽️',
-                            style: const TextStyle(fontSize: 26)),
+                        child: Text(
+                          c.icon?.isNotEmpty == true ? c.icon! : '🍽️',
+                          style: const TextStyle(fontSize: 26),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(c.name,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                          color: selected ? swatch : KuwrirColors.textSecondary,
-                        )),
+                    Text(
+                      c.name,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        color: selected ? swatch : KuwrirColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -636,7 +744,12 @@ class _SectionHeader extends StatelessWidget {
   final VoidCallback? onSeeAll;
   final double topPadding;
   final String? emoji;
-  const _SectionHeader({required this.title, this.onSeeAll, this.topPadding = 20, this.emoji});
+  const _SectionHeader({
+    required this.title,
+    this.onSeeAll,
+    this.topPadding = 20,
+    this.emoji,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -651,21 +764,29 @@ class _SectionHeader extends StatelessWidget {
                 Text(emoji!, style: const TextStyle(fontSize: 17)),
                 const SizedBox(width: 6),
               ],
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold, color: KuwrirColors.textPrimary)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: KuwrirColors.textPrimary,
+                ),
+              ),
             ],
           ),
           if (onSeeAll != null)
             GestureDetector(
               onTap: onSeeAll,
-              child: Text('Lihat Semua',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: KuwrirColors.primary,
-                      decoration: TextDecoration.underline,
-                      decorationColor: KuwrirColors.primary)),
+              child: Text(
+                'Lihat Semua',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: KuwrirColors.primary,
+                  decoration: TextDecoration.underline,
+                  decorationColor: KuwrirColors.primary,
+                ),
+              ),
             ),
         ],
       ),
@@ -684,19 +805,26 @@ class _NearbySection extends StatelessWidget {
     if (merchants.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Text('Belum ada warung di sekitar lokasimu',
-            style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          'Belum ada warung di sekitar lokasimu',
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: merchants
-            .map((m) => _MerchantCard(
-                  merchant: m,
-                  onTap: () => Navigator.pushNamed(context, '/merchant',
-                      arguments: {'id': m.id, 'name': m.name}),
-                ))
+            .map(
+              (m) => _MerchantCard(
+                merchant: m,
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  '/merchant',
+                  arguments: {'id': m.id, 'name': m.name},
+                ),
+              ),
+            )
             .toList(),
       ),
     );
@@ -714,8 +842,10 @@ class _PopularSection extends StatelessWidget {
     if (merchants.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Text('Belum ada warung dengan rating di area ini',
-            style: TextStyle(color: KuwrirColors.textSecondary)),
+        child: Text(
+          'Belum ada warung dengan rating di area ini',
+          style: TextStyle(color: KuwrirColors.textSecondary),
+        ),
       );
     }
     return SizedBox(
@@ -729,8 +859,11 @@ class _PopularSection extends StatelessWidget {
           final m = merchants[i];
           return _MerchantCardCompact(
             merchant: m,
-            onTap: () => Navigator.pushNamed(context, '/merchant',
-                arguments: {'id': m.id, 'name': m.name}),
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/merchant',
+              arguments: {'id': m.id, 'name': m.name},
+            ),
           );
         },
       ),
@@ -763,15 +896,21 @@ class _TrendingProductCard extends StatelessWidget {
   final ProductSearchResult result;
   const _TrendingProductCard({required this.result});
 
-  String _fmtPrice(double v) => v >= 1000 ? 'Rp ${(v / 1000).toStringAsFixed(0)}rb' : 'Rp ${v.toStringAsFixed(0)}';
+  String _fmtPrice(double v) => v >= 1000
+      ? 'Rp ${(v / 1000).toStringAsFixed(0)}rb'
+      : 'Rp ${v.toStringAsFixed(0)}';
 
   @override
   Widget build(BuildContext context) {
     final product = result.product;
-    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
+    final hasDiscount =
+        product.discountPrice != null && product.discountPrice! > 0;
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/merchant',
-          arguments: {'id': result.merchantId, 'name': result.merchantName}),
+      onTap: () => Navigator.pushNamed(
+        context,
+        '/merchant',
+        arguments: {'id': result.merchantId, 'name': result.merchantName},
+      ),
       child: Container(
         width: 148,
         decoration: BoxDecoration(
@@ -791,24 +930,44 @@ class _TrendingProductCard extends StatelessWidget {
                   width: double.infinity,
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   child: product.imageUrl != null
-                      ? Image.network(product.imageUrl!,
+                      ? Image.network(
+                          product.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Center(child: Icon(Icons.restaurant, color: KuwrirColors.primary)))
-                      : Center(child: Icon(Icons.restaurant, color: KuwrirColors.primary)),
+                          errorBuilder: (_, __, ___) => Center(
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedRestaurant02,
+                              color: KuwrirColors.primary,
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedRestaurant02,
+                            color: KuwrirColors.primary,
+                          ),
+                        ),
                 ),
                 if (hasDiscount)
                   Positioned(
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: KuwrirColors.error,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text('DISKON',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                      child: const Text(
+                        'DISKON',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -818,28 +977,49 @@ class _TrendingProductCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(result.merchantName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                  Text(
+                    result.merchantName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: KuwrirColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       if (hasDiscount) ...[
-                        Text(_fmtPrice(product.price),
-                            style: TextStyle(
-                                fontSize: 10.5,
-                                color: KuwrirColors.textHint,
-                                decoration: TextDecoration.lineThrough)),
+                        Text(
+                          _fmtPrice(product.price),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: KuwrirColors.textHint,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
                         const SizedBox(width: 4),
                       ],
-                      Text(_fmtPrice(hasDiscount ? product.discountPrice! : product.price),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: KuwrirColors.primary)),
+                      Text(
+                        _fmtPrice(
+                          hasDiscount ? product.discountPrice! : product.price,
+                        ),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: KuwrirColors.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -888,11 +1068,24 @@ class _MerchantCard extends StatelessWidget {
                   width: double.infinity,
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   child: (merchant.bannerUrl ?? merchant.logoUrl) != null
-                      ? Image.network((merchant.bannerUrl ?? merchant.logoUrl)!,
+                      ? Image.network(
+                          (merchant.bannerUrl ?? merchant.logoUrl)!,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Center(
-                              child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)))
-                      : Center(child: Icon(Icons.store, size: 48, color: KuwrirColors.primary)),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedStore01,
+                              size: 48,
+                              color: KuwrirColors.primary,
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedStore01,
+                            size: 48,
+                            color: KuwrirColors.primary,
+                          ),
+                        ),
                 ),
                 if (merchant.bannerUrl != null)
                   Positioned(
@@ -906,19 +1099,39 @@ class _MerchantCard extends StatelessWidget {
                         color: KuwrirColors.surface,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2)),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: ClipOval(
                         child: merchant.logoUrl != null
-                            ? Image.network(merchant.logoUrl!,
+                            ? Image.network(
+                                merchant.logoUrl!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => Container(
-                                    color: KuwrirColors.primary.withValues(alpha: 0.08),
-                                    child: Icon(Icons.store, size: 20, color: KuwrirColors.primary)))
+                                  color: KuwrirColors.primary.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  child: HugeIcon(
+                                    icon: HugeIcons.strokeRoundedStore01,
+                                    size: 20,
+                                    color: KuwrirColors.primary,
+                                  ),
+                                ),
+                              )
                             : Container(
-                                color: KuwrirColors.primary.withValues(alpha: 0.08),
-                                child: Icon(Icons.store, size: 20, color: KuwrirColors.primary)),
+                                color: KuwrirColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
+                                child: HugeIcon(
+                                  icon: HugeIcons.strokeRoundedStore01,
+                                  size: 20,
+                                  color: KuwrirColors.primary,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -933,40 +1146,85 @@ class _MerchantCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(merchant.name,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          merchant.name,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       if (!merchant.isOpen)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                              color: KuwrirColors.textHint.withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(100)),
-                          child: Text('Tutup',
-                              style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
+                            color: KuwrirColors.textHint.withValues(
+                              alpha: 0.14,
+                            ),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            'Tutup',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: KuwrirColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(merchant.address,
-                      style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    merchant.address,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: KuwrirColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.star_rounded, size: 14, color: Colors.amber[600]),
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedStar,
+                        size: 14,
+                        color: Colors.amber[600],
+                      ),
                       const SizedBox(width: 2),
-                      Text(merchant.rating.toStringAsFixed(1),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      Text(' (${merchant.totalReviews})',
-                          style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                      Text(
+                        merchant.rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        ' (${merchant.totalReviews})',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                      ),
                       if (merchant.distanceKm != null) ...[
                         const SizedBox(width: 10),
-                        Icon(Icons.location_on_outlined, size: 13, color: KuwrirColors.textSecondary),
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedLocation01,
+                          size: 13,
+                          color: KuwrirColors.textSecondary,
+                        ),
                         const SizedBox(width: 2),
-                        Text('${merchant.distanceKm!.toStringAsFixed(1)} km',
-                            style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary)),
+                        Text(
+                          '${merchant.distanceKm!.toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: KuwrirColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -1013,30 +1271,62 @@ class _MerchantCardCompact extends StatelessWidget {
               width: double.infinity,
               color: KuwrirColors.primary.withValues(alpha: 0.08),
               child: merchant.logoUrl != null
-                  ? Image.network(merchant.logoUrl!,
+                  ? Image.network(
+                      merchant.logoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Center(
-                          child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)))
-                  : Center(child: Icon(Icons.store, size: 36, color: KuwrirColors.primary)),
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedStore01,
+                          size: 36,
+                          color: KuwrirColors.primary,
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedStore01,
+                        size: 36,
+                        color: KuwrirColors.primary,
+                      ),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(11),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(merchant.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(
+                    merchant.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.star_rounded, size: 13, color: Colors.amber[600]),
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedStar,
+                        size: 13,
+                        color: Colors.amber[600],
+                      ),
                       const SizedBox(width: 2),
-                      Text(merchant.rating.toStringAsFixed(1),
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      Text(' (${merchant.totalReviews})',
-                          style: TextStyle(fontSize: 10, color: KuwrirColors.textSecondary)),
+                      Text(
+                        merchant.rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        ' (${merchant.totalReviews})',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ],

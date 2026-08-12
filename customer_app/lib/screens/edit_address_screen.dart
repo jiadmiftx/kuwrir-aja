@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -52,7 +53,8 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
     super.dispose();
   }
 
-  String get _resolvedLabel => (_customLabelSelected || _quickLabel == 'Lainnya')
+  String get _resolvedLabel =>
+      (_customLabelSelected || _quickLabel == 'Lainnya')
       ? _customLabelCtrl.text.trim()
       : _quickLabel;
 
@@ -71,13 +73,15 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
   Future<void> _save() async {
     final label = _resolvedLabel;
     if (label.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Pilih atau isi nama alamat')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih atau isi nama alamat')),
+      );
       return;
     }
     if (_picked == null || _address.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Pilih lokasi di peta')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pilih lokasi di peta')));
       return;
     }
 
@@ -108,7 +112,12 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menyimpan alamat')));
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal menyimpan alamat',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -126,9 +135,15 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('NAMA ALAMAT',
-              style: TextStyle(
-                  fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+          Text(
+            'NAMA ALAMAT',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: KuwrirColors.textHint,
+            ),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
@@ -153,14 +168,22 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
               decoration: InputDecoration(
                 labelText: 'Nama alamat',
                 hintText: 'cth. Rumah Mertua, Kos',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
           const SizedBox(height: 24),
-          Text('LOKASI',
-              style: TextStyle(
-                  fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+          Text(
+            'LOKASI',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: KuwrirColors.textHint,
+            ),
+          ),
           const SizedBox(height: 10),
           InkWell(
             onTap: _pickLocation,
@@ -181,7 +204,11 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                       color: KuwrirColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.map_outlined, color: KuwrirColors.primary, size: 20),
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedMaping,
+                      color: KuwrirColors.primary,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -189,29 +216,44 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                       _address.isEmpty ? 'Pilih lokasi di peta' : _address,
                       style: TextStyle(
                         fontSize: 13.5,
-                        fontWeight: _address.isEmpty ? FontWeight.w500 : FontWeight.w600,
-                        color: _address.isEmpty ? KuwrirColors.textHint : KuwrirColors.textPrimary,
+                        fontWeight: _address.isEmpty
+                            ? FontWeight.w500
+                            : FontWeight.w600,
+                        color: _address.isEmpty
+                            ? KuwrirColors.textHint
+                            : KuwrirColors.textPrimary,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedArrowRight01,
+                    color: KuwrirColors.textHint,
+                  ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
-          Text('DETAIL ALAMAT',
-              style: TextStyle(
-                  fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint)),
+          Text(
+            'DETAIL ALAMAT',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: KuwrirColors.textHint,
+            ),
+          ),
           const SizedBox(height: 10),
           TextField(
             controller: _detailCtrl,
             maxLines: 2,
             decoration: InputDecoration(
               hintText: 'No. rumah, patokan, lantai, dll (opsional)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -223,7 +265,10 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
             ),
             child: SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-              title: const Text('Jadikan alamat utama', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              title: const Text(
+                'Jadikan alamat utama',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
               value: _isDefault,
               onChanged: (v) => setState(() => _isDefault = v),
               activeThumbColor: KuwrirColors.primary,
@@ -236,8 +281,13 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
               onPressed: _saving ? null : _save,
               child: _saving
                   ? const SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text('Simpan Alamat'),
             ),
           ),

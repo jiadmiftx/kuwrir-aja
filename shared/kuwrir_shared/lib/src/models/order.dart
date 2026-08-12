@@ -18,14 +18,14 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
-        id: json['id'] as String? ?? '',
-        itemName: json['item_name'] as String? ?? '',
-        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-        basePrice: (json['base_price'] as num?)?.toDouble() ?? 0,
-        unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,
-        totalPrice: (json['total_price'] as num?)?.toDouble() ?? 0,
-        notes: json['notes'] as String?,
-      );
+    id: json['id'] as String? ?? '',
+    itemName: json['item_name'] as String? ?? '',
+    quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+    basePrice: (json['base_price'] as num?)?.toDouble() ?? 0,
+    unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,
+    totalPrice: (json['total_price'] as num?)?.toDouble() ?? 0,
+    notes: json['notes'] as String?,
+  );
 }
 
 class Order {
@@ -60,6 +60,7 @@ class Order {
   final String? notes;
   final String? merchantId;
   final String? merchantName;
+  final String? merchantLogoUrl;
   final List<OrderItem> items;
   final DateTime? createdAt;
 
@@ -92,6 +93,7 @@ class Order {
     this.notes,
     this.merchantId,
     this.merchantName,
+    this.merchantLogoUrl,
     this.items = const [],
     this.createdAt,
   });
@@ -129,7 +131,9 @@ class Order {
       notes: json['notes'] as String?,
       merchantId: json['merchant_id'] as String?,
       merchantName: merchant?['name'] as String?,
-      items: (json['items'] as List<dynamic>?)
+      merchantLogoUrl: merchant?['logo_url'] as String?,
+      items:
+          (json['items'] as List<dynamic>?)
               ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
@@ -139,6 +143,11 @@ class Order {
 
   bool get isCancellable => status == 'pending' || status == 'confirmed';
   bool get isDelivered => status == 'delivered';
-  bool get isActive =>
-      ['pending', 'confirmed', 'preparing', 'ready', 'picked_up'].contains(status);
+  bool get isActive => [
+    'pending',
+    'confirmed',
+    'preparing',
+    'ready',
+    'picked_up',
+  ].contains(status);
 }

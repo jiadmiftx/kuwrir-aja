@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/cart_cubit.dart';
 import '../cubits/order_cubit.dart';
+import '../widgets/checkout_widgets.dart';
 import 'payment_webview_screen.dart';
 
 /// Confirmation step shown after Cart — shows the real delivery fee/tax/
@@ -13,6 +15,7 @@ import 'payment_webview_screen.dart';
 class OrderSummaryScreen extends StatefulWidget {
   final String merchantId;
   final String merchantName;
+  final String? merchantImageUrl;
   final List<CartItem> items;
   final String dropoffAddress;
   final double dropoffLat;
@@ -25,6 +28,7 @@ class OrderSummaryScreen extends StatefulWidget {
     super.key,
     required this.merchantId,
     required this.merchantName,
+    this.merchantImageUrl,
     required this.items,
     required this.dropoffAddress,
     required this.dropoffLat,
@@ -45,43 +49,26 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   String _paymentType = 'cash';
   List<Map<String, dynamic>> _paymentMethods = [];
   bool _loadingMethods = false;
-  final Set<String> _expandedGroups = {};
+  bool _showOtherMethods = false;
 
   final _promoCtrl = TextEditingController();
   String _appliedPromoCode = '';
   String? _promoError;
   bool _applyingPromo = false;
 
-  static const _groupOrder = [
-    'E-Wallet',
-    'QRIS',
-    'Virtual Account',
-    'Kartu Kredit',
-    'Gerai Retail',
-    'PayLater',
-  ];
+  // QRIS surfaces as its own option (most-used channel); everything else
+  // (VA, e-wallet, card, retail, PayLater) sits behind a "Metode Lainnya"
+  // dropdown so the default list stays short - Cash + QRIS.
+  List<Map<String, dynamic>> get _qrisMethods =>
+      _paymentMethods.where((m) => m['paymentName'] == 'QRIS').toList();
+  List<Map<String, dynamic>> get _otherMethods =>
+      _paymentMethods.where((m) => m['paymentName'] != 'QRIS').toList();
 
-  static const _groupIcons = {
-    'E-Wallet': Icons.account_balance_wallet_outlined,
-    'QRIS': Icons.qr_code_rounded,
-    'Virtual Account': Icons.account_balance_outlined,
-    'Kartu Kredit': Icons.credit_card_outlined,
-    'Gerai Retail': Icons.storefront_outlined,
-    'PayLater': Icons.schedule_outlined,
-  };
-
-  String _categoryFor(String paymentName) {
-    final upper = paymentName.toUpperCase();
-    if (upper.contains('QRIS')) return 'QRIS';
-    if (upper.contains('CREDIT CARD')) return 'Kartu Kredit';
-    if (upper.contains('PAYLATER')) return 'PayLater';
-    if (upper.contains('RETAIL') ||
-        upper.contains('INDOMARET') ||
-        upper.contains('ALFAMART')) {
-      return 'Gerai Retail';
-    }
-    if (upper.contains('VA')) return 'Virtual Account';
-    return 'E-Wallet';
+  String _feeSubtitle(Map<String, dynamic> method) {
+    final fee = double.tryParse((method['totalFee'] as String?) ?? '0');
+    return fee != null && fee > 0
+        ? 'Biaya admin Rp ${formatRupiah(fee)}'
+        : 'Tanpa biaya admin';
   }
 
   @override
@@ -97,9 +84,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   }
 
   /// Live channel list from Duitku, re-fetched once the real total is
-  /// known (fees can vary per amount tier). Best-effort: if the gateway
+  /// known (fees can vary per amount tier). QRIS is split out as its own
+  /// option; everything else sits behind the "Metode Lainnya" dropdown
+  /// (see `_qrisMethods`/`_otherMethods`). Best-effort: if the gateway
   /// isn't configured or the call fails, checkout just falls back to
-  /// Cash (COD) only rather than blocking the whole screen.
+  /// Cash (COD) only.
   Future<void> _loadPaymentMethods(double amount) async {
     setState(() => _loadingMethods = true);
     try {
@@ -167,7 +156,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _promoError = e is ApiException ? e.message : 'Kode promo tidak valid');
+        setState(
+          () => _promoError = e is ApiException
+              ? e.message
+              : 'Kode promo tidak valid',
+        );
       }
     } finally {
       if (mounted) setState(() => _applyingPromo = false);
@@ -236,13 +229,6 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     }
   }
 
-  String _fmt(double v) => v
-      .toStringAsFixed(0)
-      .replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<OrderCubit, OrderState>(
@@ -261,10 +247,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             (route) => false,
             arguments: {'tab': 2},
           );
-          navigator.pushNamed(
-            '/tracking',
-            arguments: {'order_id': order.id},
-          );
+          navigator.pushNamed('/tracking', arguments: {'order_id': order.id});
           unawaited(_openPaymentWebView(navigator, api, order, paymentType));
         } else if (state is OrderError) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -285,12 +268,32 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _SectionLabel('Toko'),
-            const SizedBox(height: 10),
-            _SoftPanel(
+            const SectionLabel('Toko'),
+            SoftPanel(
               child: Row(
                 children: [
-                  const _PanelIcon(Icons.storefront_outlined),
+                  widget.merchantImageUrl != null &&
+                          widget.merchantImageUrl!.isNotEmpty
+                      ? Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: KuwrirColors.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.network(
+                            widget.merchantImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                HugeIcon(
+                                  icon: HugeIcons.strokeRoundedStore01,
+                                  color: KuwrirColors.primary,
+                                  size: 19,
+                                ),
+                          ),
+                        )
+                      : const _PanelIcon(HugeIcons.strokeRoundedStore01),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -305,26 +308,24 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Pesanan (${widget.items.length} item)'),
-            const SizedBox(height: 10),
-            _SoftPanel(
+            SectionLabel('Pesanan (${widget.items.length} item)'),
+            SoftPanel(
               child: Column(
                 children: [
                   for (var i = 0; i < widget.items.length; i++) ...[
-                    if (i > 0) Divider(height: 1, color: KuwrirColors.border),
+                    if (i > 0) Divider(height: 1, color: KuwrirColors.divider),
                     _ItemRow(item: widget.items[i]),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Alamat Pengiriman'),
-            const SizedBox(height: 10),
-            _SoftPanel(
+            const SectionLabel('Alamat Pengiriman'),
+            SoftPanel(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _PanelIcon(Icons.location_on_outlined),
+                  const _PanelIcon(HugeIcons.strokeRoundedLocation01),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -358,17 +359,15 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Metode Pembayaran'),
-            const SizedBox(height: 10),
+            const SectionLabel('Metode Pembayaran'),
             _PaymentMethodOption(
-              icon: Icons.payments_outlined,
+              icon: HugeIcons.strokeRoundedPayment01,
               title: 'Cash (COD)',
               subtitle: 'Bayar tunai ke driver saat pesanan tiba',
               selected: _paymentType == 'cash',
               onTap: () => setState(() => _paymentType = 'cash'),
             ),
-            if (_loadingMethods) ...[
-              const SizedBox(height: 10),
+            if (_loadingMethods)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Center(
@@ -378,53 +377,53 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
-              ),
-            ] else
-              for (final entry in () {
-                final grouped = <String, List<Map<String, dynamic>>>{};
-                for (final method in _paymentMethods) {
-                  final cat = _categoryFor(
-                    (method['paymentName'] as String?) ?? '',
-                  );
-                  grouped.putIfAbsent(cat, () => []).add(method);
-                }
-                return _groupOrder.where(
-                  (cat) => grouped[cat]?.isNotEmpty ?? false,
-                ).map((cat) => MapEntry(cat, grouped[cat]!));
-              }()) ...[
-                const SizedBox(height: 10),
-                _PaymentMethodGroup(
-                  category: entry.key,
-                  icon: _groupIcons[entry.key] ?? Icons.payments_outlined,
-                  methods: entry.value,
-                  expanded:
-                      _expandedGroups.contains(entry.key) ||
-                      entry.value.any((m) => m['paymentMethod'] == _paymentType),
-                  onToggle: () => setState(() {
-                    if (_expandedGroups.contains(entry.key)) {
-                      _expandedGroups.remove(entry.key);
-                    } else {
-                      _expandedGroups.add(entry.key);
-                    }
-                  }),
-                  selectedMethod: _paymentType,
-                  onSelect: (code) => setState(() => _paymentType = code),
-                  fmt: _fmt,
+              )
+            else ...[
+              for (final method in _qrisMethods) ...[
+                const SizedBox(height: 8),
+                _PaymentMethodOption(
+                  icon: HugeIcons.strokeRoundedQrCode01,
+                  imageUrl: method['paymentImage'] as String?,
+                  title: (method['paymentName'] as String?) ?? 'QRIS',
+                  subtitle: _feeSubtitle(method),
+                  selected: _paymentType == method['paymentMethod'],
+                  onTap: () => setState(
+                    () => _paymentType = method['paymentMethod'] as String,
+                  ),
                 ),
               ],
+              if (_otherMethods.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _OtherMethodsDropdown(
+                  expanded: _showOtherMethods,
+                  onToggle: () =>
+                      setState(() => _showOtherMethods = !_showOtherMethods),
+                  methods: _otherMethods,
+                  selectedMethod: _paymentType,
+                  onSelect: (code) => setState(() => _paymentType = code),
+                  feeSubtitle: _feeSubtitle,
+                ),
+              ],
+            ],
             const SizedBox(height: 24),
-            _SectionLabel('Kode Promo'),
-            const SizedBox(height: 10),
-            _SoftPanel(
+            const SectionLabel('Kode Promo'),
+            SoftPanel(
               child: _appliedPromoCode.isNotEmpty
                   ? Row(
                       children: [
-                        Icon(Icons.local_offer, size: 18, color: KuwrirColors.success),
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedDiscountTag01,
+                          size: 18,
+                          color: KuwrirColors.success,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _appliedPromoCode,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                         TextButton(
@@ -441,7 +440,8 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _promoCtrl,
-                                textCapitalization: TextCapitalization.characters,
+                                textCapitalization:
+                                    TextCapitalization.characters,
                                 decoration: const InputDecoration(
                                   isDense: true,
                                   border: InputBorder.none,
@@ -456,7 +456,9 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Text('Terapkan'),
                             ),
@@ -466,16 +468,18 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                           const SizedBox(height: 4),
                           Text(
                             _promoError!,
-                            style: TextStyle(color: KuwrirColors.error, fontSize: 12.5),
+                            style: TextStyle(
+                              color: KuwrirColors.error,
+                              fontSize: 12.5,
+                            ),
                           ),
                         ],
                       ],
                     ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Rincian Biaya'),
-            const SizedBox(height: 10),
-            _SoftPanel(
+            const SectionLabel('Rincian Biaya'),
+            SoftPanel(
               child: _loadingQuote
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
@@ -502,33 +506,33 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                     )
                   : Column(
                       children: [
-                        _PriceRow(
+                        PriceRow(
                           label: 'Subtotal menu',
                           amount: _quote!.subtotal,
                         ),
                         if (_quote!.packagingFee > 0)
-                          _PriceRow(
+                          PriceRow(
                             label: 'Biaya kemasan',
                             amount: _quote!.packagingFee,
                           ),
-                        _PriceRow(label: 'Ongkir', amount: _quote!.deliveryFee),
+                        PriceRow(label: 'Ongkir', amount: _quote!.deliveryFee),
                         if (_quote!.appServiceFee > 0)
-                          _PriceRow(
+                          PriceRow(
                             label: 'Biaya layanan',
                             amount: _quote!.appServiceFee,
                           ),
                         if (_quote!.taxAmount > 0)
-                          _PriceRow(
+                          PriceRow(
                             label: 'Pajak (PPN)',
                             amount: _quote!.taxAmount,
                           ),
                         if (_quote!.discountAmount > 0)
-                          _PriceRow(
+                          PriceRow(
                             label: 'Diskon ($_appliedPromoCode)',
                             amount: _quote!.discountAmount,
                             isDiscount: true,
                           ),
-                        Divider(height: 20, color: KuwrirColors.border),
+                        Divider(height: 20, color: KuwrirColors.divider),
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -537,12 +541,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: KuwrirColors.primary.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          child: _PriceRow(
+                          child: PriceRow(
                             label: 'Total',
                             amount: _quote!.total,
-                            isBold: true,
+                            emphasis: true,
                           ),
                         ),
                       ],
@@ -579,7 +583,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                     backgroundColor: KuwrirColors.primary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   onPressed: canConfirm ? _confirmOrder : null,
@@ -594,7 +598,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         )
                       : Text(
                           _quote != null
-                              ? 'Buat Pesanan · Rp ${_fmt(_quote!.total)}'
+                              ? 'Buat Pesanan · Rp ${formatRupiah(_quote!.total)}'
                               : 'Buat Pesanan',
                           style: const TextStyle(
                             fontSize: 15,
@@ -611,26 +615,109 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
+class _PanelIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  const _PanelIcon(this.icon);
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11.5,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-        color: KuwrirColors.textHint,
+    return Container(
+      width: 38,
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: KuwrirColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: HugeIcon(icon: icon, color: KuwrirColors.primary, size: 19),
+    );
+  }
+}
+
+class _OtherMethodsDropdown extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Map<String, dynamic>> methods;
+  final String selectedMethod;
+  final ValueChanged<String> onSelect;
+  final String Function(Map<String, dynamic>) feeSubtitle;
+
+  const _OtherMethodsDropdown({
+    required this.expanded,
+    required this.onToggle,
+    required this.methods,
+    required this.selectedMethod,
+    required this.onSelect,
+    required this.feeSubtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Metode pembayaran lain',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        color: KuwrirColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  HugeIcon(
+                    icon: expanded
+                        ? HugeIcons.strokeRoundedArrowUp01
+                        : HugeIcons.strokeRoundedArrowDown01,
+                    color: KuwrirColors.textHint,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                children: [
+                  for (var i = 0; i < methods.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _PaymentMethodOption(
+                      icon: HugeIcons.strokeRoundedPayment01,
+                      imageUrl: methods[i]['paymentImage'] as String?,
+                      title:
+                          (methods[i]['paymentName'] as String?) ??
+                          'Pembayaran Online',
+                      subtitle: feeSubtitle(methods[i]),
+                      selected: selectedMethod == methods[i]['paymentMethod'],
+                      onTap: () =>
+                          onSelect(methods[i]['paymentMethod'] as String),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
 class _PaymentMethodOption extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String title;
   final String subtitle;
   final bool selected;
@@ -648,53 +735,67 @@ class _PaymentMethodOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: KuwrirColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected ? KuwrirColors.primary : KuwrirColors.border,
-            width: selected ? 1.5 : 1,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: KuwrirColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? KuwrirColors.primary : Colors.transparent,
+              width: 1.5,
+            ),
+            boxShadow: selected
+                ? []
+                : [
+                    BoxShadow(
+                      color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
-        ),
-        child: Row(
-          children: [
-            imageUrl != null
-                ? _MethodImageIcon(imageUrl: imageUrl!, fallback: icon)
-                : _PanelIcon(icon),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14.5,
+          child: Row(
+            children: [
+              imageUrl != null
+                  ? _MethodImageIcon(imageUrl: imageUrl!, fallback: icon)
+                  : _PanelIcon(icon),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                      ),
                     ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: KuwrirColors.textSecondary,
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: KuwrirColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected ? KuwrirColors.primary : KuwrirColors.textHint,
-              size: 22,
-            ),
-          ],
+              HugeIcon(
+                icon: selected
+                    ? HugeIcons.strokeRoundedCheckmarkCircle02
+                    : HugeIcons.strokeRoundedCircle,
+                color: selected ? KuwrirColors.primary : KuwrirColors.textHint,
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -703,7 +804,7 @@ class _PaymentMethodOption extends StatelessWidget {
 
 class _MethodImageIcon extends StatelessWidget {
   final String imageUrl;
-  final IconData fallback;
+  final List<List<dynamic>> fallback;
   const _MethodImageIcon({required this.imageUrl, required this.fallback});
 
   @override
@@ -722,178 +823,12 @@ class _MethodImageIcon extends StatelessWidget {
         width: 26,
         height: 26,
         fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) =>
-            progress == null
-                ? child
-                : Icon(fallback, color: KuwrirColors.primary, size: 19),
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : HugeIcon(icon: fallback, color: KuwrirColors.primary, size: 19),
         errorBuilder: (context, error, stackTrace) =>
-            Icon(fallback, color: KuwrirColors.primary, size: 19),
+            HugeIcon(icon: fallback, color: KuwrirColors.primary, size: 19),
       ),
-    );
-  }
-}
-
-/// One payment-method category (e.g. "E-Wallet", "Virtual Account") as a
-/// collapsible section — Duitku returns 20+ channels flat, which is too
-/// long to scan as one list, so channels are grouped by category and only
-/// expanded on demand (or automatically if it already holds the selected
-/// method).
-class _PaymentMethodGroup extends StatelessWidget {
-  final String category;
-  final IconData icon;
-  final List<Map<String, dynamic>> methods;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final String selectedMethod;
-  final ValueChanged<String> onSelect;
-  final String Function(double) fmt;
-
-  const _PaymentMethodGroup({
-    required this.category,
-    required this.icon,
-    required this.methods,
-    required this.expanded,
-    required this.onToggle,
-    required this.selectedMethod,
-    required this.onSelect,
-    required this.fmt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: KuwrirColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: KuwrirColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  _PanelIcon(icon),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      category,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: KuwrirColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${methods.length}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: KuwrirColors.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    color: KuwrirColors.textHint,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (expanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  for (var i = 0; i < methods.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 8),
-                    _PaymentMethodOption(
-                      icon: icon,
-                      imageUrl: methods[i]['paymentImage'] as String?,
-                      title:
-                          (methods[i]['paymentName'] as String?) ??
-                          'Pembayaran Online',
-                      subtitle: () {
-                        final fee = double.tryParse(
-                          (methods[i]['totalFee'] as String?) ?? '0',
-                        );
-                        return fee != null && fee > 0
-                            ? 'Biaya admin Rp ${fmt(fee)}'
-                            : 'Tanpa biaya admin';
-                      }(),
-                      selected:
-                          selectedMethod == methods[i]['paymentMethod'],
-                      onTap: () =>
-                          onSelect(methods[i]['paymentMethod'] as String),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SoftPanel extends StatelessWidget {
-  final Widget child;
-  const _SoftPanel({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: KuwrirColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: KuwrirColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: KuwrirColors.textPrimary.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _PanelIcon extends StatelessWidget {
-  final IconData icon;
-  const _PanelIcon(this.icon);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 38,
-      height: 38,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: KuwrirColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Icon(icon, color: KuwrirColors.primary, size: 19),
     );
   }
 }
@@ -901,13 +836,6 @@ class _PanelIcon extends StatelessWidget {
 class _ItemRow extends StatelessWidget {
   final CartItem item;
   const _ItemRow({required this.item});
-
-  String _fmt(double v) => v
-      .toStringAsFixed(0)
-      .replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -973,48 +901,8 @@ class _ItemRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            'Rp ${_fmt(item.lineTotal)}',
+            'Rp ${formatRupiah(item.lineTotal)}',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PriceRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final bool isBold;
-  final bool isDiscount;
-
-  const _PriceRow({
-    required this.label,
-    required this.amount,
-    this.isBold = false,
-    this.isDiscount = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontSize: isBold ? 16 : 14,
-      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-      color: isBold ? KuwrirColors.textPrimary : KuwrirColors.textSecondary,
-    );
-    final formatted =
-        '${isDiscount ? '-' : ''}Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: style),
-          Text(
-            formatted,
-            style: style.copyWith(
-              color: isDiscount ? KuwrirColors.success : (isBold ? KuwrirColors.primary : null),
-            ),
           ),
         ],
       ),

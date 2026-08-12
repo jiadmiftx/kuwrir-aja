@@ -27,6 +27,8 @@ dependencies:
   local_auth: ^2.3.0
   url_launcher: ^6.3.1
   webview_flutter: ^4.10.0
+  google_fonts: ^6.2.1
+  hugeicons: ^1.1.7
 
 dev_dependencies:
   flutter_test:

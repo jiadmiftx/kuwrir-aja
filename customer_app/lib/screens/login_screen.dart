@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
@@ -123,8 +124,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            icon: Icon(
-                              Icons.explore_outlined,
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedCompass01,
                               size: 18,
                               color: KuwrirColors.textSecondary,
                             ),
@@ -218,7 +219,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(1.05, -0.8),
             child: _FloatingBite(
-              icon: Icons.local_pizza_outlined,
+              icon: HugeIcons.strokeRoundedPizza01,
               size: 46,
               angle: -0.3,
             ),
@@ -226,7 +227,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(-1.08, -0.06),
             child: _FloatingBite(
-              icon: Icons.ramen_dining_outlined,
+              icon: HugeIcons.strokeRoundedNoodles,
               size: 52,
               angle: 0.25,
             ),
@@ -234,7 +235,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(0.86, 0.88),
             child: _FloatingBite(
-              icon: Icons.icecream_outlined,
+              icon: HugeIcons.strokeRoundedIceCream01,
               size: 34,
               angle: 0.15,
             ),
@@ -242,7 +243,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(-0.8, 0.94),
             child: _FloatingBite(
-              icon: Icons.emoji_food_beverage_outlined,
+              icon: HugeIcons.strokeRoundedCoffee02,
               size: 30,
               angle: -0.2,
             ),
@@ -311,7 +312,11 @@ class _LoginHeroState extends State<_LoginHero>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.bolt, size: 15, color: Colors.white),
+                          const HugeIcon(
+                            icon: HugeIcons.strokeRoundedFlash,
+                            size: 15,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             'Bisa lihat ongkir sebelum order',
@@ -336,7 +341,7 @@ class _LoginHeroState extends State<_LoginHero>
 }
 
 class _FloatingBite extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final double size;
   final double angle;
   const _FloatingBite({
@@ -349,8 +354,8 @@ class _FloatingBite extends StatelessWidget {
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: angle * math.pi,
-      child: Icon(
-        icon,
+      child: HugeIcon(
+        icon: icon,
         size: size,
         color: Colors.white.withValues(alpha: 0.14),
       ),

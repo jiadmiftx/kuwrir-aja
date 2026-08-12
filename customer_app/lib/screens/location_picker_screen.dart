@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -17,7 +18,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final _mapCtrl = MapController();
   bool _mapReady = false;
 
-  LatLng _picked = const LatLng(-6.2088, 106.8456); // fallback: Jakarta, diganti GPS otomatis
+  LatLng _picked = const LatLng(
+    -6.2088,
+    106.8456,
+  ); // fallback: Jakarta, diganti GPS otomatis
   String _address = 'Pilih lokasi di peta';
   bool _resolving = false;
 
@@ -41,7 +45,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (perm == LocationPermission.deniedForever) return;
 
       final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
       if (!mounted) return;
 
       final loc = LatLng(pos.latitude, pos.longitude);
@@ -55,13 +62,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (!mounted) return;
     setState(() => _resolving = true);
     try {
-      final placemarks = await placemarkFromCoordinates(loc.latitude, loc.longitude);
+      final placemarks = await placemarkFromCoordinates(
+        loc.latitude,
+        loc.longitude,
+      );
       if (!mounted) return;
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        final parts = [p.street, p.subLocality, p.locality, p.subAdministrativeArea]
-            .where((s) => s != null && s.isNotEmpty)
-            .toList();
+        final parts = [
+          p.street,
+          p.subLocality,
+          p.locality,
+          p.subAdministrativeArea,
+        ].where((s) => s != null && s.isNotEmpty).toList();
         setState(() => _address = parts.join(', '));
       }
     } catch (_) {
@@ -93,9 +106,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         title: const Text('Pilih Lokasi Pengiriman'),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, {'latlng': _picked, 'address': _address}),
-            child: const Text('Pilih', style: TextStyle(fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.pop(context, {
+              'latlng': _picked,
+              'address': _address,
+            }),
+            child: const Text(
+              'Pilih',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -120,7 +138,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     point: _picked,
                     width: 48,
                     height: 48,
-                    child: const Icon(Icons.location_pin, color: Colors.red, size: 48),
+                    child: const HugeIcon(
+                      icon: HugeIcons.strokeRoundedMapPin,
+                      color: Colors.red,
+                      size: 48,
+                    ),
                   ),
                 ],
               ),
@@ -129,7 +151,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
           // Bottom address card
           Positioned(
-            left: 0, right: 0, bottom: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: Container(
               color: Theme.of(context).colorScheme.surface,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -139,21 +163,33 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: Colors.red, size: 20),
+                      const HugeIcon(
+                        icon: HugeIcons.strokeRoundedLocation01,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _resolving
-                            ? const Text('Mendapatkan alamat...',
-                                style: TextStyle(color: Colors.grey))
-                            : Text(_address,
+                            ? const Text(
+                                'Mendapatkan alamat...',
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : Text(
+                                _address,
                                 style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w500)),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text('Ketuk peta untuk memilih titik pengiriman',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text(
+                    'Ketuk peta untuk memilih titik pengiriman',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
               ),
             ),
@@ -166,7 +202,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             child: FloatingActionButton.small(
               heroTag: 'gps_btn',
               onPressed: _centerOnUser,
-              child: const Icon(Icons.my_location),
+              child: const HugeIcon(icon: HugeIcons.strokeRoundedGpsSignal01),
             ),
           ),
         ],

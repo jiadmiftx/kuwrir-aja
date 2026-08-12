@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -59,7 +60,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus akun')),
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal menghapus akun',
+            ),
+          ),
         );
       }
       return;
@@ -107,7 +112,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _user = await onSave(value);
                   if (dialogContext.mounted) Navigator.pop(dialogContext, true);
                 } catch (e) {
-                  setDialogState(() => error = e is ApiException ? e.message : '$e');
+                  setDialogState(
+                    () => error = e is ApiException ? e.message : '$e',
+                  );
                 }
               },
               child: const Text('Simpan'),
@@ -137,15 +144,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: KuwrirColors.primary.withValues(alpha: 0.08),
-                        child: Icon(Icons.person, size: 40, color: KuwrirColors.primary),
+                        backgroundColor: KuwrirColors.primary.withValues(
+                          alpha: 0.08,
+                        ),
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedUser,
+                          size: 40,
+                          color: KuwrirColors.primary,
+                        ),
                       ),
                       const SizedBox(height: 14),
-                      Text(_user?.name.isNotEmpty == true ? _user!.name : 'Tanpa nama',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text(
+                        _user?.name.isNotEmpty == true
+                            ? _user!.name
+                            : 'Tanpa nama',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(_user?.phone ?? '-',
-                          style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
+                      Text(
+                        _user?.phone ?? '-',
+                        style: TextStyle(
+                          color: KuwrirColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -156,31 +181,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       _ProfileRow(
-                        icon: Icons.badge_outlined,
+                        icon: HugeIcons.strokeRoundedBriefcase01,
                         label: 'Nama',
-                        value: _user?.name.isNotEmpty == true ? _user!.name : 'Belum diisi',
+                        value: _user?.name.isNotEmpty == true
+                            ? _user!.name
+                            : 'Belum diisi',
                         onTap: () => _editField(
                           label: 'Nama',
                           currentValue: _user?.name,
                           keyboardType: TextInputType.name,
-                          onSave: (value) => ApiClient().updateProfile(name: value),
+                          onSave: (value) =>
+                              ApiClient().updateProfile(name: value),
                         ),
                       ),
                       Divider(height: 1, color: KuwrirColors.border),
                       _ProfileRow(
-                        icon: Icons.email_outlined,
+                        icon: HugeIcons.strokeRoundedMail01,
                         label: 'Email',
-                        value: _user?.email.isNotEmpty == true ? _user!.email : 'Belum diisi',
+                        value: _user?.email.isNotEmpty == true
+                            ? _user!.email
+                            : 'Belum diisi',
                         onTap: () => _editField(
                           label: 'Email',
                           currentValue: _user?.email,
                           keyboardType: TextInputType.emailAddress,
-                          onSave: (value) => ApiClient().updateProfile(email: value),
+                          onSave: (value) =>
+                              ApiClient().updateProfile(email: value),
                         ),
                       ),
                       Divider(height: 1, color: KuwrirColors.border),
                       _ProfileRow(
-                        icon: Icons.phone_outlined,
+                        icon: HugeIcons.strokeRoundedCall,
                         label: 'No. Telepon',
                         value: _user?.phone ?? '-',
                       ),
@@ -192,7 +223,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 10),
                 _ProfileSoftPanel(
                   child: ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     leading: Container(
                       width: 40,
                       height: 40,
@@ -200,10 +233,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: KuwrirColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.location_on_outlined, size: 18, color: KuwrirColors.primary),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedLocation01,
+                        size: 18,
+                        color: KuwrirColors.primary,
+                      ),
                     ),
-                    title: const Text('Alamat Tersimpan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                    trailing: Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                    title: const Text(
+                      'Alamat Tersimpan',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    trailing: HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
+                      color: KuwrirColors.textHint,
+                    ),
                     onTap: () => Navigator.pushNamed(context, '/addresses'),
                   ),
                 ),
@@ -212,7 +258,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 10),
                 _ProfileSoftPanel(
                   child: ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     leading: Container(
                       width: 40,
                       height: 40,
@@ -220,28 +268,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: KuwrirColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.account_balance_wallet_outlined, size: 18, color: KuwrirColors.primary),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedWallet01,
+                        size: 18,
+                        color: KuwrirColors.primary,
+                      ),
                     ),
-                    title: const Text('Wallet Kuwrir', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                    trailing: Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                    title: const Text(
+                      'Wallet Kuwrir',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    trailing: HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
+                      color: KuwrirColors.textHint,
+                    ),
                     onTap: () => Navigator.pushNamed(context, '/wallet'),
                   ),
                 ),
                 const SizedBox(height: 28),
                 _ProfileSoftPanel(
                   child: ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    leading: Icon(Icons.logout, color: KuwrirColors.error),
-                    title: Text('Keluar', style: TextStyle(color: KuwrirColors.error, fontWeight: FontWeight.w600)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    leading: HugeIcon(
+                      icon: HugeIcons.strokeRoundedLogout01,
+                      color: KuwrirColors.error,
+                    ),
+                    title: Text(
+                      'Keluar',
+                      style: TextStyle(
+                        color: KuwrirColors.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     onTap: _logout,
                   ),
                 ),
                 const SizedBox(height: 12),
                 _ProfileSoftPanel(
                   child: ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    leading: Icon(Icons.delete_forever_outlined, color: KuwrirColors.error),
-                    title: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error, fontWeight: FontWeight.w600)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    leading: HugeIcon(
+                      icon: HugeIcons.strokeRoundedDelete02,
+                      color: KuwrirColors.error,
+                    ),
+                    title: Text(
+                      'Hapus Akun',
+                      style: TextStyle(
+                        color: KuwrirColors.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     onTap: _deleteAccount,
                   ),
                 ),
@@ -288,11 +371,16 @@ class _ProfileSoftPanel extends StatelessWidget {
 }
 
 class _ProfileRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
   final String value;
   final VoidCallback? onTap;
-  const _ProfileRow({required this.icon, required this.label, required this.value, this.onTap});
+  const _ProfileRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -304,11 +392,23 @@ class _ProfileRow extends StatelessWidget {
           color: KuwrirColors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 18, color: KuwrirColors.primary),
+        child: HugeIcon(icon: icon, size: 18, color: KuwrirColors.primary),
       ),
-      title: Text(label, style: const TextStyle(fontSize: 13, color: KuwrirColors.textSecondary)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
-      trailing: onTap != null ? Icon(Icons.edit_outlined, size: 18, color: KuwrirColors.textHint) : null,
+      title: Text(
+        label,
+        style: const TextStyle(fontSize: 13, color: KuwrirColors.textSecondary),
+      ),
+      subtitle: Text(
+        value,
+        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+      ),
+      trailing: onTap != null
+          ? HugeIcon(
+              icon: HugeIcons.strokeRoundedEdit02,
+              size: 18,
+              color: KuwrirColors.textHint,
+            )
+          : null,
       onTap: onTap,
     );
   }
