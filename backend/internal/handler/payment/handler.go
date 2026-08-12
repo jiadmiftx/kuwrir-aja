@@ -60,12 +60,12 @@ type CreatePaymentRequest struct {
 // enabled for this merchant at the given amount, so the checkout screen
 // renders real channels instead of a hardcoded guess.
 //
-// Only QRIS is surfaced to customers for now — Duitku's account for this
-// merchant routes QRIS through a single acquirer and names the channel
-// "LINKAJA QRIS" in paymentName, but customers should just see "QRIS".
-// Every other channel (VA, e-wallet, credit card, retail, PayLater) is
-// filtered out here rather than in each client, so customer_app and
-// web_app can't drift on which methods are actually offered.
+// Every channel Duitku returns is passed through — customers can still pick
+// VA/e-wallet/etc. Only the label gets normalized: Duitku's account for
+// this merchant routes QRIS through a single acquirer and names the
+// channel "LINKAJA QRIS" in paymentName, but customers should just see
+// "QRIS", not the acquirer's brand. Normalizing here (not in each client)
+// means customer_app and web_app can't drift on the label.
 func (h *Handler) GetPaymentMethods(c *gin.Context) {
 	amount, err := strconv.ParseInt(c.Query("amount"), 10, 64)
 	if err != nil || amount <= 0 {
@@ -79,15 +79,13 @@ func (h *Handler) GetPaymentMethods(c *gin.Context) {
 		return
 	}
 
-	qrisOnly := make([]service.DuitkuPaymentMethod, 0, 1)
-	for _, m := range methods {
+	for i, m := range methods {
 		if strings.Contains(strings.ToUpper(m.PaymentName), "QRIS") {
-			m.PaymentName = "QRIS"
-			qrisOnly = append(qrisOnly, m)
+			methods[i].PaymentName = "QRIS"
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"payment_methods": qrisOnly})
+	c.JSON(http.StatusOK, gin.H{"payment_methods": methods})
 }
 
 // CreatePayment creates a Duitku payment link for a pending order.
