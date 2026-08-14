@@ -432,6 +432,12 @@ type Order struct {
 	PickedUpAt      *time.Time `json:"picked_up_at,omitempty"`
 	DeliveredAt     *time.Time `json:"delivered_at,omitempty"`
 	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`
+	// CancellationReason is set whenever a merchant rejects (pending) or
+	// cancels (confirmed/preparing) an order — surfaced to the customer via
+	// push notification and the order detail screen, instead of the
+	// generic "order cancelled" text it used to be silently discarded
+	// behind (see service.CancelOrderAndRefund).
+	CancellationReason *string `json:"cancellation_reason,omitempty"`
 	ItemPickedUpAt  *time.Time `json:"item_picked_up_at,omitempty"`  // barang diambil dari customer
 	InServiceAt     *time.Time `json:"in_service_at,omitempty"`      // mulai dikerjakan
 	ReadyForReturnAt *time.Time `json:"ready_for_return_at,omitempty"` // selesai dikerjakan
@@ -765,6 +771,45 @@ type DeliveryZone struct {
 }
 
 // RefundRequest tracks a customer's refund request and admin resolution.
+// Reason categories shared by the merchant reject-order and
+// item-replacement-request flows — quick-select chips client-side, with
+// "lainnya" (other) allowing free text via the accompanying Reason field.
+const (
+	ReasonCategoryStockOut        = "stok_habis"
+	ReasonCategoryStoreClosed     = "toko_tutup"
+	ReasonCategoryItemUnavailable = "item_tidak_tersedia"
+	ReasonCategoryOther           = "lainnya"
+)
+
+// OrderModificationRequest tracks a merchant-initiated "this item is out of
+// stock" flag on an already-accepted order, waiting on the customer to pick
+// a replacement product or cancel. At most one unresolved (status=pending)
+// request should exist per order at a time — enforced by the handler, not
+// a DB constraint, since Status also needs to reach terminal states.
+type OrderModificationRequest struct {
+	Base
+	OrderID        uuid.UUID  `gorm:"type:uuid;not null;index" json:"order_id"`
+	RemovedItemID  uuid.UUID  `gorm:"type:uuid;not null" json:"removed_item_id"`
+	ReasonCategory string     `gorm:"type:varchar(30);not null" json:"reason_category"`
+	Reason         string     `json:"reason,omitempty"`
+	// pending → replaced | cancelled | expired
+	Status string     `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
+	ExpiresAt   time.Time  `gorm:"not null" json:"expires_at"`
+	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
+
+	// Populated only on the "replace" resolution path when the new total is
+	// higher and the customer opts to top up via Duitku rather than COD —
+	// kept here rather than overloading Order's single payment_status,
+	// since the order's original payment may already be independently
+	// "paid" while this top-up is still pending.
+	TopupAmount        float64 `gorm:"default:0" json:"topup_amount,omitempty"`
+	TopupPaymentStatus string  `gorm:"type:varchar(20);default:''" json:"topup_payment_status,omitempty"` // '', pending, paid, failed
+	TopupPaymentRef    string  `json:"topup_payment_ref,omitempty"`
+	TopupPaymentURL    string  `json:"topup_payment_url,omitempty"`
+
+	Order Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+}
+
 type RefundRequest struct {
 	Base
 	OrderID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"order_id"`

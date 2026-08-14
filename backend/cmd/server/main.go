@@ -99,6 +99,8 @@ func main() {
 		&model.DeliveryZone{},
 		// Refund requests
 		&model.RefundRequest{},
+		// Merchant-initiated item-out-of-stock -> customer picks replacement
+		&model.OrderModificationRequest{},
 		// In-order chat messages
 		&model.ChatMessage{},
 		// Customer ↔ Admin support chat
@@ -275,7 +277,7 @@ func main() {
 			merchOrderH.RegisterRoutes(merchOrderRoutes)
 
 			// Customer order routes
-			custH := customerHandler.NewHandler(db)
+			custH := customerHandler.NewHandler(db, cfg)
 			custRoutes := protected.Group("")
 			custRoutes.Use(middleware.RoleMiddleware("customer"))
 			custH.RegisterRoutes(custRoutes)

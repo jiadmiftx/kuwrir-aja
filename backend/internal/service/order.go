@@ -37,10 +37,14 @@ func CancelOrderAndRefund(db *gorm.DB, order *model.Order, reason string) error 
 	}
 
 	now := time.Now()
-	if err := tx.Model(order).Updates(map[string]interface{}{
+	updates := map[string]interface{}{
 		"status":       model.OrderStatusCancelled,
 		"cancelled_at": &now,
-	}).Error; err != nil {
+	}
+	if reason != "" {
+		updates["cancellation_reason"] = &reason
+	}
+	if err := tx.Model(order).Updates(updates).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("cancel order: %w", err)
 	}
@@ -52,5 +56,9 @@ func CancelOrderAndRefund(db *gorm.DB, order *model.Order, reason string) error 
 		}
 	}
 
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	PublishOrderStatusEvent(order.ID.String(), string(model.OrderStatusCancelled))
+	return nil
 }

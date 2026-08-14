@@ -19,11 +19,19 @@ import (
 )
 
 type Handler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg *config.Config
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
+	return &Handler{db: db, cfg: cfg}
+}
+
+// duitku builds a client from the current admin-configured settings on
+// every call, mirroring payment.Handler.duitku — needed here for the order
+// item-replacement top-up payment (see ResolveModificationRequest).
+func (h *Handler) duitku() *service.DuitkuClient {
+	return service.LoadDuitkuClient(h.db, h.cfg)
 }
 
 // RegisterRoutes sets up customer order routes
@@ -34,10 +42,14 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/quote", h.QuoteOrder)
 		orders.GET("", h.MyOrders)
 		orders.GET("/:id", h.GetOrder)
+		orders.GET("/:id/stream", h.StreamOrderStatus)
 		orders.POST("/:id/cancel", h.CancelOrder)
 		orders.POST("/:id/refund-request", h.RequestRefund)
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
+		orders.GET("/:id/chat/stream", h.StreamChat)
+		orders.GET("/:id/modification-request", h.GetModificationRequest)
+		orders.POST("/:id/modification-request/:reqId/resolve", h.ResolveModificationRequest)
 	}
 
 	addresses := r.Group("/addresses")
@@ -782,6 +794,71 @@ func (h *Handler) GetOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"order": order})
 }
 
+// isTerminalOrderStatus reports whether an order's status will never
+// change again — the stream can close right after sending one of these
+// instead of holding the connection open for nothing.
+func isTerminalOrderStatus(status model.OrderStatus) bool {
+	return status == model.OrderStatusDelivered ||
+		status == model.OrderStatusCancelled ||
+		status == model.OrderStatusReturned
+}
+
+// StreamOrderStatus holds an SSE connection open for a single order and
+// pushes its status the instant a merchant/driver action changes it (see
+// PublishOrderStatusEvent call sites: transitionOrder, MarkPickedUp,
+// MarkDelivered, CancelOrderAndRefund) — replaces the client having to
+// poll GetOrder every ~12s while an order is in flight. Mirrors
+// payment.Handler.StreamPaymentStatus exactly.
+func (h *Handler) StreamOrderStatus(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	writeEvent := func(status model.OrderStatus) {
+		c.SSEvent("order_status", service.OrderStatusEvent{OrderID: order.ID.String(), Status: string(status)})
+		c.Writer.Flush()
+	}
+
+	// Send the current status right away — closes the race where the
+	// status already changed before the client opened the stream.
+	writeEvent(order.Status)
+	if isTerminalOrderStatus(order.Status) {
+		return
+	}
+
+	events, unsubscribe := service.SubscribeOrderStatusEvents(order.ID.String())
+	defer unsubscribe()
+
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case evt := <-events:
+			status := model.OrderStatus(evt.Status)
+			writeEvent(status)
+			if isTerminalOrderStatus(status) {
+				return
+			}
+		case <-heartbeat.C:
+			c.Writer.WriteString(": keep-alive\n\n")
+			c.Writer.Flush()
+		}
+	}
+}
+
 // CancelOrder cancels an order (only if pending)
 func (h *Handler) CancelOrder(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -823,6 +900,8 @@ func (h *RestaurantOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("", h.ActiveOrders)
 		orders.POST("/:id/accept", h.AcceptOrder)
 		orders.POST("/:id/reject", h.RejectOrder)
+		orders.POST("/:id/cancel", h.CancelAcceptedOrder)
+		orders.POST("/:id/request-item-change", h.RequestItemChange)
 		orders.POST("/:id/preparing", h.MarkPreparing)
 		orders.POST("/:id/ready", h.MarkReady)
 	}
@@ -898,13 +977,153 @@ func (h *RestaurantOrderHandler) RejectOrder(c *gin.Context) {
 	}
 
 	if order.CustomerID != nil {
+		body := fmt.Sprintf("Order #%s ditolak merchant. Dana dikembalikan ke wallet kamu.", order.OrderNumber)
+		if req.Reason != "" {
+			body = fmt.Sprintf("Order #%s ditolak: %s. Dana dikembalikan ke wallet kamu.", order.OrderNumber, req.Reason)
+		}
 		service.SendToUser(h.db, *order.CustomerID,
 			"Pesanan Ditolak",
-			fmt.Sprintf("Order #%s ditolak merchant. Dana dikembalikan ke wallet kamu.", order.OrderNumber),
+			body,
 			map[string]string{"order_id": order.ID.String(), "type": "order_status"})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order rejected", "status": model.OrderStatusCancelled})
+}
+
+// CancelAcceptedOrder cancels an order the merchant already accepted but
+// can no longer fulfill (e.g. discovered out of stock after confirming) —
+// RejectOrder only covers the pre-accept (pending) case. Allowed up through
+// "preparing"; once "ready" a driver may already be en route to pick up,
+// so cancellation from that point needs admin (POST /orders/:id/admin-cancel),
+// not a self-service merchant action.
+func (h *RestaurantOrderHandler) CancelAcceptedOrder(c *gin.Context) {
+	orderID := c.Param("id")
+	userID := c.GetString("user_id")
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ? AND status IN ?", orderID, merchant.ID,
+		[]string{string(model.OrderStatusConfirmed), string(model.OrderStatusPreparing)}).
+		First(&order).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or can no longer be cancelled at this stage"})
+		return
+	}
+
+	reason := req.Reason
+	if reason == "" {
+		reason = fmt.Sprintf("Order cancelled by merchant: %s", order.OrderNumber)
+	}
+	if err := service.CancelOrderAndRefund(h.db, &order, reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		return
+	}
+
+	if order.CustomerID != nil {
+		body := fmt.Sprintf("Order #%s dibatalkan merchant. Dana dikembalikan ke wallet kamu.", order.OrderNumber)
+		if req.Reason != "" {
+			body = fmt.Sprintf("Order #%s dibatalkan: %s. Dana dikembalikan ke wallet kamu.", order.OrderNumber, req.Reason)
+		}
+		service.SendToUser(h.db, *order.CustomerID,
+			"Pesanan Dibatalkan",
+			body,
+			map[string]string{"order_id": order.ID.String(), "type": "order_status"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order cancelled", "status": model.OrderStatusCancelled})
+}
+
+// RequestItemChange flags one item on an already-accepted order as
+// unavailable and routes the customer to pick a replacement (or cancel the
+// whole order) — see ResolveModificationRequest for the customer-side half.
+// Unlike CancelAcceptedOrder this doesn't cancel anything itself; it just
+// opens the request and waits (or auto-expires, see the SLA sweeper).
+func (h *RestaurantOrderHandler) RequestItemChange(c *gin.Context) {
+	orderID := c.Param("id")
+	userID := c.GetString("user_id")
+
+	var req struct {
+		ItemID         string `json:"item_id" binding:"required"`
+		ReasonCategory string `json:"reason_category" binding:"required"`
+		Reason         string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ? AND status IN ?", orderID, merchant.ID,
+		[]string{string(model.OrderStatusConfirmed), string(model.OrderStatusPreparing)}).
+		First(&order).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or not in a modifiable status"})
+		return
+	}
+
+	itemID, err := uuid.Parse(req.ItemID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid item_id"})
+		return
+	}
+	var item model.OrderItem
+	if err := h.db.Where("id = ? AND order_id = ?", itemID, order.ID).First(&item).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Item does not belong to this order"})
+		return
+	}
+
+	// Only one unresolved request per order at a time.
+	var existing model.OrderModificationRequest
+	if err := h.db.Where("order_id = ? AND status = ?", order.ID, "pending").First(&existing).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This order already has a pending item-change request"})
+		return
+	}
+
+	modReq := model.OrderModificationRequest{
+		OrderID:        order.ID,
+		RemovedItemID:  itemID,
+		ReasonCategory: req.ReasonCategory,
+		Reason:         req.Reason,
+		Status:         "pending",
+		ExpiresAt:      time.Now().Add(15 * time.Minute),
+	}
+	if err := h.db.Create(&modReq).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create item-change request"})
+		return
+	}
+
+	if order.CustomerID != nil {
+		body := fmt.Sprintf("%s di pesanan #%s tidak tersedia. Pilih pengganti sebelum %d menit.",
+			item.ItemName, order.OrderNumber, 15)
+		if req.Reason != "" {
+			body = fmt.Sprintf("%s di pesanan #%s tidak tersedia (%s). Pilih pengganti sebelum %d menit.",
+				item.ItemName, order.OrderNumber, req.Reason, 15)
+		}
+		service.SendToUser(h.db, *order.CustomerID,
+			"Item Pesanan Perlu Diganti",
+			body,
+			map[string]string{
+				"order_id":                order.ID.String(),
+				"modification_request_id": modReq.ID.String(),
+				"type":                    "item_change_requested",
+			})
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"modification_request": modReq})
 }
 
 // MarkPreparing transitions: confirmed → preparing
@@ -937,6 +1156,16 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Order payment not yet completed"})
 		return
 	}
+	// Block progressing past confirmed/preparing while the customer hasn't
+	// resolved a pending item-replacement request yet — the order might
+	// still end up cancelled or with a different item list.
+	if to == model.OrderStatusPreparing || to == model.OrderStatusReady {
+		var pendingMod model.OrderModificationRequest
+		if h.db.Where("order_id = ? AND status = ?", order.ID, "pending").First(&pendingMod).Error == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Order has a pending item-replacement request awaiting customer response"})
+			return
+		}
+	}
 
 	updates := map[string]interface{}{"status": to}
 	if timestampField != "" {
@@ -945,6 +1174,7 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 	}
 
 	h.db.Model(&order).Updates(updates)
+	service.PublishOrderStatusEvent(order.ID.String(), string(to))
 
 	// Push notifications to customer on key status changes
 	if order.CustomerID != nil {
@@ -990,6 +1220,7 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/:id/deliver", h.MarkDelivered)
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
+		orders.GET("/:id/chat/stream", h.StreamChat)
 		orders.GET("/:id/road-route", h.GetRoadRoute)
 	}
 }
@@ -1183,6 +1414,7 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot mark as picked up"})
 		return
 	}
+	service.PublishOrderStatusEvent(orderID, string(model.OrderStatusPickedUp))
 
 	// Notify customer that order is on the way, and hand the updated order
 	// back to the driver app — without this it can't tell locally that
@@ -1284,6 +1516,7 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete delivery"})
 		return
 	}
+	service.PublishOrderStatusEvent(orderUUID.String(), string(model.OrderStatusDelivered))
 
 	// Notify customer that order has arrived
 	if order.CustomerID != nil {
@@ -1328,6 +1561,28 @@ func (h *DriverOrderHandler) GetChat(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
+// StreamChat is the driver side of the order-chat SSE stream — same
+// trigger-only event, same ownership-check-then-subscribe shape as
+// Handler.StreamChat, just checking driver_id instead of customer_id.
+func (h *DriverOrderHandler) StreamChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND driver_id = ?", orderID, driver.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	streamChatEvents(c, order.ID.String())
+}
+
 // SendChat sends a chat message from driver to customer.
 func (h *DriverOrderHandler) SendChat(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -1362,6 +1617,7 @@ func (h *DriverOrderHandler) SendChat(c *gin.Context) {
 		Text:       req.Text,
 	}
 	h.db.Create(&msg)
+	service.PublishChatEvent(orderID)
 
 	// Notify customer
 	if order.CustomerID != nil {
@@ -1421,6 +1677,245 @@ func (h *Handler) RequestRefund(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"refund": refund, "message": "Refund request submitted. Admin will review within 1-2 business days."})
 }
 
+// GetModificationRequest returns the pending item-change request (if any)
+// for an order — the customer app polls/opens this to render the
+// pick-a-replacement screen after the "Item Pesanan Perlu Diganti" push.
+func (h *Handler) GetModificationRequest(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var modReq model.OrderModificationRequest
+	if err := h.db.Where("order_id = ? AND status = ?", order.ID, "pending").First(&modReq).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No pending modification request for this order"})
+		return
+	}
+
+	var removedItem model.OrderItem
+	h.db.Where("id = ?", modReq.RemovedItemID).First(&removedItem)
+
+	c.JSON(http.StatusOK, gin.H{"modification_request": modReq, "removed_item": removedItem})
+}
+
+// extractVariantIDs recovers the variant IDs originally selected for an
+// OrderItem from its VariantsJSON snapshot — needed to re-run
+// calculateOrderPricing for the item-replacement flow's untouched items
+// (their variant selection has to survive the swap unchanged).
+func extractVariantIDs(variantsJSON *string) []string {
+	if variantsJSON == nil || *variantsJSON == "" {
+		return nil
+	}
+	var snapshots []selectedVariantSnapshot
+	if err := json.Unmarshal([]byte(*variantsJSON), &snapshots); err != nil {
+		return nil
+	}
+	ids := make([]string, 0, len(snapshots))
+	for _, s := range snapshots {
+		ids = append(ids, s.ID)
+	}
+	return ids
+}
+
+// ResolveModificationRequest is the customer's response to a pending
+// item-change request: either "replace" (pick a substitute product from
+// the same merchant, recomputes the order total and settles the
+// difference) or "cancel" (whole order cancelled + refunded, same as
+// CancelOrderAndRefund).
+func (h *Handler) ResolveModificationRequest(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+	reqID := c.Param("reqId")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var modReq model.OrderModificationRequest
+	if err := h.db.Where("id = ? AND order_id = ? AND status = ?", reqID, order.ID, "pending").First(&modReq).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Modification request not found or already resolved"})
+		return
+	}
+
+	var body struct {
+		Action     string   `json:"action" binding:"required"` // replace | cancel
+		ProductID  string   `json:"product_id"`
+		VariantIDs []string `json:"variant_ids"`
+		Quantity   int      `json:"quantity"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+
+	if body.Action == "cancel" {
+		reason := fmt.Sprintf("Customer cancelled after item unavailable: %s", order.OrderNumber)
+		if err := service.CancelOrderAndRefund(h.db, &order, reason); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+			return
+		}
+		h.db.Model(&modReq).Updates(map[string]interface{}{"status": "cancelled", "resolved_at": &now})
+		if order.MerchantID != nil {
+			var merchant model.Merchant
+			if h.db.Where("id = ?", *order.MerchantID).First(&merchant).Error == nil {
+				service.SendToUser(h.db, merchant.UserID, "Pesanan Dibatalkan Customer",
+					fmt.Sprintf("Order #%s dibatalkan customer setelah item tidak tersedia.", order.OrderNumber),
+					map[string]string{"order_id": order.ID.String(), "type": "order_status"})
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"order": order, "status": "cancelled"})
+		return
+	}
+
+	if body.Action != "replace" || body.ProductID == "" || body.Quantity < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "product_id and quantity are required to replace an item"})
+		return
+	}
+	if order.MerchantID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order has no merchant"})
+		return
+	}
+	var merchant model.Merchant
+	if err := h.db.Where("id = ?", *order.MerchantID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var existingItems []model.OrderItem
+	h.db.Where("order_id = ?", order.ID).Find(&existingItems)
+
+	newItemsReq := make([]OrderItemRequest, 0, len(existingItems))
+	for _, it := range existingItems {
+		if it.ID == modReq.RemovedItemID || it.ProductID == nil {
+			continue
+		}
+		newItemsReq = append(newItemsReq, OrderItemRequest{
+			ProductID:  it.ProductID.String(),
+			Quantity:   it.Quantity,
+			Notes:      it.Notes,
+			VariantIDs: extractVariantIDs(it.VariantsJSON),
+		})
+	}
+	newItemsReq = append(newItemsReq, OrderItemRequest{
+		ProductID:  body.ProductID,
+		Quantity:   body.Quantity,
+		VariantIDs: body.VariantIDs,
+	})
+
+	settings := h.loadSettings()
+	pricingSettings := pricing.LoadSettings(h.db)
+	result, perr := h.calculateOrderPricing(merchant, newItemsReq, order.DropoffLat, order.DropoffLng,
+		order.PaymentType, order.PromoCode, settings, pricingSettings)
+	if perr != nil {
+		c.JSON(perr.Status, gin.H{"error": perr.Message})
+		return
+	}
+
+	oldTotal := order.Total
+	delta := result.GrandTotal - oldTotal
+
+	tx := h.db.Begin()
+	if err := tx.Where("order_id = ?", order.ID).Delete(&model.OrderItem{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace item"})
+		return
+	}
+	for i := range result.OrderItems {
+		result.OrderItems[i].OrderID = order.ID
+	}
+	if err := tx.Create(&result.OrderItems).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to replace item"})
+		return
+	}
+	if err := tx.Model(&order).Updates(map[string]interface{}{
+		"subtotal":        result.SubtotalWithMarkup,
+		"platform_markup": result.TotalPlatformMarkup,
+		"tax_amount":      result.TaxAmount,
+		"app_service_fee": result.AppServiceFee,
+		"packaging_fee":   result.TotalPackagingFee,
+		"merchant_payout": result.MerchantPayout,
+		"total":           result.GrandTotal,
+	}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order total"})
+		return
+	}
+
+	var topupURL string
+	switch {
+	case delta < -0.01:
+		// New total is cheaper — refund the difference if this order was
+		// already paid online; a cash order just collects less on delivery.
+		if order.PaymentStatus == "paid" && order.CustomerID != nil {
+			if err := service.CreditWallet(tx, *order.CustomerID, -delta, "refund", &order.ID,
+				fmt.Sprintf("Selisih harga penggantian item, order #%s", order.OrderNumber)); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund difference"})
+				return
+			}
+		}
+	case delta > 0.01 && order.PaymentType != "cash":
+		// Paid online: the extra amount needs its own Duitku link — can't
+		// reuse the original order payment, which may already be "paid".
+		customerName, email := "", "customer@kuwrir.com"
+		if order.CustomerID != nil {
+			var customer model.User
+			if h.db.Where("id = ?", *order.CustomerID).First(&customer).Error == nil {
+				customerName = customer.Name
+				if customer.Email != "" {
+					email = customer.Email
+				}
+			}
+		}
+		merchantOrderID := fmt.Sprintf("ORDMOD-%s", modReq.ID.String())
+		resp, err := h.duitku().CreatePayment(modReq.ID.String(), merchantOrderID, int64(delta),
+			customerName, email, order.PaymentType, fmt.Sprintf("Selisih pesanan %s", order.OrderNumber))
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to create top-up payment: " + err.Error()})
+			return
+		}
+		topupURL = resp.PaymentURL
+		if err := tx.Model(&modReq).Updates(map[string]interface{}{
+			"topup_amount":         delta,
+			"topup_payment_status": "pending",
+			"topup_payment_ref":    merchantOrderID,
+			"topup_payment_url":    topupURL,
+		}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save top-up payment"})
+			return
+		}
+		// delta > 0 and cash: nothing to do — the higher total is simply
+		// collected on delivery.
+	}
+
+	if err := tx.Model(&modReq).Updates(map[string]interface{}{"status": "replaced", "resolved_at": &now}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve modification request"})
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save changes"})
+		return
+	}
+
+	service.SendToUser(h.db, merchant.UserID, "Item Diganti Customer",
+		fmt.Sprintf("Customer memilih pengganti untuk order #%s. Pesanan bisa dilanjutkan.", order.OrderNumber),
+		map[string]string{"order_id": order.ID.String(), "type": "order_status"})
+
+	c.JSON(http.StatusOK, gin.H{"order": order, "topup_payment_url": topupURL})
+}
+
 // GetChat returns chat messages for an order (customer side).
 func (h *Handler) GetChat(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -1436,6 +1931,53 @@ func (h *Handler) GetChat(c *gin.Context) {
 	var msgs []model.ChatMessage
 	h.db.Where("order_id = ?", orderID).Order("created_at ASC").Find(&msgs)
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// StreamChat holds an SSE connection open for a single order's chat and
+// pushes a trigger event the instant either side sends a message (see
+// PublishChatEvent call sites in this SendChat and DriverOrderHandler's) —
+// replaces the client having to poll GetChat every few seconds. No
+// terminal state: runs until the client disconnects (screen dispose).
+func (h *Handler) StreamChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	streamChatEvents(c, order.ID.String())
+}
+
+// streamChatEvents is the shared SSE loop for both the customer and driver
+// chat streams — they differ only in the ownership check performed before
+// calling this.
+func streamChatEvents(c *gin.Context, orderID string) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	events, unsubscribe := service.SubscribeChatEvents(orderID)
+	defer unsubscribe()
+
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case evt := <-events:
+			c.SSEvent("chat_message", evt)
+			c.Writer.Flush()
+		case <-heartbeat.C:
+			c.Writer.WriteString(": keep-alive\n\n")
+			c.Writer.Flush()
+		}
+	}
 }
 
 // SendChat sends a chat message from customer to driver.
@@ -1466,6 +2008,7 @@ func (h *Handler) SendChat(c *gin.Context) {
 		Text:       req.Text,
 	}
 	h.db.Create(&msg)
+	service.PublishChatEvent(orderID)
 
 	// Notify driver if assigned
 	if order.DriverID != nil {

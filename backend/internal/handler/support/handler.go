@@ -2,6 +2,7 @@ package support
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ func NewHandler(db *gorm.DB) *Handler {
 func (h *Handler) RegisterCustomerRoutes(r *gin.RouterGroup) {
 	r.GET("/support/messages", h.GetMyMessages)
 	r.POST("/support/messages", h.SendMessage)
+	r.GET("/support/messages/stream", h.StreamSupportMessages)
 }
 
 func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
@@ -54,6 +56,43 @@ func (h *Handler) GetMyMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
+// StreamSupportMessages holds an SSE connection open for the requesting
+// user's support thread and pushes a trigger event whenever a new message
+// lands on either side (customer's own SendMessage or admin's ReplyToUser)
+// — replaces the client having to poll GetMyMessages every few seconds.
+// No terminal state: runs until the client disconnects.
+func (h *Handler) StreamSupportMessages(c *gin.Context) {
+	userIDStr := c.GetString("user_id")
+	if _, err := uuid.Parse(userIDStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user"})
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	events, unsubscribe := service.SubscribeSupportEvents(userIDStr)
+	defer unsubscribe()
+
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case evt := <-events:
+			c.SSEvent("support_message", evt)
+			c.Writer.Flush()
+		case <-heartbeat.C:
+			c.Writer.WriteString(": keep-alive\n\n")
+			c.Writer.Flush()
+		}
+	}
+}
+
 type sendMsgRequest struct {
 	Text string `json:"text" binding:"required"`
 }
@@ -82,6 +121,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message"})
 		return
 	}
+	service.PublishSupportEvent(userID.String())
 
 	// Notify all admins via FCM
 	var admins []model.User
@@ -169,6 +209,7 @@ func (h *Handler) ReplyToUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save reply"})
 		return
 	}
+	service.PublishSupportEvent(targetUserID.String())
 
 	// Notify customer
 	service.SendToUser(h.db, targetUserID, "Balasan dari Admin", req.Text, map[string]string{

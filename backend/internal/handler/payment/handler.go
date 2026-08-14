@@ -263,6 +263,12 @@ func (h *Handler) Callback(c *gin.Context) {
 		return
 	}
 
+	if strings.HasPrefix(payload.MerchantOrderID, "ORDMOD-") {
+		h.handleOrderModTopupCallback(payload.MerchantOrderID, payload.ResultCode)
+		c.String(http.StatusOK, "OK")
+		return
+	}
+
 	var order model.Order
 	if err := h.db.Where("order_number = ?", payload.MerchantOrderID).First(&order).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
@@ -313,6 +319,27 @@ func (h *Handler) handleTopupCallback(merchantOrderID, resultCode string) {
 		return
 	}
 	tx.Commit()
+}
+
+// handleOrderModTopupCallback marks the top-up payment on an item-replacement
+// modification request as paid — this is the delta charged when a customer
+// swaps for a pricier item after the merchant flagged the original one
+// unavailable (see customer.Handler.ResolveModificationRequest). Tracked
+// separately from the order's own payment_status since that may already be
+// "paid" independently of this top-up.
+func (h *Handler) handleOrderModTopupCallback(merchantOrderID, resultCode string) {
+	var modReq model.OrderModificationRequest
+	if err := h.db.Where("topup_payment_ref = ?", merchantOrderID).First(&modReq).Error; err != nil {
+		return
+	}
+	if modReq.TopupPaymentStatus != "pending" {
+		return
+	}
+	if resultCode != "00" {
+		h.db.Model(&modReq).Update("topup_payment_status", "failed")
+		return
+	}
+	h.db.Model(&modReq).Update("topup_payment_status", "paid")
 }
 
 // SimulatePaid marks an order as paid without calling Duitku.
