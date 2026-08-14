@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'register_screen.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Merchant waiting for admin verification.
 /// Polls GET /my-store/status every 30s.
@@ -79,11 +80,11 @@ class _MerchantPendingScreenState extends State<MerchantPendingScreen> {
     }
   }
 
-  IconData get _icon {
+  List<List<dynamic>> get _icon {
     switch (_status) {
-      case 'approved': return Icons.check_rounded;
-      case 'rejected': return Icons.priority_high_rounded;
-      default: return Icons.hourglass_top_rounded;
+      case 'approved': return HugeIcons.strokeRoundedTick01;
+      case 'rejected': return HugeIcons.strokeRoundedAlertCircle;
+      default: return HugeIcons.strokeRoundedHourglass;
     }
   }
 
@@ -198,7 +199,7 @@ class _MerchantPendingScreenState extends State<MerchantPendingScreen> {
                           ? const SizedBox(
                               width: 15, height: 15,
                               child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.refresh_rounded, size: 18),
+                          : const HugeIcon(icon: HugeIcons.strokeRoundedRefresh, size: 18),
                       label: const Text('Perbarui Status', style: TextStyle(fontWeight: FontWeight.w600)),
                     ),
                   if (_status == 'rejected')
@@ -255,7 +256,7 @@ class _InitialLoading extends StatelessWidget {
 class _StatusBadge extends StatelessWidget {
   final Color color;
   final Color soft;
-  final IconData icon;
+  final List<List<dynamic>> icon;
   const _StatusBadge({super.key, required this.color, required this.soft, required this.icon});
 
   @override
@@ -288,7 +289,7 @@ class _StatusBadge extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, size: 40, color: color),
+            child: HugeIcon(icon: icon, size: 40, color: color),
           ),
         ],
       ),
@@ -324,7 +325,7 @@ class _VerificationTracker extends StatelessWidget {
         color: done ? KuwrirColors.primary : (active ? Colors.white : KuwrirColors.border),
         border: active ? Border.all(color: KuwrirColors.primary, width: 2.5) : null,
       ),
-      child: done ? const Icon(Icons.check, size: 7, color: Colors.white) : null,
+      child: done ? const HugeIcon(icon: HugeIcons.strokeRoundedTick01, size: 7, color: Colors.white) : null,
     );
   }
 
@@ -359,7 +360,7 @@ class _NoteCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline_rounded, size: 16, color: accent),
+              HugeIcon(icon: HugeIcons.strokeRoundedInformationCircle, size: 16, color: accent),
               const SizedBox(width: 8),
               Text(
                 'Catatan Admin',

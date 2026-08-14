@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Piutang / Tab pelanggan untuk POS Merchant
 /// Mirip fitur piutang di finansial-mac
@@ -58,7 +59,7 @@ class _KasirReceivablesScreenState extends State<KasirReceivablesScreen> {
         title: const Text('Piutang / Tab Pelanggan'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
             tooltip: 'Catat piutang manual',
             onPressed: _showAddReceivableDialog,
           ),
@@ -77,7 +78,7 @@ class _KasirReceivablesScreenState extends State<KasirReceivablesScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.arrow_forward, color: Colors.white),
+                const HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, color: Colors.white),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,7 +190,7 @@ class _KasirReceivablesScreenState extends State<KasirReceivablesScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Icon(Icons.event, size: 14, color: isOverdue ? Colors.red : Colors.grey),
+                    HugeIcon(icon: HugeIcons.strokeRoundedCalendar03, size: 14, color: isOverdue ? Colors.red : Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       'Jatuh tempo: ${r.dueDate!.day}/${r.dueDate!.month}/${r.dueDate!.year}',
@@ -207,14 +208,14 @@ class _KasirReceivablesScreenState extends State<KasirReceivablesScreen> {
                 child: Row(
                   children: [
                     OutlinedButton.icon(
-                      icon: const Icon(Icons.history, size: 16),
+                      icon: const HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: 16),
                       label: const Text('Riwayat'),
                       onPressed: () => _showPaymentHistory(r),
                       style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
-                      icon: const Icon(Icons.payment, size: 16),
+                      icon: const HugeIcon(icon: HugeIcons.strokeRoundedPayment01, size: 16),
                       label: const Text('Terima Bayar'),
                       onPressed: () => _showPaymentDialog(r),
                       style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),

@@ -90,11 +90,16 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _confirmClearCart() async {
+  /// Deleting an item is only reachable by decrementing its own quantity
+  /// down to zero (see `_CartItemCard.onDecrement` below) — there's no
+  /// global "empty cart" shortcut, so this only ever confirms removing the
+  /// one item the customer was already adjusting.
+  Future<void> _confirmRemoveItem(CartItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Kosongkan keranjang?'),
+        title: Text('Hapus ${item.product.name}?'),
+        content: const Text('Item ini akan dihapus dari keranjang.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -107,7 +112,12 @@ class _CartScreenState extends State<CartScreen> {
         ],
       ),
     );
-    if (confirmed == true && mounted) context.read<CartCubit>().clear();
+    if (confirmed == true && mounted) {
+      context.read<CartCubit>().removeItem(
+        item.product.id,
+        variantKey: item.variantKey,
+      );
+    }
   }
 
   Future<void> _goToSummary(CartState cart) async {
@@ -151,17 +161,6 @@ class _CartScreenState extends State<CartScreen> {
                   : 'Keranjang · ${cart.items.length} item',
             ),
             backgroundColor: KuwrirColors.background,
-            actions: [
-              if (!cart.isEmpty)
-                IconButton(
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedDelete02,
-                    color: KuwrirColors.error,
-                  ),
-                  tooltip: 'Kosongkan keranjang',
-                  onPressed: _confirmClearCart,
-                ),
-            ],
           ),
           body: cart.isEmpty ? _EmptyCart() : _buildCart(cart),
         );
@@ -261,10 +260,12 @@ class _CartScreenState extends State<CartScreen> {
                       merchantName: cart.merchantName,
                       selectedVariants: item.selectedVariants,
                     ),
-                    onDecrement: () => context.read<CartCubit>().decrementItem(
-                      item.product.id,
-                      variantKey: item.variantKey,
-                    ),
+                    onDecrement: () => item.quantity <= 1
+                        ? _confirmRemoveItem(item)
+                        : context.read<CartCubit>().decrementItem(
+                            item.product.id,
+                            variantKey: item.variantKey,
+                          ),
                   ),
                 ),
 

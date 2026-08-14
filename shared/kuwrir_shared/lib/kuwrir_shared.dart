@@ -5,6 +5,8 @@ library kuwrir_shared;
 export 'src/api/api_client.dart';
 export 'src/api/api_config.dart';
 export 'src/api/payment_status_watcher.dart';
+export 'src/api/order_status_watcher.dart';
+export 'src/api/sse_stream.dart';
 export 'src/models/user.dart';
 export 'src/models/auth.dart';
 export 'src/models/order.dart';

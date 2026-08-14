@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../cubits/wallet_cubit.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 const _bankCodes = ['BCA', 'BNI', 'BRI', 'MANDIRI', 'CIMB', 'PERMATA'];
 
@@ -409,7 +410,7 @@ class _TransactionTile extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(color: tint.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-          child: Icon(isCredit ? Icons.arrow_downward : Icons.arrow_upward, color: tint, size: 18),
+          child: HugeIcon(icon: isCredit ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowUp01, color: tint, size: 18),
         ),
         title: Text(_categoryLabel(tx.category), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         subtitle: Text(

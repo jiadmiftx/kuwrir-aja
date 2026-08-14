@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
 import 'register_screen.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class MerchantLoginScreen extends StatefulWidget {
   const MerchantLoginScreen({super.key});
@@ -175,10 +176,10 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
-          const Align(alignment: Alignment(1.05, -0.8), child: _FloatingIcon(icon: Icons.storefront_outlined, size: 46, angle: -0.3)),
-          const Align(alignment: Alignment(-1.08, -0.06), child: _FloatingIcon(icon: Icons.receipt_long_outlined, size: 48, angle: 0.25)),
-          const Align(alignment: Alignment(0.86, 0.88), child: _FloatingIcon(icon: Icons.point_of_sale_outlined, size: 36, angle: 0.15)),
-          const Align(alignment: Alignment(-0.8, 0.94), child: _FloatingIcon(icon: Icons.inventory_2_outlined, size: 30, angle: -0.2)),
+          const Align(alignment: Alignment(1.05, -0.8), child: _FloatingIcon(icon: HugeIcons.strokeRoundedStore01, size: 46, angle: -0.3)),
+          const Align(alignment: Alignment(-1.08, -0.06), child: _FloatingIcon(icon: HugeIcons.strokeRoundedInvoice01, size: 48, angle: 0.25)),
+          const Align(alignment: Alignment(0.86, 0.88), child: _FloatingIcon(icon: HugeIcons.strokeRoundedCreditCardPos, size: 36, angle: 0.15)),
+          const Align(alignment: Alignment(-0.8, 0.94), child: _FloatingIcon(icon: HugeIcons.strokeRoundedPackage, size: 30, angle: -0.2)),
           Positioned.fill(
             child: SafeArea(
               bottom: false,
@@ -229,7 +230,7 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.bolt, size: 15, color: Colors.white),
+                          const HugeIcon(icon: HugeIcons.strokeRoundedFlash, size: 15, color: Colors.white),
                           const SizedBox(width: 5),
                           Text('Kelola toko dari HP, tanpa laptop',
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 12, fontWeight: FontWeight.w600)),
@@ -248,7 +249,7 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
 }
 
 class _FloatingIcon extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final double size;
   final double angle;
   const _FloatingIcon({required this.icon, required this.size, required this.angle});
@@ -257,7 +258,7 @@ class _FloatingIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: angle * math.pi,
-      child: Icon(icon, size: size, color: Colors.white.withValues(alpha: 0.14)),
+      child: HugeIcon(icon: icon, size: size, color: Colors.white.withValues(alpha: 0.14)),
     );
   }
 }

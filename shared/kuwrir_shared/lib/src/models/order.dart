@@ -61,6 +61,7 @@ class Order {
   final String? merchantId;
   final String? merchantName;
   final String? merchantLogoUrl;
+  final String? cancellationReason;
   final List<OrderItem> items;
   final DateTime? createdAt;
 
@@ -94,6 +95,7 @@ class Order {
     this.merchantId,
     this.merchantName,
     this.merchantLogoUrl,
+    this.cancellationReason,
     this.items = const [],
     this.createdAt,
   });
@@ -132,6 +134,7 @@ class Order {
       merchantId: json['merchant_id'] as String?,
       merchantName: merchant?['name'] as String?,
       merchantLogoUrl: merchant?['logo_url'] as String?,
+      cancellationReason: json['cancellation_reason'] as String?,
       items:
           (json['items'] as List<dynamic>?)
               ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
@@ -141,7 +144,10 @@ class Order {
     );
   }
 
-  bool get isCancellable => status == 'pending' || status == 'confirmed';
+  // Matches the backend's CancelOrder rule exactly (customer/handler.go) —
+  // once a merchant accepts (status leaves 'pending'), only the merchant's
+  // own cancel/item-change flow can end the order, not the customer.
+  bool get isCancellable => status == 'pending';
   bool get isDelivered => status == 'delivered';
   bool get isActive => [
     'pending',

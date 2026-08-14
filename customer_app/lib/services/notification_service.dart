@@ -25,26 +25,29 @@ class AppNotification {
   });
 
   AppNotification copyWith({bool? read}) => AppNotification(
-        id: id,
-        title: title,
-        body: body,
-        receivedAt: receivedAt,
-        read: read ?? this.read,
-      );
+    id: id,
+    title: title,
+    body: body,
+    receivedAt: receivedAt,
+    read: read ?? this.read,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'body': body,
-        'received_at': receivedAt.toIso8601String(),
-        'read': read,
-      };
+    'id': id,
+    'title': title,
+    'body': body,
+    'received_at': receivedAt.toIso8601String(),
+    'read': read,
+  };
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
+  factory AppNotification.fromJson(Map<String, dynamic> json) =>
+      AppNotification(
         id: json['id'] as String,
         title: json['title'] as String? ?? '',
         body: json['body'] as String? ?? '',
-        receivedAt: DateTime.tryParse(json['received_at'] as String? ?? '') ?? DateTime.now(),
+        receivedAt:
+            DateTime.tryParse(json['received_at'] as String? ?? '') ??
+            DateTime.now(),
         read: json['read'] as bool? ?? false,
       );
 }
@@ -59,8 +62,9 @@ class NotificationService {
   /// Latest push message's data payload, published on both foreground
   /// arrival and tap-to-open. Screens (e.g. chat) listen to this to refresh
   /// immediately instead of waiting on a slow poll fallback.
-  static final ValueNotifier<Map<String, dynamic>?> onPushData =
-      ValueNotifier(null);
+  static final ValueNotifier<Map<String, dynamic>?> onPushData = ValueNotifier(
+    null,
+  );
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');
@@ -80,7 +84,8 @@ class NotificationService {
     );
     await _localNotif
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
 
     await FirebaseMessaging.instance.requestPermission(
@@ -88,6 +93,21 @@ class NotificationService {
       badge: true,
       sound: true,
     );
+
+    // FirebaseMessaging.requestPermission above only covers iOS — Android
+    // 13+ (API 33) gates ALL locally-shown notifications (including the
+    // ones this app builds itself via flutter_local_notifications, which
+    // is what actually displays chat/order-status pushes) behind the
+    // separate POST_NOTIFICATIONS runtime permission, which is never
+    // requested implicitly. Declaring it in AndroidManifest.xml alone
+    // isn't enough — without this call, a device on Android 13+ that never
+    // happened to grant it sees nothing at all, silently, in any app
+    // state. Same root cause merchant_app hit and fixed earlier.
+    await _localNotif
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
   }
 
   static void setupForegroundHandler() {
@@ -150,7 +170,10 @@ class NotificationService {
       ),
     );
     final trimmed = all.take(maxStored).toList();
-    await prefs.setString(_storeKey, jsonEncode(trimmed.map((n) => n.toJson()).toList()));
+    await prefs.setString(
+      _storeKey,
+      jsonEncode(trimmed.map((n) => n.toJson()).toList()),
+    );
   }
 
   static Future<List<AppNotification>> getAll() async {
@@ -159,7 +182,9 @@ class NotificationService {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list.map((n) => AppNotification.fromJson(n as Map<String, dynamic>)).toList();
+      return list
+          .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
+          .toList();
     } catch (_) {
       return [];
     }
@@ -175,6 +200,9 @@ class NotificationService {
     if (all.every((n) => n.read)) return;
     final prefs = await SharedPreferences.getInstance();
     final updated = all.map((n) => n.copyWith(read: true)).toList();
-    await prefs.setString(_storeKey, jsonEncode(updated.map((n) => n.toJson()).toList()));
+    await prefs.setString(
+      _storeKey,
+      jsonEncode(updated.map((n) => n.toJson()).toList()),
+    );
   }
 }

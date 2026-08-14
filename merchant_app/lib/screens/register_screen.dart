@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'location_picker_screen.dart';
 import 'pending_screen.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Merchant registration: data diri + data toko + upload 3 dokumen
 /// Single-step form (semua sekaligus)
@@ -59,8 +60,8 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
       context: context,
       builder: (_) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(leading: const Icon(Icons.camera_alt), title: const Text('Foto'), onTap: () => Navigator.pop(context, ImageSource.camera)),
-          ListTile(leading: const Icon(Icons.photo_library), title: const Text('Galeri'), onTap: () => Navigator.pop(context, ImageSource.gallery)),
+          ListTile(leading: const HugeIcon(icon: HugeIcons.strokeRoundedCamera01), title: const Text('Foto'), onTap: () => Navigator.pop(context, ImageSource.camera)),
+          ListTile(leading: const HugeIcon(icon: HugeIcons.strokeRoundedImage02), title: const Text('Galeri'), onTap: () => Navigator.pop(context, ImageSource.gallery)),
         ]),
       ),
     );
@@ -230,14 +231,14 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         const Text('Data Pemilik',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
         const SizedBox(height: 18),
-        _field(_nameCtrl, 'Nama Lengkap', Icons.person_outline,
+        _field(_nameCtrl, 'Nama Lengkap', HugeIcons.strokeRoundedUserCircle02,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        _field(_phoneCtrl, 'Nomor HP', Icons.phone_outlined, keyboardType: TextInputType.phone,
+        _field(_phoneCtrl, 'Nomor HP', HugeIcons.strokeRoundedCall02, keyboardType: TextInputType.phone,
             hint: 'Boleh format apa saja, mis. 08xxx atau +62 8xxx',
             validator: (v) => (v?.length ?? 0) < 9 ? 'Tidak valid' : null),
         const SizedBox(height: 12),
-        _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress,
+        _field(_emailCtrl, 'Email', HugeIcons.strokeRoundedMail01, keyboardType: TextInputType.emailAddress,
             validator: (v) => !(v?.contains('@') ?? false) ? 'Email tidak valid' : null),
         const SizedBox(height: 12),
         Container(
@@ -252,13 +253,13 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
             validator: (v) => (v?.length ?? 0) < 6 ? 'Min 6 karakter' : null,
             decoration: InputDecoration(
               labelText: 'Password',
-              prefixIcon: Icon(Icons.lock_outline, color: KuwrirColors.textHint),
+              prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedSquareLock01, color: KuwrirColors.textHint),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
               ),
               suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                icon: HugeIcon(icon: _obscure ? HugeIcons.strokeRoundedViewOff : HugeIcons.strokeRoundedView,
                     color: KuwrirColors.textHint),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
@@ -300,14 +301,14 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         const Text('Data Toko',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
         const SizedBox(height: 18),
-        _field(_storeNameCtrl, 'Nama Toko', Icons.storefront_outlined,
+        _field(_storeNameCtrl, 'Nama Toko', HugeIcons.strokeRoundedStore01,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        _field(_storeDescCtrl, 'Deskripsi Toko', Icons.description_outlined),
+        _field(_storeDescCtrl, 'Deskripsi Toko', HugeIcons.strokeRoundedFile01),
         const SizedBox(height: 12),
-        _field(_storePhoneCtrl, 'Nomor HP Toko', Icons.phone_outlined, keyboardType: TextInputType.phone),
+        _field(_storePhoneCtrl, 'Nomor HP Toko', HugeIcons.strokeRoundedCall02, keyboardType: TextInputType.phone),
         const SizedBox(height: 12),
-        _field(_addressCtrl, 'Alamat Lengkap', Icons.location_on_outlined,
+        _field(_addressCtrl, 'Alamat Lengkap', HugeIcons.strokeRoundedLocation01,
             validator: (v) => v!.trim().isEmpty ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
         // Map location picker
@@ -347,7 +348,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
                       color: KuwrirColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(11),
                     ),
-                    child: Icon(Icons.map_outlined, color: KuwrirColors.primary, size: 19),
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedMaps, color: KuwrirColors.primary, size: 19),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -365,7 +366,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: KuwrirColors.textHint),
+                  HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, color: KuwrirColors.textHint),
                 ],
               ),
             ),
@@ -426,13 +427,13 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         Text('Dokumen diperlukan untuk verifikasi toko oleh admin.',
             style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13)),
         const SizedBox(height: 18),
-        _field(_nikCtrl, 'NIK Pemilik (sesuai KTP)', Icons.badge_outlined,
+        _field(_nikCtrl, 'NIK Pemilik (sesuai KTP)', HugeIcons.strokeRoundedBadge,
             keyboardType: TextInputType.number,
             validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
         const SizedBox(height: 12),
-        _docTile('KTP Pemilik *', 'Foto KTP pemilik toko yang jelas', Icons.badge_outlined, _ktpFile, () => _pick('ktp')),
-        _docTile('Izin Usaha (opsional)', 'SIUP / IUMK / NIB jika ada', Icons.business_center_outlined, _bizLicenseFile, () => _pick('biz')),
-        _docTile('Foto Toko *', 'Foto tampak depan toko / tempat jualan', Icons.store_outlined, _storePhotoFile, () => _pick('store')),
+        _docTile('KTP Pemilik *', 'Foto KTP pemilik toko yang jelas', HugeIcons.strokeRoundedBadge, _ktpFile, () => _pick('ktp')),
+        _docTile('Izin Usaha (opsional)', 'SIUP / IUMK / NIB jika ada', HugeIcons.strokeRoundedBriefcase01, _bizLicenseFile, () => _pick('biz')),
+        _docTile('Foto Toko *', 'Foto tampak depan toko / tempat jualan', HugeIcons.strokeRoundedStore01, _storePhotoFile, () => _pick('store')),
         const SizedBox(height: 24),
         SizedBox(
           height: 52,
@@ -468,7 +469,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     );
   }
 
-  Widget _docTile(String title, String subtitle, IconData icon, File? file, VoidCallback onTap) {
+  Widget _docTile(String title, String subtitle, List<List<dynamic>> icon, File? file, VoidCallback onTap) {
     final uploaded = file != null;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -484,7 +485,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
               ? KuwrirColors.success.withValues(alpha: 0.1)
               : KuwrirColors.primary.withValues(alpha: 0.08),
           backgroundImage: uploaded ? FileImage(file) : null,
-          child: uploaded ? null : Icon(icon, color: KuwrirColors.primary),
+          child: uploaded ? null : HugeIcon(icon: icon, color: KuwrirColors.primary),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
         subtitle: Text(uploaded ? 'Siap' : subtitle,
@@ -501,7 +502,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
     );
   }
 
-  Widget _field(TextEditingController ctrl, String label, IconData icon,
+  Widget _field(TextEditingController ctrl, String label, List<List<dynamic>> icon,
       {TextInputType? keyboardType, String? Function(String?)? validator, String? hint}) {
     return Container(
       decoration: BoxDecoration(
@@ -516,7 +517,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          prefixIcon: Icon(icon, color: KuwrirColors.textHint),
+          prefixIcon: HugeIcon(icon: icon, color: KuwrirColors.textHint),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -537,7 +538,7 @@ class _MerchantRegisterScreenState extends State<MerchantRegisterScreen> {
             radius: 14,
             backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
             child: done
-                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                ? const HugeIcon(icon: HugeIcons.strokeRoundedTick01, size: 14, color: Colors.white)
                 : Text('${i + 1}',
                     style: TextStyle(
                         color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),

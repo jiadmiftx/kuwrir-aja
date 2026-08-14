@@ -193,9 +193,25 @@ export interface Order {
   picked_up_at?: string;
   delivered_at?: string;
   cancelled_at?: string;
+  cancellation_reason?: string;
   created_at: string;
+  merchant_id?: string;
   merchant?: Merchant;
   items?: OrderItem[];
+}
+
+export interface OrderModificationRequest {
+  id: string;
+  order_id: string;
+  removed_item_id: string;
+  reason_category: string;
+  reason?: string;
+  status: string;
+  expires_at: string;
+  resolved_at?: string;
+  topup_amount?: number;
+  topup_payment_status?: string;
+  topup_payment_url?: string;
 }
 
 export interface ChatMessage {

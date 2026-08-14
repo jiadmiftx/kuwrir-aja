@@ -3,7 +3,9 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'chat_screen.dart';
+import 'order_modification_screen.dart';
 import 'payment_webview_screen.dart';
+import '../cubits/chat_cubit.dart' show ChatChannel;
 import '../cubits/order_tracking_cubit.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class OrderTrackingScreen extends StatefulWidget {
 
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   bool _payingNow = false;
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -70,6 +73,50 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
+  /// Confirms before cancelling — the button used to fire the cancel
+  /// request the instant it was tapped, no "are you sure", so a mis-tap
+  /// permanently cancelled a real order with no recovery path.
+  Future<void> _cancelOrder(BuildContext context, Order order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Batalkan pesanan ini?'),
+        content: Text(
+          order.paymentType != 'cash' && order.paymentStatus == 'paid'
+              ? 'Pesanan #${order.orderNumber} akan dibatalkan dan dana akan dikembalikan ke wallet kamu.'
+              : 'Pesanan #${order.orderNumber} akan dibatalkan. Tindakan ini tidak bisa dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Kembali'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ya, Batalkan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await context.read<ApiClient>().cancelOrder(order.id);
+      if (context.mounted) Navigator.pop(context);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membatalkan pesanan')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<OrderTrackingCubit, OrderTrackingState>(
@@ -96,14 +143,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         final order = state is OrderTracking
             ? state.order
             : (state as OrderTrackingDelivered).order;
+        final modificationRequest = state is OrderTracking
+            ? state.modificationRequest
+            : null;
         final isDelivered =
             state is OrderTrackingDelivered || order.status == 'delivered';
-        // Order.status stays 'pending' while unpaid (the merchant never even
-        // sees it — see ActiveOrders' payment_status filter backend-side),
-        // so _statusLabel('pending') would misleadingly say "waiting on the
-        // merchant" when the real blocker is payment.
-        final isAwaitingPayment =
-            order.paymentType != 'cash' && order.paymentStatus != 'paid';
 
         // Show chat button only when driver is assigned (order in transit)
         final canChat = [
@@ -119,6 +163,25 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             actions: [
               if (canChat)
                 IconButton(
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedStore01),
+                  tooltip: 'Chat dengan Merchant',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        channel: ChatChannel.merchant,
+                        counterpartLabel: order.merchantName ?? 'Merchant',
+                        itemSummary: _itemSummary(order),
+                        total: order.total,
+                        statusLabel: _statusLabel(order.status),
+                      ),
+                    ),
+                  ),
+                ),
+              if (canChat)
+                IconButton(
                   icon: const HugeIcon(icon: HugeIcons.strokeRoundedChat),
                   tooltip: 'Chat dengan Driver',
                   onPressed: () => Navigator.push(
@@ -127,6 +190,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       builder: (_) => ChatScreen(
                         orderId: order.id,
                         orderNumber: order.orderNumber,
+                        itemSummary: _itemSummary(order),
+                        total: order.total,
+                        statusLabel: _statusLabel(order.status),
                       ),
                     ),
                   ),
@@ -143,16 +209,16 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status card
+                  // Status card — order progress headline. Payment clarity
+                  // lives in its own badge below, kept visually distinct so
+                  // "is this paid?" never has to be inferred from the order
+                  // status text (see _PaymentBadge).
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 28,
-                    ),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: KuwrirColors.surface,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
                           color: KuwrirColors.textPrimary.withValues(
@@ -163,16 +229,17 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
                       ],
                     ),
-                    child: Column(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
-                          width: 64,
-                          height: 64,
+                          width: 44,
+                          height: 44,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color:
-                                (isAwaitingPayment
-                                        ? KuwrirColors.warning
+                                (order.status == 'cancelled'
+                                        ? KuwrirColors.error
                                         : isDelivered
                                         ? KuwrirColors.success
                                         : KuwrirColors.primary)
@@ -180,132 +247,162 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: HugeIcon(
-                            icon: isAwaitingPayment
-                                ? HugeIcons.strokeRoundedHourglass
+                            icon: order.status == 'cancelled'
+                                ? HugeIcons.strokeRoundedCancelCircle
                                 : isDelivered
                                 ? HugeIcons.strokeRoundedCheckmarkCircle02
                                 : HugeIcons.strokeRoundedDeliveryBox01,
-                            size: 30,
-                            color: isAwaitingPayment
-                                ? KuwrirColors.warning
+                            size: 22,
+                            color: order.status == 'cancelled'
+                                ? KuwrirColors.error
                                 : isDelivered
                                 ? KuwrirColors.success
                                 : KuwrirColors.primary,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isAwaitingPayment
-                              ? 'Menunggu Pembayaran'
-                              : _statusLabel(order.status),
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        if (order.merchantName != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            order.merchantName!,
-                            style: TextStyle(
-                              color: KuwrirColors.textSecondary,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ],
-                        if (isAwaitingPayment &&
-                            order.paymentExpiredAt != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Bayar sebelum ${_fmtDeadline(order.paymentExpiredAt!)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: KuwrirColors.textHint,
-                            ),
-                          ),
-                        ],
-                        if (!isDelivered) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.warning.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: KuwrirColors.warning,
-                                  ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _statusLabel(order.status),
+                                style: const TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w800,
                                 ),
-                                const SizedBox(width: 8),
+                              ),
+                              if (order.merchantName != null) ...[
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Memperbarui setiap 12 detik...',
-                                  style: const TextStyle(
-                                    color: KuwrirColors.warning,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 11.5,
+                                  order.merchantName!,
+                                  style: TextStyle(
+                                    color: KuwrirColors.textSecondary,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ],
+                              if (order.status == 'cancelled' &&
+                                  order.cancellationReason != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  order.cancellationReason!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: KuwrirColors.textHint,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (!isDelivered && order.status != 'cancelled')
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: KuwrirColors.textHint,
                             ),
                           ),
-                        ],
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+
+                  // Payment clarity — the one thing customers ask about
+                  // most, given its own badge instead of being inferred
+                  // from the order status text.
+                  _PaymentBadge(
+                    order: order,
+                    paying: _payingNow,
+                    onPayNow: () => _payNow(context, order),
+                    fmtDeadline: _fmtDeadline,
+                  ),
                   const SizedBox(height: 24),
 
-                  // Timeline
-                  const Text(
-                    'Status Pesanan',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  _TimelineStep(
-                    title: 'Pesanan Dibuat',
-                    isCompleted: true,
-                    isFirst: true,
-                  ),
-                  _TimelineStep(
-                    title: 'Dikonfirmasi Merchant',
-                    isCompleted: _isCompleted(order.status, 'confirmed'),
-                    isActive: order.status == 'confirmed',
-                  ),
-                  _TimelineStep(
-                    title: 'Sedang Diproses',
-                    isCompleted: _isCompleted(order.status, 'preparing'),
-                    isActive: order.status == 'preparing',
-                  ),
-                  _TimelineStep(
-                    title: 'Siap Dikirim',
-                    isCompleted: _isCompleted(order.status, 'ready'),
-                    isActive: order.status == 'ready',
-                  ),
-                  _TimelineStep(
-                    title: 'Driver Menjemput',
-                    isCompleted: _isCompleted(order.status, 'picked_up'),
-                    isActive: order.status == 'picked_up',
-                  ),
-                  _TimelineStep(
-                    title: 'Terkirim',
-                    isCompleted: isDelivered,
-                    isActive: isDelivered,
-                    isLast: true,
-                  ),
+                  if (modificationRequest != null) ...[
+                    InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderModificationScreen(
+                              orderId: order.id,
+                              modificationRequest: modificationRequest,
+                            ),
+                          ),
+                        );
+                        if (context.mounted) {
+                          context.read<OrderTrackingCubit>().refreshNow(
+                            order.id,
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: KuwrirColors.warning.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const HugeIcon(
+                              icon: HugeIcons.strokeRoundedAlert02,
+                              color: KuwrirColors.warning,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Ada item yang tidak tersedia. Pilih pengganti atau batalkan pesanan.',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
-                  const SizedBox(height: 24),
+                  // Horizontal progress tracker — mirrors the condensed
+                  // Gojek/Grab step pattern (order placed → prepared →
+                  // on the way → delivered) rather than the app's full
+                  // 6-status state machine, which is one status finer than
+                  // a customer needs to see at a glance.
+                  if (order.status != 'cancelled') ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: KuwrirColors.textPrimary.withValues(
+                              alpha: 0.05,
+                            ),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: _HorizontalTracker(status: order.status),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Delivery info
                   if (order.dropoffAddress != null)
@@ -371,59 +468,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             amount: order.total,
                             isBold: true,
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              HugeIcon(
-                                icon: order.paymentType == 'cash'
-                                    ? HugeIcons.strokeRoundedPayment01
-                                    : HugeIcons.strokeRoundedQrCode01,
-                                size: 16,
-                                color: KuwrirColors.warning,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                order.paymentType == 'cash'
-                                    ? 'Bayar tunai ke driver'
-                                    : 'Bayar online (${order.paymentStatus})',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: KuwrirColors.warning,
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 16),
-
-                  // Pay Now button (only while a non-cash order is unpaid)
-                  if (isAwaitingPayment)
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _payingNow
-                            ? null
-                            : () => _payNow(context, order),
-                        icon: _payingNow
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const HugeIcon(
-                                icon: HugeIcons.strokeRoundedPayment01,
-                              ),
-                        label: const Text('Bayar Sekarang'),
-                      ),
-                    ),
-                  if (isAwaitingPayment) const SizedBox(height: 16),
 
                   // Cancel button (only if still cancellable)
                   if (order.isCancellable)
@@ -433,22 +483,19 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                         ),
-                        onPressed: () async {
-                          final api = context.read<ApiClient>();
-                          try {
-                            await api.cancelOrder(order.id);
-                            if (context.mounted) Navigator.pop(context);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Gagal membatalkan pesanan'),
+                        onPressed: _cancelling
+                            ? null
+                            : () => _cancelOrder(context, order),
+                        child: _cancelling
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.red,
                                 ),
-                              );
-                            }
-                          }
-                        },
-                        child: const Text('Batalkan Pesanan'),
+                              )
+                            : const Text('Batalkan Pesanan'),
                       ),
                     ),
                   const SizedBox(height: 24),
@@ -468,10 +515,24 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return '$hh:$mm';
   }
 
+  String _itemSummary(Order order) {
+    if (order.items.isEmpty) return order.merchantName ?? '-';
+    final first = order.items.first;
+    final extra = order.items.length - 1;
+    final label = '${first.quantity}x ${first.itemName}';
+    return extra > 0 ? '$label +$extra lainnya' : label;
+  }
+
+  // Deliberately payment-agnostic: Order.status stays 'pending' while an
+  // online order is unpaid (the merchant never even sees it — see
+  // ActiveOrders' payment_status filter backend-side), so this can't say
+  // "waiting on the merchant" without risking a false claim. Payment state
+  // is its own, separately-badged concern (see _PaymentBadge) rather than
+  // folded into this label.
   String _statusLabel(String status) {
     switch (status) {
       case 'pending':
-        return 'Menunggu konfirmasi merchant';
+        return 'Pesanan Dibuat';
       case 'confirmed':
         return 'Pesanan dikonfirmasi';
       case 'preparing':
@@ -488,88 +549,268 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         return status.replaceAll('_', ' ');
     }
   }
-
-  bool _isCompleted(String current, String target) {
-    const order = [
-      'pending',
-      'confirmed',
-      'preparing',
-      'ready',
-      'picked_up',
-      'delivered',
-    ];
-    final ci = order.indexOf(current);
-    final ti = order.indexOf(target);
-    return ci > ti;
-  }
 }
 
-class _TimelineStep extends StatelessWidget {
-  final String title;
-  final bool isCompleted;
-  final bool isActive;
-  final bool isFirst;
-  final bool isLast;
+/// Payment status, badged separately from order progress so "is this paid?"
+/// is never something a customer has to infer from a status word. Three
+/// distinct states get three distinct treatments: cash is informational
+/// (nothing blocks progress), paid is a quiet confirmation, unpaid is the
+/// one that needs an actual call to action.
+class _PaymentBadge extends StatelessWidget {
+  final Order order;
+  final bool paying;
+  final VoidCallback onPayNow;
+  final String Function(DateTime) fmtDeadline;
 
-  const _TimelineStep({
-    required this.title,
-    this.isCompleted = false,
-    this.isActive = false,
-    this.isFirst = false,
-    this.isLast = false,
+  const _PaymentBadge({
+    required this.order,
+    required this.paying,
+    required this.onPayNow,
+    required this.fmtDeadline,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isCompleted || isActive
-                    ? KuwrirColors.primary
-                    : Colors.grey[300],
-                shape: BoxShape.circle,
+    final isCash = order.paymentType == 'cash';
+    final isPaid = order.paymentStatus == 'paid';
+
+    final Color color;
+    final List<List<dynamic>> icon;
+    final String title;
+    String? subtitle;
+    if (isCash) {
+      color = KuwrirColors.primary;
+      icon = HugeIcons.strokeRoundedCash01;
+      title = 'Bayar Tunai ke Driver';
+      subtitle = 'Siapkan uang pas saat pesanan tiba';
+    } else if (isPaid) {
+      color = KuwrirColors.success;
+      icon = HugeIcons.strokeRoundedCheckmarkCircle02;
+      title = 'Sudah Dibayar';
+    } else {
+      color = KuwrirColors.warning;
+      icon = HugeIcons.strokeRoundedQrCode01;
+      title = 'Menunggu Pembayaran';
+      subtitle = order.paymentExpiredAt != null
+          ? 'Bayar sebelum ${fmtDeadline(order.paymentExpiredAt!)}'
+          : null;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: HugeIcon(icon: icon, size: 18, color: color),
               ),
-              child: HugeIcon(
-                icon: isCompleted
-                    ? HugeIcons.strokeRoundedTick01
-                    : HugeIcons.strokeRoundedCircle,
-                size: 14,
-                color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!isCash && !isPaid) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: paying ? null : onPayNow,
+                style: FilledButton.styleFrom(backgroundColor: color),
+                icon: paying
+                    ? const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const HugeIcon(
+                        icon: HugeIcons.strokeRoundedPayment01,
+                        size: 17,
+                      ),
+                label: const Text('Bayar Sekarang'),
               ),
             ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 32,
-                color: isCompleted ? KuwrirColors.primary : Colors.grey[300],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+enum _StepState { pending, active, done }
+
+/// Condensed 4-step horizontal tracker (Dipesan → Diproses → Diantar →
+/// Selesai), mirroring the Gojek/Grab order-tracking pattern rather than
+/// the backend's full 6-status state machine — a customer glancing at this
+/// mid-delivery doesn't need to distinguish "ready" from "picked_up".
+class _HorizontalTracker extends StatelessWidget {
+  final String status;
+  const _HorizontalTracker({required this.status});
+
+  static const _labels = ['Dipesan', 'Diproses', 'Diantar', 'Selesai'];
+  static const _icons = [
+    HugeIcons.strokeRoundedReceiptText,
+    HugeIcons.strokeRoundedChefHat,
+    HugeIcons.strokeRoundedMotorbike01,
+    HugeIcons.strokeRoundedPackageDelivered,
+  ];
+
+  int get _currentIndex {
+    switch (status) {
+      case 'confirmed':
+      case 'preparing':
+        return 1;
+      case 'ready':
+      case 'picked_up':
+        return 2;
+      case 'delivered':
+        return 3;
+      case 'pending':
+      default:
+        return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = _currentIndex;
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < _labels.length; i++) ...[
+              _StepDot(
+                icon: _icons[i],
+                state: i < current
+                    ? _StepState.done
+                    : i == current
+                    ? _StepState.active
+                    : _StepState.pending,
               ),
+              if (i != _labels.length - 1)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    color: i < current
+                        ? KuwrirColors.primary
+                        : KuwrirColors.border,
+                  ),
+                ),
+            ],
           ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 8),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive
-                    ? KuwrirColors.primary
-                    : isCompleted
-                    ? Colors.black87
-                    : Colors.grey,
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (var i = 0; i < _labels.length; i++) ...[
+              SizedBox(
+                width: 40,
+                child: Text(
+                  _labels[i],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: i == current
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: i == current
+                        ? KuwrirColors.primary
+                        : i < current
+                        ? KuwrirColors.textSecondary
+                        : KuwrirColors.textHint,
+                  ),
+                ),
               ),
-            ),
-          ),
+              if (i != _labels.length - 1) const Expanded(child: SizedBox()),
+            ],
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _StepDot extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final _StepState state;
+  const _StepDot({required this.icon, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = state != _StepState.pending;
+    final isActive = state == _StepState.active;
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Center(
+        child: Container(
+          width: isActive ? 34 : 30,
+          height: isActive ? 34 : 30,
+          decoration: BoxDecoration(
+            color: filled ? KuwrirColors.primary : KuwrirColors.surface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: filled ? KuwrirColors.primary : KuwrirColors.border,
+              width: isActive ? 2.5 : 1.5,
+            ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: KuwrirColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: HugeIcon(
+            icon: state == _StepState.done
+                ? HugeIcons.strokeRoundedTick01
+                : icon,
+            size: 15,
+            color: filled ? Colors.white : KuwrirColors.textHint,
+          ),
+        ),
+      ),
     );
   }
 }

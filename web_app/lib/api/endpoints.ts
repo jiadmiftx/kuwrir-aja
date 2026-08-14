@@ -7,6 +7,8 @@ import type {
   FoodCategory,
   Merchant,
   Order,
+  OrderItem,
+  OrderModificationRequest,
   PaymentMethod,
   PlaceOrderRequest,
   ProductCategory,
@@ -99,6 +101,28 @@ export const requestRefund = (orderId: string, reason: string) =>
   apiFetch<{ refund: RefundRequest; message: string }>(`/orders/${orderId}/refund-request`, {
     method: "POST",
     body: { reason },
+  });
+
+// Merchant flagged an item unavailable on an already-accepted order —
+// customer picks a replacement from the live menu or cancels. See
+// backend RequestItemChange/ResolveModificationRequest.
+export const getModificationRequest = (orderId: string) =>
+  apiFetch<{ modification_request: OrderModificationRequest; removed_item: OrderItem }>(
+    `/orders/${orderId}/modification-request`
+  );
+export const replaceOrderItem = (
+  orderId: string,
+  requestId: string,
+  body: { product_id: string; quantity: number; variant_ids: string[] }
+) =>
+  apiFetch<{ order: Order; topup_payment_url?: string }>(`/orders/${orderId}/modification-request/${requestId}/resolve`, {
+    method: "POST",
+    body: { action: "replace", ...body },
+  });
+export const cancelViaModificationRequest = (orderId: string, requestId: string) =>
+  apiFetch<{ order: Order; status: string }>(`/orders/${orderId}/modification-request/${requestId}/resolve`, {
+    method: "POST",
+    body: { action: "cancel" },
   });
 
 // --- Payment ---

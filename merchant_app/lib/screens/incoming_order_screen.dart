@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'package:vibration/vibration.dart';
 import '../cubits/store_orders_cubit.dart';
+import '../widgets/reason_dialog.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Full-screen "incoming order" alarm — plays a looping siren + repeating
 /// vibration until the merchant taps Terima or Tolak, mirroring how
@@ -105,46 +107,21 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
   }
 
   Future<void> _reject() async {
-    final reason = await _askRejectReason();
-    if (reason == null) return; // cancelled the dialog
+    final result = await showReasonDialog(
+      context,
+      title: 'Tolak pesanan?',
+      confirmLabel: 'Tolak Pesanan',
+    );
+    if (result == null) return; // cancelled the dialog
     setState(() => _submitting = true);
     try {
       await context.read<ApiClient>().rejectOrder(
         widget.orderId,
-        reason: reason.isEmpty ? null : reason,
+        reason: _combineReason(result),
       );
       if (mounted) context.read<StoreOrdersCubit>().load();
     } catch (_) {}
     if (mounted) Navigator.of(context).pop();
-  }
-
-  Future<String?> _askRejectReason() async {
-    final ctrl = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Tolak pesanan?'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Alasan (opsional) — cth. stok habis',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Tolak Pesanan'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -173,8 +150,8 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
                     color: Colors.white.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.notifications_active,
+                  child: const HugeIcon(icon:
+                    HugeIcons.strokeRoundedNotification03,
                     color: Colors.white,
                     size: 44,
                   ),
@@ -341,4 +318,13 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
+
+  /// The backend's reject/cancel endpoints only take one free-text `reason`
+  /// field (no separate category column on Order) — fold the chip label in
+  /// so it's still visible to the customer even without a category field.
+  String _combineReason(ReasonResult result) {
+    final label = reasonCategoryLabel(result.category);
+    if (result.reason.isEmpty) return label;
+    return '$label: ${result.reason}';
+  }
 }

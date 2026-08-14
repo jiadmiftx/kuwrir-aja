@@ -22,6 +22,7 @@ import 'cubits/menu_cubit.dart';
 import 'cubits/store_cubit.dart';
 import 'cubits/dashboard_cubit.dart';
 import 'cubits/wallet_cubit.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -57,14 +58,20 @@ class KuwrirMerchantApp extends StatelessWidget {
     final apiClient = ApiClient();
     final storeOrdersCubit = StoreOrdersCubit(apiClient);
 
-    // Push already tells us the moment a new order lands (backend sends it
-    // on order creation) — use that as the primary refresh trigger instead
-    // of waiting on the slow poll fallback in StoreOrdersCubit, and pop the
-    // incoming-order alarm screen on top so it can't be missed.
+    // Push already tells us the moment something about an order changes
+    // (new order, customer resolving an item-replacement request, customer
+    // cancelling, etc. — see backend's `type` field on each SendToUser call)
+    // — use that as the primary refresh trigger instead of waiting on the
+    // slow poll fallback in StoreOrdersCubit. Only 'new_order' also pops
+    // the full-screen incoming-order alarm; 'order_status' (customer
+    // replaced/cancelled an item, etc.) just needs the list to refresh so
+    // it's not left showing a stale item list or total.
     NotificationService.onPushData.addListener(() {
       final data = NotificationService.onPushData.value;
-      if (data?['type'] != 'new_order') return;
+      final type = data?['type'];
+      if (type != 'new_order' && type != 'order_status') return;
       storeOrdersCubit.load();
+      if (type != 'new_order') return;
       final orderId = data?['order_id'] as String?;
       final nav = navigatorKey.currentState;
       if (orderId != null && nav != null) {
@@ -139,28 +146,30 @@ class _MerchantHomeState extends State<MerchantHome> {
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedDashboardSquare01),
+            selectedIcon: HugeIcon(
+              icon: HugeIcons.strokeRoundedDashboardSquare01,
+            ),
             label: 'Dashboard',
           ),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
             label: 'Orders',
           ),
           NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedPackage),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedPackage),
             label: 'Menu',
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedWallet01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedWallet01),
             label: 'Keuangan',
           ),
           NavigationDestination(
-            icon: Icon(Icons.store_outlined),
-            selectedIcon: Icon(Icons.store),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedStore01),
+            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedStore01),
             label: 'Toko',
           ),
         ],
@@ -272,7 +281,11 @@ class _SplashRouterState extends State<_SplashRouter> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.store, size: 72, color: KuwrirColors.primary),
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedStore01,
+              size: 72,
+              color: KuwrirColors.primary,
+            ),
             SizedBox(height: 16),
             Text(
               'Cocourir Merchant',

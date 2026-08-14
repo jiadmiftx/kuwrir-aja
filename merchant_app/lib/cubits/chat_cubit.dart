@@ -27,15 +27,15 @@ class ChatCubit extends Cubit<ChatState> {
   ChatCubit(this._api, {required this.orderId})
     : _stream = SseStream(
         _api,
-        path: '/driver-orders/$orderId/chat/stream',
+        path: '/merchant-orders/$orderId/chat/stream',
         eventName: 'chat_message',
       ),
       super(ChatInitial());
 
-  /// SSE is the primary refresh trigger now — every event is trigger-only
-  /// (see backend ChatEvent), so it just re-runs the same refetch as the
-  /// old poll. The periodic timer here is just a slow safety net for the
-  /// rare case where the stream stalls without tripping its own reconnect.
+  /// SSE is the primary refresh trigger — every event is trigger-only (see
+  /// backend ChatEvent), so it just re-runs the same refetch as a poll
+  /// would. The periodic timer here is just a slow safety net for the rare
+  /// case where the stream stalls without tripping its own reconnect.
   void start() {
     _load();
     _stream.start(onEvent: (_) => _silentRefresh());
@@ -50,7 +50,7 @@ class ChatCubit extends Cubit<ChatState> {
   Future<void> _load() async {
     emit(ChatLoading());
     try {
-      final data = await _api.getDriverOrderChat(orderId);
+      final data = await _api.getMerchantOrderChat(orderId);
       final msgs = data.map((m) => ChatMessage.fromJson(m)).toList();
       emit(ChatLoaded(msgs));
     } catch (e) {
@@ -60,7 +60,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> _silentRefresh() async {
     try {
-      final data = await _api.getDriverOrderChat(orderId);
+      final data = await _api.getMerchantOrderChat(orderId);
       final msgs = data.map((m) => ChatMessage.fromJson(m)).toList();
       if (!isClosed) emit(ChatLoaded(msgs));
     } catch (_) {}
@@ -68,7 +68,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> sendMessage(String text) async {
     try {
-      await _api.sendDriverChatMessage(orderId, text);
+      await _api.sendMerchantOrderChat(orderId, text);
       await _silentRefresh();
     } catch (_) {}
   }

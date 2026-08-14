@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Buy/track paid homepage carousel slots. A slot goes live only after
 /// admin approval (Banner.Status) — see backend admin/handler.go
@@ -68,7 +69,7 @@ class _BannerAdsScreenState extends State<BannerAdsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _buySlot,
-        icon: const Icon(Icons.campaign_outlined),
+        icon: const HugeIcon(icon: HugeIcons.strokeRoundedMegaphone01),
         label: const Text('Beli Slot Banner'),
         backgroundColor: KuwrirColors.primary,
       ),
@@ -107,7 +108,7 @@ class _BannerAdsScreenState extends State<BannerAdsScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.account_balance_wallet_outlined, color: KuwrirColors.primary),
+                HugeIcon(icon: HugeIcons.strokeRoundedWallet01, color: KuwrirColors.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -130,7 +131,7 @@ class _BannerAdsScreenState extends State<BannerAdsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.campaign_outlined, size: 48, color: KuwrirColors.textHint),
+                    HugeIcon(icon: HugeIcons.strokeRoundedMegaphone01, size: 48, color: KuwrirColors.textHint),
                     const SizedBox(height: 12),
                     Text('Belum pernah beli slot banner',
                         style: TextStyle(fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary)),
@@ -240,7 +241,7 @@ class _BannerCard extends StatelessWidget {
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: onUploadImage,
-                icon: const Icon(Icons.image_outlined, size: 16),
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedImage02, size: 16),
                 label: const Text('Upload Gambar Banner'),
               ),
             ],

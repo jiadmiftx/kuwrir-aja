@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Laporan keuangan POS untuk merchant
 /// Mencakup: Laba Rugi, Arus Kas, Stok — terinspirasi dari finansial-mac
@@ -108,7 +109,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
         title: const Text('Laporan Keuangan'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.date_range),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedCalendar03),
             tooltip: 'Pilih periode',
             onPressed: _pickDateRange,
           ),
@@ -117,9 +118,9 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
           controller: _tabController,
           isScrollable: true,
           tabs: const [
-            Tab(text: 'Laba Rugi', icon: Icon(Icons.trending_up)),
-            Tab(text: 'Arus Kas', icon: Icon(Icons.account_balance_wallet)),
-            Tab(text: 'Stok', icon: Icon(Icons.inventory)),
+            Tab(text: 'Laba Rugi', icon: HugeIcon(icon: HugeIcons.strokeRoundedAnalyticsUp)),
+            Tab(text: 'Arus Kas', icon: HugeIcon(icon: HugeIcons.strokeRoundedWallet01)),
+            Tab(text: 'Stok', icon: HugeIcon(icon: HugeIcons.strokeRoundedPackage)),
           ],
         ),
       ),
@@ -131,7 +132,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                const HugeIcon(icon: HugeIcons.strokeRoundedCalendar03, size: 14, color: Colors.grey),
                 const SizedBox(width: 6),
                 Text(
                   '${_from.day}/${_from.month}/${_from.year} — ${_to.day}/${_to.month}/${_to.year}',
@@ -204,7 +205,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
           // Transaction count
           Card(
             child: ListTile(
-              leading: const Icon(Icons.receipt_long),
+              leading: const HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
               title: const Text('Total Transaksi'),
               trailing: Text('${_summary.txCount}x', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
@@ -214,9 +215,9 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _outstandingCard('Piutang Belum Lunas', _summary.receivableUnpaid, Icons.arrow_forward, Colors.blue)),
+              Expanded(child: _outstandingCard('Piutang Belum Lunas', _summary.receivableUnpaid, HugeIcons.strokeRoundedArrowRight01, Colors.blue)),
               const SizedBox(width: 8),
-              Expanded(child: _outstandingCard('Hutang Belum Lunas', _summary.payableUnpaid, Icons.arrow_back, Colors.red)),
+              Expanded(child: _outstandingCard('Hutang Belum Lunas', _summary.payableUnpaid, HugeIcons.strokeRoundedArrowLeft01, Colors.red)),
             ],
           ),
         ],
@@ -325,7 +326,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
 
   Widget _buildBreakdownRow(_PaymentBreakdown b, double total) {
     final pct = total > 0 ? b.total / total * 100 : 0.0;
-    final icons = {'cash': Icons.money, 'qris': Icons.qr_code, 'card': Icons.credit_card, 'tab': Icons.person};
+    final icons = {'cash': HugeIcons.strokeRoundedMoney01, 'qris': HugeIcons.strokeRoundedQrCode01, 'card': HugeIcons.strokeRoundedCreditCard, 'tab': HugeIcons.strokeRoundedUser};
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -333,7 +334,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
         children: [
           Row(
             children: [
-              Icon(icons[b.method] ?? Icons.payment, size: 16, color: Colors.grey),
+              HugeIcon(icon: icons[b.method] ?? HugeIcons.strokeRoundedPayment01, size: 16, color: Colors.grey),
               const SizedBox(width: 6),
               Text(b.method.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
@@ -379,7 +380,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.warning_amber, color: Colors.orange),
+                        const HugeIcon(icon: HugeIcons.strokeRoundedAlert02, color: Colors.orange),
                         const SizedBox(width: 8),
                         Text('${lowStockItems.length} Produk Stok Menipis',
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
@@ -390,7 +391,7 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(
                         children: [
-                          const Icon(Icons.circle, size: 8, color: Colors.orange),
+                          const HugeIcon(icon: HugeIcons.strokeRoundedCircle, size: 8, color: Colors.orange),
                           const SizedBox(width: 6),
                           Expanded(child: Text(i.name)),
                           Text('Sisa: ${i.stock}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
@@ -419,8 +420,8 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
                       dense: true,
                       leading: CircleAvatar(
                         backgroundColor: i.lowStock ? Colors.orange.withOpacity(0.15) : Colors.green.withOpacity(0.1),
-                        child: Icon(
-                          i.lowStock ? Icons.warning_amber : Icons.check,
+                        child: HugeIcon(
+                          icon: i.lowStock ? HugeIcons.strokeRoundedAlert02 : HugeIcons.strokeRoundedTick01,
                           color: i.lowStock ? Colors.orange : Colors.green,
                           size: 18,
                         ),
@@ -466,13 +467,13 @@ class _KasirReportsScreenState extends State<KasirReportsScreen>
     );
   }
 
-  Widget _outstandingCard(String label, double value, IconData icon, Color color) {
+  Widget _outstandingCard(String label, double value, List<List<dynamic>> icon, Color color) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 20),
+            HugeIcon(icon: icon, color: color, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Column(

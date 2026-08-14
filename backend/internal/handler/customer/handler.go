@@ -932,6 +932,7 @@ func (h *RestaurantOrderHandler) GetChat(c *gin.Context) {
 
 	var msgs []model.ChatMessage
 	h.db.Where("order_id = ? AND channel = ?", orderID, "merchant").Order("created_at ASC").Find(&msgs)
+	markChatRead(h.db, orderID, "merchant", "merchant")
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -995,7 +996,7 @@ func (h *RestaurantOrderHandler) SendChat(c *gin.Context) {
 
 	if order.CustomerID != nil {
 		service.SendToUser(h.db, *order.CustomerID,
-			fmt.Sprintf("Pesan dari %s 💬", merchant.Name),
+			fmt.Sprintf("Pesan dari %s • #%s 💬", merchant.Name, order.OrderNumber),
 			req.Text,
 			map[string]string{"order_id": orderID, "type": "merchant_chat"},
 		)
@@ -1698,6 +1699,7 @@ func (h *DriverOrderHandler) GetChat(c *gin.Context) {
 
 	var msgs []model.ChatMessage
 	h.db.Where("order_id = ? AND channel = ?", orderID, "driver").Order("created_at ASC").Find(&msgs)
+	markChatRead(h.db, orderID, "driver", "driver")
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -1763,7 +1765,7 @@ func (h *DriverOrderHandler) SendChat(c *gin.Context) {
 	// Notify customer
 	if order.CustomerID != nil {
 		service.SendToUser(h.db, *order.CustomerID,
-			"Pesan dari Driver 💬",
+			fmt.Sprintf("Pesan dari Driver • #%s 💬", order.OrderNumber),
 			req.Text,
 			map[string]string{"order_id": orderID, "type": "chat"},
 		)
@@ -2071,6 +2073,7 @@ func (h *Handler) GetChat(c *gin.Context) {
 
 	var msgs []model.ChatMessage
 	h.db.Where("order_id = ? AND channel = ?", orderID, "driver").Order("created_at ASC").Find(&msgs)
+	markChatRead(h.db, orderID, "driver", "customer")
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -2107,6 +2110,7 @@ func (h *Handler) GetMerchantChat(c *gin.Context) {
 
 	var msgs []model.ChatMessage
 	h.db.Where("order_id = ? AND channel = ?", orderID, "merchant").Order("created_at ASC").Find(&msgs)
+	markChatRead(h.db, orderID, "merchant", "customer")
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -2160,7 +2164,7 @@ func (h *Handler) SendMerchantChat(c *gin.Context) {
 		var merchant model.Merchant
 		if h.db.Where("id = ?", *order.MerchantID).First(&merchant).Error == nil {
 			service.SendToUser(h.db, merchant.UserID,
-				"Pesan dari Customer 💬",
+				fmt.Sprintf("Pesan dari Customer • #%s 💬", order.OrderNumber),
 				req.Text,
 				map[string]string{"order_id": orderID, "type": "merchant_chat"},
 			)
@@ -2168,6 +2172,16 @@ func (h *Handler) SendMerchantChat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
+// markChatRead flips IsRead on every message in this order/channel that
+// wasn't sent by readerRole — called whenever that party fetches the
+// thread, so the *other* party's next fetch sees their own messages marked
+// read (mirrors SupportMessage's fetch-then-mark-read pattern).
+func markChatRead(db *gorm.DB, orderID, channel, readerRole string) {
+	db.Model(&model.ChatMessage{}).
+		Where("order_id = ? AND channel = ? AND sender_role != ? AND is_read = false", orderID, channel, readerRole).
+		Update("is_read", true)
 }
 
 // chatEventKey composes the key chat_events.go's broadcaster is keyed by —
@@ -2243,7 +2257,7 @@ func (h *Handler) SendChat(c *gin.Context) {
 		var driver model.Driver
 		if h.db.Where("id = ?", order.DriverID).First(&driver).Error == nil {
 			service.SendToUser(h.db, driver.UserID,
-				"Pesan dari Customer 💬",
+				fmt.Sprintf("Pesan dari Customer • #%s 💬", order.OrderNumber),
 				req.Text,
 				map[string]string{"order_id": orderID, "type": "chat"},
 			)

@@ -5,6 +5,7 @@ import '../cubits/dashboard_cubit.dart';
 import '../services/notification_service.dart';
 import 'orders_screen.dart';
 import 'notifications_screen.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -94,7 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   CircleAvatar(
                     radius: 17,
                     backgroundColor: KuwrirColors.background,
-                    child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 19),
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: KuwrirColors.primary, size: 19),
                   ),
                   if (_unreadNotifications > 0)
                     Positioned(
@@ -156,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(Icons.account_balance_wallet_outlined, color: KuwrirColors.primary),
+                    HugeIcon(icon: HugeIcons.strokeRoundedWallet01, color: KuwrirColors.primary),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -168,7 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: KuwrirColors.textSecondary),
+                    HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, color: KuwrirColors.textSecondary),
                   ],
                 ),
               ),
@@ -188,41 +189,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             childAspectRatio: 1.15,
             children: [
               _StatCard(
-                icon: Icons.fiber_new_outlined,
+                icon: HugeIcons.strokeRoundedNewReleases,
                 label: 'Order Baru',
                 value: '${s.newOrders}',
                 color: Colors.orange,
                 onTap: () => _openOrders({'pending'}),
               ),
               _StatCard(
-                icon: Icons.sync,
+                icon: HugeIcons.strokeRoundedReload,
                 label: 'Sedang Diproses',
                 value: '${s.processingOrders}',
                 color: Colors.blue,
                 onTap: () => _openOrders({'confirmed', 'preparing'}),
               ),
               _StatCard(
-                icon: Icons.delivery_dining_outlined,
+                icon: HugeIcons.strokeRoundedDeliveryBox01,
                 label: 'Kurir Dalam Perjalanan',
                 value: '${s.courierEnRoute}',
                 color: Colors.purple,
                 onTap: () => _openOrders({'ready', 'picked_up'}),
               ),
               _StatCard(
-                icon: Icons.check_circle_outline,
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                 label: 'Order Selesai',
                 value: '${s.completedOrders}',
                 color: Colors.green,
                 onTap: () => _openOrders({'delivered'}),
               ),
               _StatCard(
-                icon: Icons.payments_outlined,
+                icon: HugeIcons.strokeRoundedPayment01,
                 label: 'Pendapatan Hari Ini',
                 value: 'Rp ${_fmt(s.todayRevenue)}',
                 color: KuwrirColors.primary,
               ),
               _StatCard(
-                icon: Icons.star_outline,
+                icon: HugeIcons.strokeRoundedStar,
                 label: 'Rating Merchant',
                 value: '${s.rating.toStringAsFixed(1)} (${s.totalReviews})',
                 color: Colors.amber,
@@ -259,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _StatCard extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
   final String value;
   final Color color;
@@ -293,7 +294,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: color, size: 20),
+                child: HugeIcon(icon: icon, color: color, size: 20),
               ),
               const SizedBox(height: 10),
               FittedBox(
@@ -349,8 +350,8 @@ class _TopProductRow extends StatelessWidget {
             child: product.imageUrl != null
                 ? Image.network(product.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(Icons.fastfood, color: KuwrirColors.primary, size: 20))
-                : Icon(Icons.fastfood, color: KuwrirColors.primary, size: 20),
+                    errorBuilder: (_, __, ___) => HugeIcon(icon: HugeIcons.strokeRoundedRiceBowl01, color: KuwrirColors.primary, size: 20))
+                : HugeIcon(icon: HugeIcons.strokeRoundedRiceBowl01, color: KuwrirColors.primary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(

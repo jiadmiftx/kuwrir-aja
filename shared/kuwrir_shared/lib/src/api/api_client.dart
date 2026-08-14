@@ -484,6 +484,75 @@ class ApiClient {
     await post('/merchant-orders/$id/ready', {});
   }
 
+  /// Cancels an order the merchant already accepted (confirmed/preparing) —
+  /// RejectOrder only covers the pre-accept (pending) case. Same instant
+  /// wallet refund behavior if it was paid online.
+  Future<void> cancelAcceptedOrder(String id, {String? reason}) async {
+    await post('/merchant-orders/$id/cancel', {
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+  }
+
+  /// Flags one item on an already-accepted order as unavailable, routing
+  /// the customer to pick a replacement (or cancel) — see
+  /// getModificationRequest/resolveModificationRequest for the customer
+  /// side of this flow.
+  Future<Map<String, dynamic>> requestItemChange(
+    String orderId, {
+    required String itemId,
+    required String reasonCategory,
+    String? reason,
+  }) async {
+    return await post('/merchant-orders/$orderId/request-item-change', {
+      'item_id': itemId,
+      'reason_category': reasonCategory,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+  }
+
+  /// Fetches the pending item-replacement request for an order, if any —
+  /// null (via a 404 the caller should treat as "no request") when there
+  /// isn't one.
+  Future<Map<String, dynamic>> getModificationRequest(String orderId) async {
+    return await get('/orders/$orderId/modification-request');
+  }
+
+  /// Customer picks a replacement product for the flagged item — the order
+  /// total is recomputed server-side and the price difference settled
+  /// (wallet refund if cheaper, a top-up Duitku link in the response's
+  /// `topup_payment_url` if pricier and paid online, or just a higher COD
+  /// amount collected on delivery).
+  Future<Map<String, dynamic>> replaceOrderItem(
+    String orderId,
+    String requestId, {
+    required String productId,
+    required int quantity,
+    List<String> variantIds = const [],
+  }) async {
+    return await post(
+      '/orders/$orderId/modification-request/$requestId/resolve',
+      {
+        'action': 'replace',
+        'product_id': productId,
+        'quantity': quantity,
+        'variant_ids': variantIds,
+      },
+    );
+  }
+
+  /// Customer declines the replacement — cancels the whole order (full
+  /// refund if paid online), same as [cancelOrder] but scoped to this
+  /// modification request.
+  Future<Map<String, dynamic>> cancelViaModificationRequest(
+    String orderId,
+    String requestId,
+  ) async {
+    return await post(
+      '/orders/$orderId/modification-request/$requestId/resolve',
+      {'action': 'cancel'},
+    );
+  }
+
   Future<List<ProductCategory>> getMyStoreMenu() async {
     final data = await get('/my-store/categories');
     final list = data['categories'] as List<dynamic>? ?? [];
@@ -939,6 +1008,34 @@ class ApiClient {
 
   Future<void> sendDriverChatMessage(String orderId, String text) async {
     await post('/driver-orders/$orderId/chat', {'text': text});
+  }
+
+  /// Customer side of the customer↔merchant chat thread — separate from
+  /// [getOrderChat]/[sendChatMessage] (the customer↔driver thread), even
+  /// though both live under the same order.
+  Future<List<Map<String, dynamic>>> getOrderMerchantChat(
+    String orderId,
+  ) async {
+    final data = await get('/orders/$orderId/merchant-chat');
+    final list = data['messages'] as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> sendOrderMerchantChat(String orderId, String text) async {
+    await post('/orders/$orderId/merchant-chat', {'text': text});
+  }
+
+  /// Merchant side of the customer↔merchant chat thread.
+  Future<List<Map<String, dynamic>>> getMerchantOrderChat(
+    String orderId,
+  ) async {
+    final data = await get('/merchant-orders/$orderId/chat');
+    final list = data['messages'] as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> sendMerchantOrderChat(String orderId, String text) async {
+    await post('/merchant-orders/$orderId/chat', {'text': text});
   }
 
   // --- Notifications ---

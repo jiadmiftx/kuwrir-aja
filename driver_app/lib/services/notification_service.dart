@@ -40,6 +40,16 @@ class NotificationService {
       badge: true,
       sound: true,
     );
+
+    // FirebaseMessaging.requestPermission above only covers iOS — Android
+    // 13+ (API 33) gates ALL locally-shown notifications behind the
+    // separate POST_NOTIFICATIONS runtime permission, never requested
+    // implicitly. Declaring it in AndroidManifest.xml alone isn't enough —
+    // without this, a device on Android 13+ sees nothing at all, silently.
+    await _localNotif
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
   }
 
   static void setupForegroundHandler() {

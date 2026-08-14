@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 // Local cart item wraps the shared Product model
 class _CartItem {
@@ -162,7 +163,7 @@ class _KasirScreenState extends State<KasirScreen>
             ],
             const SizedBox(height: 8),
             Row(children: [
-              const Icon(Icons.payment, size: 16),
+              const HugeIcon(icon: HugeIcons.strokeRoundedPayment01, size: 16),
               const SizedBox(width: 4),
               Text(_paymentMethod.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
             ]),
@@ -192,7 +193,7 @@ class _KasirScreenState extends State<KasirScreen>
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green),
+            HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02, color: Colors.green),
             SizedBox(width: 8),
             Text('Transaksi Berhasil'),
           ],
@@ -209,7 +210,7 @@ class _KasirScreenState extends State<KasirScreen>
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
           FilledButton.icon(
             onPressed: () => Navigator.pop(ctx),
-            icon: const Icon(Icons.print),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedPrinter),
             label: const Text('Cetak Struk'),
           ),
         ],
@@ -248,13 +249,13 @@ class _KasirScreenState extends State<KasirScreen>
         title: const Text('Kasir / POS'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
             tooltip: 'Muat ulang produk',
             onPressed: _loadMenu,
           ),
           if (_cart.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_sweep),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
               tooltip: 'Kosongkan keranjang',
               onPressed: () => showDialog(
                 context: context,
@@ -271,12 +272,12 @@ class _KasirScreenState extends State<KasirScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            const Tab(text: 'Produk', icon: Icon(Icons.grid_view)),
+            const Tab(text: 'Produk', icon: HugeIcon(icon: HugeIcons.strokeRoundedGridView)),
             Tab(
               text: 'Keranjang',
               icon: _cart.isNotEmpty
-                  ? Badge(label: Text('${_cart.length}'), child: const Icon(Icons.shopping_cart))
-                  : const Icon(Icons.shopping_cart),
+                  ? Badge(label: Text('${_cart.length}'), child: const HugeIcon(icon: HugeIcons.strokeRoundedShoppingCart01))
+                  : const HugeIcon(icon: HugeIcons.strokeRoundedShoppingCart01),
             ),
           ],
         ),
@@ -291,7 +292,7 @@ class _KasirScreenState extends State<KasirScreen>
       floatingActionButton: _cart.isNotEmpty && _tabController.index == 0
           ? FloatingActionButton.extended(
               onPressed: () => _tabController.animateTo(1),
-              icon: const Icon(Icons.shopping_cart),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedShoppingCart01),
               label: Text('${_cart.length} item · ${_fmt(_grandTotal)}'),
               backgroundColor: KuwrirColors.primary,
             )
@@ -309,7 +310,7 @@ class _KasirScreenState extends State<KasirScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const HugeIcon(icon: HugeIcons.strokeRoundedAlertCircle, size: 48, color: Colors.red),
             const SizedBox(height: 8),
             Text('Gagal memuat produk', style: TextStyle(color: Colors.grey[600])),
             const SizedBox(height: 4),
@@ -317,7 +318,7 @@ class _KasirScreenState extends State<KasirScreen>
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _loadMenu,
-              icon: const Icon(Icons.refresh),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
               label: const Text('Coba Lagi'),
             ),
           ],
@@ -330,7 +331,7 @@ class _KasirScreenState extends State<KasirScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+            const HugeIcon(icon: HugeIcons.strokeRoundedPackage, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             const Text('Belum ada produk', style: TextStyle(color: Colors.grey, fontSize: 16)),
             const SizedBox(height: 8),
@@ -339,7 +340,7 @@ class _KasirScreenState extends State<KasirScreen>
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _loadMenu,
-              icon: const Icon(Icons.refresh),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
               label: const Text('Muat Ulang'),
             ),
           ],
@@ -458,7 +459,7 @@ class _KasirScreenState extends State<KasirScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
+            HugeIcon(icon: HugeIcons.strokeRoundedShoppingCart01, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('Keranjang kosong', style: TextStyle(color: Colors.grey, fontSize: 16)),
             SizedBox(height: 8),
@@ -500,7 +501,7 @@ class _KasirScreenState extends State<KasirScreen>
                     style: TextStyle(fontWeight: FontWeight.bold, color: KuwrirColors.primary)),
                 const SizedBox(width: 4),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedCancel01, size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _removeFromCart(index),
@@ -513,7 +514,7 @@ class _KasirScreenState extends State<KasirScreen>
                 Text('${_fmt(item.product.price)} × ',
                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 IconButton(
-                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedMinusSignCircle, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _updateQty(index, -1),
@@ -521,7 +522,7 @@ class _KasirScreenState extends State<KasirScreen>
                 Text('${item.qty}',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedAddCircle, size: 20),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _updateQty(index, 1),
@@ -598,7 +599,7 @@ class _KasirScreenState extends State<KasirScreen>
               decoration: const InputDecoration(
                 labelText: 'Nama Pelanggan *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
+                prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedUser),
                 isDense: true,
               ),
             ),
@@ -612,7 +613,7 @@ class _KasirScreenState extends State<KasirScreen>
               decoration: InputDecoration(
                 labelText: 'Uang Diterima',
                 border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.money),
+                prefixIcon: const HugeIcon(icon: HugeIcons.strokeRoundedMoney01),
                 isDense: true,
                 suffixText: _cashChange > 0 ? 'Kembalian: ${_fmt(_cashChange)}' : null,
                 suffixStyle: const TextStyle(color: Colors.blue),
@@ -626,7 +627,7 @@ class _KasirScreenState extends State<KasirScreen>
             height: 48,
             child: FilledButton.icon(
               onPressed: _processPayment,
-              icon: const Icon(Icons.check_circle),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02),
               label: Text(
                 _paymentMethod == 'tab'
                     ? 'Catat Tab (${_fmt(_grandTotal)})'
@@ -642,10 +643,10 @@ class _KasirScreenState extends State<KasirScreen>
 
   Widget _buildPaymentMethodSelector() {
     const methods = [
-      ('cash', Icons.money, 'Cash'),
-      ('qris', Icons.qr_code, 'QRIS'),
-      ('card', Icons.credit_card, 'Kartu'),
-      ('tab', Icons.person_add, 'Tab'),
+      ('cash', HugeIcons.strokeRoundedMoney01, 'Cash'),
+      ('qris', HugeIcons.strokeRoundedQrCode01, 'QRIS'),
+      ('card', HugeIcons.strokeRoundedCreditCard, 'Kartu'),
+      ('tab', HugeIcons.strokeRoundedUserAdd01, 'Tab'),
     ];
     return Row(
       children: methods.map((m) {
@@ -666,7 +667,7 @@ class _KasirScreenState extends State<KasirScreen>
                 ),
                 child: Column(
                   children: [
-                    Icon(m.$2, size: 20, color: selected ? Colors.white : Colors.grey),
+                    HugeIcon(icon: m.$2, size: 20, color: selected ? Colors.white : Colors.grey),
                     Text(m.$3,
                         style: TextStyle(
                             fontSize: 11, color: selected ? Colors.white : Colors.grey)),
@@ -694,7 +695,7 @@ class _KasirScreenState extends State<KasirScreen>
           decoration: const InputDecoration(
             labelText: 'Jumlah Diskon (Rp)',
             border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.discount),
+            prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedDiscount01),
           ),
         ),
         actions: [

@@ -5,24 +5,18 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/chat_cubit.dart';
 import '../services/notification_service.dart';
 
+/// Merchant side of the customer↔merchant chat thread — mirrors
+/// customer_app/driver_app's chat_screen.dart, just pointed at the
+/// merchant-order endpoints and always merchant-branded (no channel param
+/// needed here, merchant_app only ever has this one thread).
 class ChatScreen extends StatefulWidget {
   final String orderId;
   final String orderNumber;
+  final String customerName;
 
-  /// Which thread this screen shows — driver (default, existing behavior)
-  /// or merchant. Also picks [counterpartLabel]'s default and which push
-  /// `type` should trigger a refresh (see backend's SendChat/SendMerchantChat).
-  final ChatChannel channel;
-
-  /// Display name for the other party — "Driver" for the driver thread, or
-  /// the merchant's own name for the merchant thread (more useful than a
-  /// generic "Merchant" once the customer might be juggling multiple orders).
-  final String counterpartLabel;
-
-  /// Short item summary (e.g. "2x Nasi Goreng, 1x Es Teh") shown in a
-  /// context card under the app bar — without this, a customer with
-  /// several active orders open at once has no way to tell which order a
-  /// chat is even about once they're a few messages in.
+  /// Short item summary shown in a context card under the app bar — a
+  /// merchant fielding several chats at once has no other way to tell
+  /// which order this thread is about once they're a few messages in.
   final String? itemSummary;
   final double? total;
   final String? statusLabel;
@@ -31,12 +25,11 @@ class ChatScreen extends StatefulWidget {
     super.key,
     required this.orderId,
     required this.orderNumber,
-    this.channel = ChatChannel.driver,
-    String? counterpartLabel,
+    required this.customerName,
     this.itemSummary,
     this.total,
     this.statusLabel,
-  }) : counterpartLabel = counterpartLabel ?? 'Driver';
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -50,20 +43,15 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _cubit = ChatCubit(
-      context.read<ApiClient>(),
-      orderId: widget.orderId,
-      channel: widget.channel,
-    )..start();
+    _cubit = ChatCubit(context.read<ApiClient>(), orderId: widget.orderId)
+      ..start();
     NotificationService.onPushData.addListener(_onPush);
   }
 
   void _onPush() {
     final data = NotificationService.onPushData.value;
-    final expectedType = widget.channel == ChatChannel.merchant
-        ? 'merchant_chat'
-        : 'chat';
-    if (data?['type'] == expectedType && data?['order_id'] == widget.orderId) {
+    if (data?['type'] == 'merchant_chat' &&
+        data?['order_id'] == widget.orderId) {
       _cubit.refreshNow();
     }
   }
@@ -82,7 +70,6 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
     _textCtrl.clear();
     _cubit.sendMessage(text);
-    // Scroll to bottom after send
     Future.delayed(const Duration(milliseconds: 200), () {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
@@ -99,10 +86,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return BlocProvider.value(
       value: _cubit,
       child: Scaffold(
+        backgroundColor: KuwrirColors.background,
         appBar: AppBar(
-          title: Text(
-            'Chat ${widget.counterpartLabel} - #${widget.orderNumber}',
-          ),
+          title: Text('Chat ${widget.customerName} · #${widget.orderNumber}'),
+          backgroundColor: KuwrirColors.background,
         ),
         body: Column(
           children: [
@@ -127,8 +114,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     if (state.messages.isEmpty) {
                       return Center(
                         child: Text(
-                          'Belum ada pesan. Mulai chat dengan ${widget.counterpartLabel}!',
-                          style: const TextStyle(color: Colors.grey),
+                          'Belum ada pesan. Mulai chat dengan ${widget.customerName}!',
+                          style: TextStyle(color: KuwrirColors.textHint),
                         ),
                       );
                     }
@@ -138,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       itemCount: state.messages.length,
                       itemBuilder: (_, i) => _MessageBubble(
                         msg: state.messages[i],
-                        counterpartLabel: widget.counterpartLabel,
+                        customerName: widget.customerName,
                       ),
                     );
                   }
@@ -214,7 +201,7 @@ class _OrderContextCard extends StatelessWidget {
           if (total != null) ...[
             const SizedBox(width: 8),
             Text(
-              'Rp ${_fmt(total!)}',
+              'IDR ${_fmt(total!)}',
               style: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
@@ -230,12 +217,12 @@ class _OrderContextCard extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   final ChatMessage msg;
-  final String counterpartLabel;
-  const _MessageBubble({required this.msg, required this.counterpartLabel});
+  final String customerName;
+  const _MessageBubble({required this.msg, required this.customerName});
 
   @override
   Widget build(BuildContext context) {
-    final isMe = msg.isFromCustomer;
+    final isMe = msg.isFromMerchant;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -245,29 +232,34 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.72,
         ),
         decoration: BoxDecoration(
-          color: isMe ? KuwrirColors.primary : Colors.grey.shade200,
+          color: isMe ? KuwrirColors.primary : KuwrirColors.surface,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
             bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
             bottomRight: isMe ? Radius.zero : const Radius.circular(16),
           ),
+          border: isMe ? null : Border.all(color: KuwrirColors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isMe ? 'Kamu' : counterpartLabel,
+              isMe ? 'Kamu' : customerName,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: isMe ? Colors.white70 : Colors.grey.shade600,
+                color: isMe
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : KuwrirColors.textSecondary,
               ),
             ),
             const SizedBox(height: 2),
             Text(
               msg.text,
-              style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+              style: TextStyle(
+                color: isMe ? Colors.white : KuwrirColors.textPrimary,
+              ),
             ),
             if (isMe) ...[
               const SizedBox(height: 3),
@@ -310,9 +302,12 @@ class _InputBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: KuwrirColors.surface,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8),
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.06),
+            blurRadius: 8,
+          ),
         ],
       ),
       child: Row(
@@ -332,7 +327,7 @@ class _InputBar extends StatelessWidget {
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: KuwrirColors.background,
               ),
               onSubmitted: (_) => onSend(),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Hutang supplier untuk POS Merchant
 /// Mirip fitur hutang di finansial-mac
@@ -57,7 +58,7 @@ class _KasirPayablesScreenState extends State<KasirPayablesScreen> {
         title: const Text('Hutang Supplier'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
             tooltip: 'Catat hutang baru',
             onPressed: _showAddPayableDialog,
           ),
@@ -77,7 +78,7 @@ class _KasirPayablesScreenState extends State<KasirPayablesScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.arrow_back, color: Colors.red.shade700),
+                HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: Colors.red.shade700),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,7 +188,7 @@ class _KasirPayablesScreenState extends State<KasirPayablesScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    Icon(Icons.event, size: 14, color: isOverdue ? Colors.red : Colors.grey),
+                    HugeIcon(icon: HugeIcons.strokeRoundedCalendar03, size: 14, color: isOverdue ? Colors.red : Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       'Jatuh tempo: ${p.dueDate!.day}/${p.dueDate!.month}/${p.dueDate!.year}',
@@ -206,7 +207,7 @@ class _KasirPayablesScreenState extends State<KasirPayablesScreen> {
                   children: [
                     const Spacer(),
                     FilledButton.icon(
-                      icon: const Icon(Icons.payment, size: 16),
+                      icon: const HugeIcon(icon: HugeIcons.strokeRoundedPayment01, size: 16),
                       label: const Text('Catat Pembayaran'),
                       onPressed: () => _showPaymentDialog(p),
                       style: FilledButton.styleFrom(visualDensity: VisualDensity.compact, backgroundColor: Colors.red),

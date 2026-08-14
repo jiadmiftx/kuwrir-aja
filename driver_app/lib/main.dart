@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -31,9 +33,7 @@ void main() async {
   final apiClient = ApiClient();
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
       child: MultiRepositoryProvider(
         providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
         child: MultiBlocProvider(
@@ -108,20 +108,31 @@ class _InitialRouterState extends State<InitialRouter> {
     try {
       final res = await ApiClient().get('/driver/application');
       final application = res['application'];
-      approved = application != null && application['status'] == 'approved' && res['is_active'] == true;
+      approved =
+          application != null &&
+          application['status'] == 'approved' &&
+          res['is_active'] == true;
     } catch (_) {
       // Treat an unreachable status check as not-yet-approved.
     }
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, approved ? '/job_board' : '/pending');
+    Navigator.pushReplacementNamed(
+      context,
+      approved ? '/job_board' : '/pending',
+    );
+
+    // Re-upload the FCM token on every app start, not just fresh login —
+    // login_screen.dart's upload only fires the moment credentials are
+    // entered, so a persisted session that skips straight past login here
+    // (the common case: reopening the app) would otherwise never register
+    // a current token, and SendToUser on the backend silently no-ops when
+    // the stored token is empty/stale. Same fix merchant_app/customer_app
+    // already have.
+    unawaited(NotificationService.uploadToken(ApiClient()));
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

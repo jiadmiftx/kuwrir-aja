@@ -9,6 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  hugeicons: ^1.1.7
   kuwrir_shared:
     path: ../shared/kuwrir_shared
   firebase_core: ^3.13.1

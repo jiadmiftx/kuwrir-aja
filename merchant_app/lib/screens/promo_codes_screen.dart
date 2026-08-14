@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Merchant's own promo codes — only ever discount this merchant's own
 /// orders (backend enforces this via Promotion.MerchantID), separate from
@@ -104,7 +105,7 @@ class _PromoCodesScreenState extends State<PromoCodesScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(),
-        icon: const Icon(Icons.add),
+        icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
         label: const Text('Buat Promo'),
         backgroundColor: KuwrirColors.primary,
       ),
@@ -133,7 +134,7 @@ class _PromoCodesScreenState extends State<PromoCodesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.sell_outlined, size: 48, color: KuwrirColors.textHint),
+              HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01, size: 48, color: KuwrirColors.textHint),
               const SizedBox(height: 12),
               Text('Belum ada kode promo',
                   style: TextStyle(fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary)),
@@ -250,7 +251,7 @@ class _PromoCard extends StatelessWidget {
                 children: [
                   Switch.adaptive(value: isActive, onChanged: (_) => onToggle(), activeThumbColor: KuwrirColors.primary),
                   IconButton(
-                    icon: Icon(Icons.delete_outline, size: 20, color: KuwrirColors.error),
+                    icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete02, size: 20, color: KuwrirColors.error),
                     onPressed: onDelete,
                   ),
                 ],

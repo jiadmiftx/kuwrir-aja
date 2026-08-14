@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/notification_service.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -63,7 +64,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             color: KuwrirColors.primary.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.notifications_none_rounded, size: 36, color: KuwrirColors.primary),
+                          child: HugeIcon(icon: HugeIcons.strokeRoundedNotification01, size: 36, color: KuwrirColors.primary),
                         ),
                         const SizedBox(height: 20),
                         const Text('Belum ada notifikasi',
@@ -99,7 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               color: KuwrirColors.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(Icons.notifications_outlined, color: KuwrirColors.primary, size: 20),
+                            child: HugeIcon(icon: HugeIcons.strokeRoundedNotification01, color: KuwrirColors.primary, size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(

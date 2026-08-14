@@ -891,6 +891,10 @@ type ChatMessage struct {
 	SenderID   uuid.UUID `gorm:"type:uuid;not null" json:"sender_id"`
 	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | driver | merchant
 	Text       string    `gorm:"type:text;not null" json:"text"`
+	// IsRead is flipped by the *other* party's next GetChat call (see
+	// markChatRead) — lets the sender's own bubble show "terkirim" vs
+	// "dibaca", same idea as SupportMessage's IsRead.
+	IsRead bool `gorm:"default:false" json:"is_read"`
 }
 
 // SupportMessage stores customer ↔ admin support chat.

@@ -55,6 +55,26 @@ class StoreOrdersCubit extends Cubit<StoreOrdersState> {
     await load();
   }
 
+  Future<void> cancelAccepted(String orderId, {String? reason}) async {
+    await _api.cancelAcceptedOrder(orderId, reason: reason);
+    await load();
+  }
+
+  Future<void> requestItemChange(
+    String orderId, {
+    required String itemId,
+    required String reasonCategory,
+    String? reason,
+  }) async {
+    await _api.requestItemChange(
+      orderId,
+      itemId: itemId,
+      reasonCategory: reasonCategory,
+      reason: reason,
+    );
+    await load();
+  }
+
   @override
   Future<void> close() {
     _timer?.cancel();

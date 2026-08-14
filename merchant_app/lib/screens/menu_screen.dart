@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/menu_cubit.dart';
 import 'variant_manager_sheet.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -87,14 +88,14 @@ class _MenuScreenState extends State<MenuScreen> with TickerProviderStateMixin {
                   decoration: InputDecoration(
                     hintText: 'Cari produk...',
                     isDense: true,
-                    prefixIcon: Icon(
-                      Icons.search,
+                    prefixIcon: HugeIcon(icon:
+                      HugeIcons.strokeRoundedSearch01,
                       color: KuwrirColors.textHint,
                       size: 20,
                     ),
                     suffixIcon: _query.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.close, size: 18),
+                            icon: const HugeIcon(icon: HugeIcons.strokeRoundedCancel01, size: 18),
                             onPressed: () => _searchCtrl.clear(),
                           )
                         : null,
@@ -120,7 +121,7 @@ class _MenuScreenState extends State<MenuScreen> with TickerProviderStateMixin {
                 : () => _showAddCategoryDialog(context),
             backgroundColor: KuwrirColors.primary,
             foregroundColor: Colors.white,
-            icon: const Icon(Icons.add),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
             label: const Text('Tambah Kategori'),
           ),
         );
@@ -170,8 +171,8 @@ class _MenuScreenState extends State<MenuScreen> with TickerProviderStateMixin {
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
+                child: HugeIcon(icon:
+                  HugeIcons.strokeRoundedPackage,
                   size: 36,
                   color: KuwrirColors.primary,
                 ),
@@ -316,12 +317,12 @@ class _CategoryProductsList extends StatelessWidget {
             TextButton.icon(
               onPressed: () =>
                   _showAddProductDialog(context, category.id, category.name),
-              icon: const Icon(Icons.add_circle_outline, size: 18),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedAddCircle, size: 18),
               label: const Text('Tambah Produk'),
             ),
             IconButton(
-              icon: Icon(
-                Icons.delete_outline,
+              icon: HugeIcon(icon:
+                HugeIcons.strokeRoundedDelete02,
                 size: 20,
                 color: KuwrirColors.error,
               ),
@@ -543,7 +544,7 @@ class _SearchResults extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.search_off, size: 40, color: KuwrirColors.textHint),
+              HugeIcon(icon: HugeIcons.strokeRoundedSearchRemove, size: 40, color: KuwrirColors.textHint),
               const SizedBox(height: 12),
               Text(
                 'Tidak ada produk yang cocok dengan "$query"',
@@ -659,12 +660,12 @@ class _ProductImagePicker extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt),
+              leading: const HugeIcon(icon: HugeIcons.strokeRoundedCamera01),
               title: const Text('Foto'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: const HugeIcon(icon: HugeIcons.strokeRoundedImage02),
               title: const Text('Galeri'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -726,7 +727,7 @@ class _ProductImagePicker extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.add_a_photo_outlined, color: KuwrirColors.primary),
+          HugeIcon(icon: HugeIcons.strokeRoundedCameraAdd01, color: KuwrirColors.primary),
           const SizedBox(height: 4),
           Text(
             'Upload Foto Produk',
@@ -767,10 +768,10 @@ class _ProductTile extends StatelessWidget {
                     product.imageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                        Icon(Icons.fastfood, color: KuwrirColors.primary),
+                        HugeIcon(icon: HugeIcons.strokeRoundedRiceBowl01, color: KuwrirColors.primary),
                   ),
                 )
-              : Icon(Icons.fastfood, color: KuwrirColors.primary, size: 22),
+              : HugeIcon(icon: HugeIcons.strokeRoundedRiceBowl01, color: KuwrirColors.primary, size: 22),
         ),
         title: Text(
           product.name,
@@ -801,7 +802,7 @@ class _ProductTile extends StatelessWidget {
               activeThumbColor: KuwrirColors.success,
             ),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 18),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical, size: 18),
               onSelected: (action) => _handleAction(context, action),
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
@@ -809,7 +810,7 @@ class _ProductTile extends StatelessWidget {
                   value: 'variants',
                   child: Row(
                     children: [
-                      Icon(Icons.tune, size: 18),
+                      HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal, size: 18),
                       SizedBox(width: 10),
                       Text('Kelola Topping/Varian'),
                     ],

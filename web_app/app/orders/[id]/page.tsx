@@ -4,14 +4,39 @@ import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, Message01Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, ArrowLeft01Icon, ArrowRight01Icon, Message01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
-import { cancelOrder, getOrder, getOrderChat, requestRefund, sendOrderChat } from "@/lib/api/endpoints";
+import { ReplacementPickerSheet } from "@/components/ReplacementPickerSheet";
+import {
+  cancelOrder,
+  cancelViaModificationRequest,
+  getModificationRequest,
+  getOrder,
+  getOrderChat,
+  replaceOrderItem,
+  requestRefund,
+  sendOrderChat,
+} from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
 import { orderStatusLabel, isActiveOrder } from "@/lib/order-status";
 import { useAuthStore } from "@/lib/stores/auth";
 import { ApiError } from "@/lib/api/client";
 import { usePaymentStream } from "@/lib/hooks/usePaymentStream";
+import { useOrderStatusStream } from "@/lib/hooks/useOrderStatusStream";
+import { useSseSignal } from "@/lib/hooks/useSseSignal";
+import type { Product, ProductVariant } from "@/lib/api/types";
+
+const MODIFICATION_REASON_LABELS: Record<string, string> = {
+  stok_habis: "Stok habis",
+  toko_tutup: "Toko tutup",
+  item_tidak_tersedia: "Item tidak tersedia",
+  lainnya: "Lainnya",
+};
+
+function modificationReasonLabel(category: string, reason?: string) {
+  const label = MODIFICATION_REASON_LABELS[category] ?? category;
+  return reason ? `${label} — ${reason}` : label;
+}
 
 function OrderDetailContent() {
   const params = useParams<{ id: string }>();
@@ -23,11 +48,62 @@ function OrderDetailContent() {
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState("");
   const [refundResult, setRefundResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   const order = useQuery({
     queryKey: ["order", params.id],
     queryFn: () => getOrder(params.id),
-    refetchInterval: (query) => (query.state.data && isActiveOrder(query.state.data.order.status) ? 10_000 : false),
+    // SSE (useOrderStatusStream, below) is the primary refresh trigger now —
+    // this is just a slow safety net for the rare case where the stream
+    // can't connect at all (fetch-event-source handles reconnects itself
+    // otherwise, so this doesn't need to be a tight poll).
+    refetchInterval: (query) => (query.state.data && isActiveOrder(query.state.data.order.status) ? 45_000 : false),
+  });
+
+  const onOrderStatus = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["order", params.id] });
+  }, [queryClient, params.id]);
+  useOrderStatusStream(params.id, !!order.data && isActiveOrder(order.data.order.status), onOrderStatus);
+
+  // Merchant flagged an item unavailable on this already-accepted order —
+  // only worth polling while the order is in a status where that can
+  // happen (confirmed/preparing); a 404 here just means nothing pending.
+  const o0 = order.data?.order;
+  const modificationEnabled = o0?.status === "confirmed" || o0?.status === "preparing";
+  const modification = useQuery({
+    queryKey: ["order-modification", params.id],
+    queryFn: () => getModificationRequest(params.id),
+    enabled: modificationEnabled,
+    refetchInterval: modificationEnabled ? 10_000 : false,
+    retry: false,
+  });
+  const modReq = modification.data?.modification_request;
+  const removedItem = modification.data?.removed_item;
+
+  const replace = useMutation({
+    mutationFn: (picked: { product: Product; variants: ProductVariant[]; quantity: number }) =>
+      replaceOrderItem(params.id, modReq!.id, {
+        product_id: picked.product.id,
+        quantity: picked.quantity,
+        variant_ids: picked.variants.map((v) => v.id),
+      }),
+    onSuccess: (data) => {
+      setShowPicker(false);
+      if (data.topup_payment_url) {
+        window.location.href = data.topup_payment_url;
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["order", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["order-modification", params.id] });
+    },
+  });
+
+  const cancelModification = useMutation({
+    mutationFn: () => cancelViaModificationRequest(params.id, modReq!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["order", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["order-modification", params.id] });
+    },
   });
 
   // SSE instead of polling for the one thing that's actually latency-sensitive
@@ -49,8 +125,14 @@ function OrderDetailContent() {
     queryKey: ["order-chat", params.id],
     queryFn: () => getOrderChat(params.id),
     enabled: showChat,
-    refetchInterval: showChat ? 20_000 : false,
+    // SSE (below) is the primary refresh trigger now — this is just a slow
+    // safety net for the rare case where the stream can't connect at all.
+    refetchInterval: showChat ? 60_000 : false,
   });
+  const onChatSignal = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["order-chat", params.id] });
+  }, [queryClient, params.id]);
+  useSseSignal(`/orders/${params.id}/chat/stream`, "chat_message", showChat, onChatSignal);
 
   const sendChat = useMutation({
     mutationFn: () => sendOrderChat(params.id, chatText),
@@ -113,7 +195,36 @@ function OrderDetailContent() {
           </div>
           <p className="text-sm text-(--color-ink-soft)">{o.merchant?.name}</p>
           <p className="text-xs text-(--color-ink-faint)">{o.dropoff_address}</p>
+          {o.status === "cancelled" && o.cancellation_reason && (
+            <p className="mt-2 text-xs text-(--color-ink-faint)">{o.cancellation_reason}</p>
+          )}
         </section>
+
+        {modReq && removedItem && (
+          <section className="rounded-2xl border border-(--color-warning-soft) bg-(--color-warning-soft) p-4">
+            <button onClick={() => setShowPicker(true)} className="flex w-full items-center gap-3 text-left">
+              <HugeiconsIcon icon={Alert02Icon} size={20} strokeWidth={1.5} className="shrink-0 text-(--color-warning)" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-(--color-ink)">
+                  {removedItem.quantity}x {removedItem.item_name} tidak tersedia
+                </p>
+                <p className="text-xs text-(--color-ink-soft)">{modificationReasonLabel(modReq.reason_category, modReq.reason)}</p>
+              </div>
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.5} className="shrink-0 text-(--color-ink-faint)" />
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Batalkan pesanan ini? Pembayaran (jika ada) akan direfund ke wallet.")) {
+                  cancelModification.mutate();
+                }
+              }}
+              disabled={cancelModification.isPending}
+              className="mt-3 text-xs font-semibold text-(--color-danger)"
+            >
+              Batalkan pesanan ini
+            </button>
+          </section>
+        )}
 
         {o.payment_type !== "cash" && o.payment_status !== "paid" && o.payment_url && (
           <section className="rounded-2xl border border-(--color-warning-soft) bg-(--color-warning-soft) p-4">
@@ -271,6 +382,26 @@ function OrderDetailContent() {
           </section>
         )}
       </div>
+
+      {showPicker && o.merchant?.id && (
+        <ReplacementPickerSheet
+          merchantId={o.merchant.id}
+          onClose={() => setShowPicker(false)}
+          onConfirm={(picked) => {
+            const removedTotal = removedItem?.total_price ?? 0;
+            const delta = picked.estimatedTotal - removedTotal;
+            const deltaMsg =
+              Math.abs(delta) < 1
+                ? "Tidak ada selisih harga."
+                : delta > 0
+                  ? `Perkiraan tambahan bayar: ${formatIDR(delta)}`
+                  : `Perkiraan refund: ${formatIDR(-delta)}`;
+            if (confirm(`Ganti ke ${picked.quantity}x ${picked.product.name}?\n\n${deltaMsg}`)) {
+              replace.mutate(picked);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

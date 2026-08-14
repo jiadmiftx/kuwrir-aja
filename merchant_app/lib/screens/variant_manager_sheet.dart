@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/menu_cubit.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Lets a merchant create/manage variant groups (e.g. "Ukuran", "Topping")
 /// and their options for a single product. Reads the live product from
@@ -203,7 +204,7 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                               fontSize: 17, fontWeight: FontWeight.w800, color: KuwrirColors.textPrimary)),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: KuwrirColors.textSecondary),
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedCancel01, color: KuwrirColors.textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -236,7 +237,7 @@ class _VariantManagerSheetState extends State<VariantManagerSheet> {
                       side: BorderSide(color: KuwrirColors.primary.withValues(alpha: 0.4)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    icon: const Icon(Icons.add),
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
                     label: const Text('Tambah Topping/Varian Baru',
                         style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
@@ -321,7 +322,7 @@ class _GroupCard extends StatelessWidget {
                     Text('+IDR ${o.price.toStringAsFixed(0)}',
                         style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: KuwrirColors.primary)),
                     IconButton(
-                      icon: Icon(Icons.delete_outline, size: 18, color: KuwrirColors.error),
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete02, size: 18, color: KuwrirColors.error),
                       onPressed: () => onDeleteOption(o.id),
                     ),
                   ],
@@ -331,7 +332,7 @@ class _GroupCard extends StatelessWidget {
             TextButton.icon(
               onPressed: onAddOption,
               style: TextButton.styleFrom(foregroundColor: KuwrirColors.primary),
-              icon: const Icon(Icons.add, size: 16),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: 16),
               label: const Text('Tambah Opsi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ],

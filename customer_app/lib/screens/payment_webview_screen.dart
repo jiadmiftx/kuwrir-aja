@@ -18,10 +18,19 @@ import '../cubits/order_tracking_cubit.dart';
 class PaymentWebViewScreen extends StatefulWidget {
   final String paymentUrl;
   final String orderId;
+
+  /// The id Duitku's return URL actually contains — normally the same as
+  /// [orderId], except for order-modification top-ups (see
+  /// OrderModificationScreen) where CreatePayment is called with the
+  /// OrderModificationRequest's id, not the order's, so the return URL
+  /// doesn't contain [orderId] at all. Defaults to [orderId].
+  final String? returnMatchId;
+
   const PaymentWebViewScreen({
     super.key,
     required this.paymentUrl,
     required this.orderId,
+    this.returnMatchId,
   });
 
   @override
@@ -44,7 +53,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
           onPageStarted: (_) => setState(() => _loading = true),
           onPageFinished: (_) => setState(() => _loading = false),
           onNavigationRequest: (request) {
-            if (request.url.contains(widget.orderId)) {
+            if (request.url.contains(widget.returnMatchId ?? widget.orderId)) {
               _onReturnDetected();
               return NavigationDecision.prevent;
             }

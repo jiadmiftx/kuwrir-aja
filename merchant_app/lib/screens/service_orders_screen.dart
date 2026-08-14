@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Service order management for jasa merchants (laundry, bengkel, etc.)
 /// Statuses handled here: confirmed → in_service → ready_for_return
@@ -161,7 +162,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
     if (orders.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+          const HugeIcon(icon: HugeIcons.strokeRoundedInbox, size: 48, color: Colors.grey),
           const SizedBox(height: 8),
           Text('Tidak ada order ${_statusLabel(status)}', style: const TextStyle(color: Colors.grey)),
         ]),
@@ -199,7 +200,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
             ...o.items.map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(children: [
-                const Icon(Icons.arrow_right, size: 16, color: Colors.grey),
+                const HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, size: 16, color: Colors.grey),
                 Text(item, style: const TextStyle(fontSize: 13)),
               ]),
             )),
@@ -211,7 +212,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.amber.shade200)),
                 child: Row(children: [
-                  const Icon(Icons.note, size: 14, color: Colors.amber),
+                  const HugeIcon(icon: HugeIcons.strokeRoundedNote01, size: 14, color: Colors.amber),
                   const SizedBox(width: 6),
                   Expanded(child: Text(o.serviceNotes, style: const TextStyle(fontSize: 12))),
                 ]),
@@ -242,7 +243,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
       case 'confirmed':
         return const Row(children: [
           Expanded(child: SizedBox()),
-          Icon(Icons.delivery_dining, color: Colors.orange, size: 16),
+          HugeIcon(icon: HugeIcons.strokeRoundedDeliveryBox01, color: Colors.orange, size: 16),
           SizedBox(width: 4),
           Text('Menunggu kurir jemput barang', style: TextStyle(color: Colors.orange, fontSize: 13)),
         ]);
@@ -251,7 +252,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
         return SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            icon: const Icon(Icons.build, size: 16),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedWrench01, size: 16),
             label: const Text('Mulai Kerjakan'),
             onPressed: () => _transition(o.id, 'item_picked_up', 'in_service', 'Mulai Kerjakan'),
           ),
@@ -261,7 +262,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
         return SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            icon: const Icon(Icons.done_all, size: 16),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02, size: 16),
             label: const Text('Tandai Selesai'),
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () => _transition(o.id, 'in_service', 'ready_for_return', 'Tandai Selesai'),
@@ -270,7 +271,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen>
 
       case 'ready_for_return':
         return Row(children: [
-          const Icon(Icons.pending_actions, color: Colors.blue, size: 16),
+          const HugeIcon(icon: HugeIcons.strokeRoundedTimeSchedule, color: Colors.blue, size: 16),
           const SizedBox(width: 6),
           const Expanded(child: Text('Menunggu kurir untuk antar balik ke customer', style: TextStyle(color: Colors.blue, fontSize: 13))),
         ]);

@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class LocationPickerScreen extends StatefulWidget {
   final LatLng? initial;
@@ -90,7 +91,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     point: _picked,
                     width: 48,
                     height: 48,
-                    child: Icon(Icons.store_mall_directory,
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedStore01,
                         color: KuwrirColors.primary, size: 48),
                   ),
                 ],
@@ -126,7 +127,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           color: KuwrirColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.location_on_outlined, color: KuwrirColors.primary, size: 19),
+                        child: HugeIcon(icon: HugeIcons.strokeRoundedLocation01, color: KuwrirColors.primary, size: 19),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -154,7 +155,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               backgroundColor: KuwrirColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              child: const Icon(Icons.my_location),
+              child: const HugeIcon(icon: HugeIcons.strokeRoundedGpsSignal01),
             ),
           ),
         ],

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, CustomerService01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { getSupportMessages, sendSupportMessage } from "@/lib/api/endpoints";
+import { useSseSignal } from "@/lib/hooks/useSseSignal";
 
 function SupportContent() {
   const router = useRouter();
@@ -16,8 +17,14 @@ function SupportContent() {
   const messages = useQuery({
     queryKey: ["support-messages"],
     queryFn: getSupportMessages,
-    refetchInterval: 15_000,
+    // SSE (below) is the primary refresh trigger now — this is just a slow
+    // safety net for the rare case where the stream can't connect at all.
+    refetchInterval: 60_000,
   });
+  const onSupportSignal = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["support-messages"] });
+  }, [queryClient]);
+  useSseSignal("/support/messages/stream", "support_message", true, onSupportSignal);
 
   const send = useMutation({
     mutationFn: () => sendSupportMessage(text),

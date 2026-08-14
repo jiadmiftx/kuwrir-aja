@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,7 @@ import 'screens/order_tracking_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/support_chat_screen.dart';
+import 'cubits/chat_cubit.dart' show ChatChannel;
 import 'screens/profile_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/addresses_screen.dart';
@@ -37,7 +40,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   final notification = message.notification;
   if (notification != null) {
-    await NotificationService.persist(notification.title ?? '', notification.body ?? '');
+    await NotificationService.persist(
+      notification.title ?? '',
+      notification.body ?? '',
+    );
   }
 }
 
@@ -53,7 +59,11 @@ ThemeData _customerTheme(ThemeData base) {
   return base.copyWith(
     textTheme: textTheme,
     appBarTheme: base.appBarTheme.copyWith(
-      titleTextStyle: GoogleFonts.plusJakartaSans(color: KuwrirColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
+      titleTextStyle: GoogleFonts.plusJakartaSans(
+        color: KuwrirColors.textPrimary,
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+      ),
     ),
   );
 }
@@ -99,35 +109,54 @@ class KuwrirCustomerApp extends StatelessWidget {
           onGenerateRoute: (settings) {
             switch (settings.name) {
               case '/login':
-                return MaterialPageRoute(builder: (_) => const CustomerLoginScreen());
+                return MaterialPageRoute(
+                  builder: (_) => const CustomerLoginScreen(),
+                );
               case '/home':
                 final homeArgs = settings.arguments as Map<String, dynamic>?;
                 return MaterialPageRoute(
-                  builder: (_) => AppLockGate(child: CustomerHome(initialTab: homeArgs?['tab'] as int? ?? 0)),
+                  builder: (_) => AppLockGate(
+                    child: CustomerHome(
+                      initialTab: homeArgs?['tab'] as int? ?? 0,
+                    ),
+                  ),
                 );
               case '/search':
                 return MaterialPageRoute(builder: (_) => const SearchScreen());
               case '/merchant':
                 final args = settings.arguments as Map<String, dynamic>;
                 return MaterialPageRoute(
-                  builder: (_) => MerchantDetailScreen(merchantId: args['id'] as String, merchantName: args['name'] as String),
+                  builder: (_) => MerchantDetailScreen(
+                    merchantId: args['id'] as String,
+                    merchantName: args['name'] as String,
+                  ),
                 );
               case '/cart':
                 return MaterialPageRoute(builder: (_) => const CartScreen());
               case '/tracking':
                 final args = settings.arguments as Map<String, dynamic>;
-                return MaterialPageRoute(builder: (ctx) => OrderTrackingScreen(orderId: args['order_id'] as String));
+                return MaterialPageRoute(
+                  builder: (ctx) =>
+                      OrderTrackingScreen(orderId: args['order_id'] as String),
+                );
               case '/chat':
                 final args = settings.arguments as Map<String, dynamic>;
                 return MaterialPageRoute(
-                  builder: (_) => ChatScreen(orderId: args['order_id'] as String, orderNumber: args['order_number'] as String),
+                  builder: (_) => ChatScreen(
+                    orderId: args['order_id'] as String,
+                    orderNumber: args['order_number'] as String,
+                  ),
                 );
               case '/profile':
                 return MaterialPageRoute(builder: (_) => const ProfileScreen());
               case '/notifications':
-                return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+                return MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
+                );
               case '/addresses':
-                return MaterialPageRoute(builder: (_) => const AddressesScreen());
+                return MaterialPageRoute(
+                  builder: (_) => const AddressesScreen(),
+                );
               case '/wallet':
                 return MaterialPageRoute(builder: (_) => const WalletScreen());
               default:
@@ -175,6 +204,15 @@ class _SplashRouterState extends State<_SplashRouter> {
         return;
       }
       Navigator.pushReplacementNamed(context, '/home');
+
+      // Re-upload the FCM token on every app start, not just fresh login —
+      // login_screen.dart's upload only fires the moment credentials are
+      // entered, so a persisted session that skips straight to /home here
+      // (the common case: reopening the app) would otherwise never
+      // register a current token, and SendToUser on the backend silently
+      // no-ops when the stored token is empty/stale. Same fix merchant_app
+      // already has (see its _SplashRouterState._checkAuth).
+      unawaited(NotificationService.uploadToken(api));
     } catch (_) {
       await api.clearTokens();
       if (mounted) Navigator.pushReplacementNamed(context, '/login');
@@ -185,7 +223,14 @@ class _SplashRouterState extends State<_SplashRouter> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64), const SizedBox(height: 24), const CircularProgressIndicator()]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset('assets/images/logo_cocourir.svg', height: 64),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+          ],
+        ),
       ),
     );
   }
@@ -205,7 +250,15 @@ class _CustomerHomeState extends State<CustomerHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _idx, children: const [HomeScreen(), _PromoScreen(), _OrdersScreen(), _ChatListScreen()]),
+      body: IndexedStack(
+        index: _idx,
+        children: const [
+          HomeScreen(),
+          _PromoScreen(),
+          _OrdersScreen(),
+          _ChatListScreen(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) async {
@@ -248,10 +301,54 @@ class _OrdersScreen extends StatefulWidget {
   State<_OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<_OrdersScreen> {
+/// Order status → which of the four tabs it belongs under. Mirrors
+/// _StatusBadge's own status vocabulary so a badge color and its tab agree
+/// on what "active"/"done" mean.
+enum _OrderTab { all, active, completed, cancelled }
+
+const _orderTabLabels = {
+  _OrderTab.all: 'Semua',
+  _OrderTab.active: 'Berlangsung',
+  _OrderTab.completed: 'Selesai',
+  _OrderTab.cancelled: 'Dibatalkan',
+};
+
+const _activeStatuses = {
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'picked_up',
+};
+
+bool _orderMatchesTab(Order order, _OrderTab tab) {
+  switch (tab) {
+    case _OrderTab.all:
+      return true;
+    case _OrderTab.active:
+      return _activeStatuses.contains(order.status);
+    case _OrderTab.completed:
+      return order.status == 'delivered' || order.status == 'returned';
+    case _OrderTab.cancelled:
+      return order.status == 'cancelled';
+  }
+}
+
+class _OrdersScreenState extends State<_OrdersScreen>
+    with SingleTickerProviderStateMixin {
   List<Order> _orders = [];
   bool _loading = false;
   bool _loaded = false;
+  late final TabController _tabController = TabController(
+    length: _OrderTab.values.length,
+    vsync: this,
+  );
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   /// This screen lives inside CustomerHome's IndexedStack, so it's mounted
   /// (and this fires) from app launch regardless of which tab is active or
@@ -277,6 +374,19 @@ class _OrdersScreenState extends State<_OrdersScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  /// Awaiting the push (rather than firing it and forgetting) is what picks
+  /// up status changes made on the tracking screen — cancel, item-replacement,
+  /// delivery progress — instead of leaving this list showing stale data
+  /// once the customer comes back to it.
+  Future<void> _openTracking(Order order) async {
+    await Navigator.pushNamed(
+      context,
+      '/tracking',
+      arguments: {'order_id': order.id},
+    );
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_loaded && !_loading) {
@@ -291,24 +401,120 @@ class _OrdersScreenState extends State<_OrdersScreen> {
     if (_orders.isEmpty) {
       return Scaffold(
         backgroundColor: KuwrirColors.background,
-        appBar: AppBar(title: const Text('Pesanan Saya'), backgroundColor: KuwrirColors.background),
-        body: _EmptyState(icon: HugeIcons.strokeRoundedInvoice01, title: 'Belum ada pesanan', subtitle: 'Pesanan yang kamu buat akan muncul di sini', onRefresh: _load),
+        appBar: AppBar(
+          title: const Text('Pesanan Saya'),
+          backgroundColor: KuwrirColors.background,
+        ),
+        body: _EmptyState(
+          icon: HugeIcons.strokeRoundedInvoice01,
+          title: 'Belum ada pesanan',
+          subtitle: 'Pesanan yang kamu buat akan muncul di sini',
+          onRefresh: _load,
+        ),
       );
     }
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(title: const Text('Pesanan Saya'), backgroundColor: KuwrirColors.background),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: KuwrirColors.primary,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(20),
-          itemCount: _orders.length,
-          itemBuilder: (_, i) => _OrderCard(
-            order: _orders[i],
-            onTap: () => Navigator.pushNamed(context, '/tracking', arguments: {'order_id': _orders[i].id}),
+      appBar: AppBar(
+        title: const Text('Pesanan Saya'),
+        backgroundColor: KuwrirColors.background,
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelColor: KuwrirColors.primary,
+          unselectedLabelColor: KuwrirColors.textSecondary,
+          indicatorColor: KuwrirColors.primary,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13.5,
           ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 13.5,
+          ),
+          tabs: _OrderTab.values
+              .map((t) => Tab(text: _orderTabLabels[t]))
+              .toList(),
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: _OrderTab.values
+            .map(
+              (tab) => _OrdersTabView(
+                orders: _orders.where((o) => _orderMatchesTab(o, tab)).toList(),
+                tab: tab,
+                onRefresh: _load,
+                onTapOrder: _openTracking,
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _OrdersTabView extends StatelessWidget {
+  final List<Order> orders;
+  final _OrderTab tab;
+  final Future<void> Function() onRefresh;
+  final void Function(Order) onTapOrder;
+
+  const _OrdersTabView({
+    required this.orders,
+    required this.tab,
+    required this.onRefresh,
+    required this.onTapOrder,
+  });
+
+  static const _emptyCopy = {
+    _OrderTab.all: (
+      'Belum ada pesanan',
+      'Pesanan yang kamu buat akan muncul di sini',
+    ),
+    _OrderTab.active: (
+      'Tidak ada pesanan berlangsung',
+      'Pesanan yang sedang diproses akan muncul di sini',
+    ),
+    _OrderTab.completed: (
+      'Belum ada pesanan selesai',
+      'Riwayat pesanan yang selesai akan muncul di sini',
+    ),
+    _OrderTab.cancelled: (
+      'Tidak ada pesanan dibatalkan',
+      'Pesanan yang dibatalkan akan muncul di sini',
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (orders.isEmpty) {
+      final (title, subtitle) = _emptyCopy[tab]!;
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        color: KuwrirColors.primary,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.14),
+            _EmptyState(
+              icon: HugeIcons.strokeRoundedInvoice01,
+              title: title,
+              subtitle: subtitle,
+            ),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: KuwrirColors.primary,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: orders.length,
+        itemBuilder: (_, i) =>
+            _OrderCard(order: orders[i], onTap: () => onTapOrder(orders[i])),
       ),
     );
   }
@@ -319,10 +525,16 @@ class _OrderCard extends StatelessWidget {
   final VoidCallback onTap;
   const _OrderCard({required this.order, required this.onTap});
 
-  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
 
   String get _itemSummary {
-    if (order.items.isEmpty) return order.merchantName ?? order.senderName ?? '-';
+    if (order.items.isEmpty)
+      return order.merchantName ?? order.senderName ?? '-';
     final first = order.items.first.itemName;
     final extra = order.items.length - 1;
     return extra > 0 ? '$first +$extra lainnya' : first;
@@ -362,15 +574,29 @@ class _OrderCard extends StatelessWidget {
                     Container(
                       width: 40,
                       height: 40,
-                      decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(11)),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
                       clipBehavior: Clip.antiAlias,
-                      child: order.merchantLogoUrl != null && order.merchantLogoUrl!.isNotEmpty
+                      child:
+                          order.merchantLogoUrl != null &&
+                              order.merchantLogoUrl!.isNotEmpty
                           ? Image.network(
                               order.merchantLogoUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => HugeIcon(icon: HugeIcons.strokeRoundedStore01, color: KuwrirColors.primary, size: 17),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  HugeIcon(
+                                    icon: HugeIcons.strokeRoundedStore01,
+                                    color: KuwrirColors.primary,
+                                    size: 17,
+                                  ),
                             )
-                          : HugeIcon(icon: HugeIcons.strokeRoundedStore01, color: KuwrirColors.primary, size: 17),
+                          : HugeIcon(
+                              icon: HugeIcons.strokeRoundedStore01,
+                              color: KuwrirColors.primary,
+                              size: 17,
+                            ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -381,10 +607,19 @@ class _OrderCard extends StatelessWidget {
                             order.merchantName ?? order.senderName ?? 'Pesanan',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.5,
+                            ),
                           ),
                           const SizedBox(height: 2),
-                          Text('#${order.orderNumber}${_dateLabel != null ? ' · ${_dateLabel!}' : ''}', style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint)),
+                          Text(
+                            '#${order.orderNumber}${_dateLabel != null ? ' · ${_dateLabel!}' : ''}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: KuwrirColors.textHint,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -401,13 +636,20 @@ class _OrderCard extends StatelessWidget {
                         _itemSummary,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: KuwrirColors.textSecondary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Rp ${_fmt(order.total)}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: KuwrirColors.primary),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: KuwrirColors.primary,
+                      ),
                     ),
                   ],
                 ),
@@ -427,7 +669,12 @@ class _EmptyState extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onRefresh;
-  const _EmptyState({required this.icon, required this.title, required this.subtitle, this.onRefresh});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -440,13 +687,24 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 88,
               height: 88,
-              decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), shape: BoxShape.circle),
-              child: HugeIcon(icon: icon, size: 36, color: KuwrirColors.primary),
+              decoration: BoxDecoration(
+                color: KuwrirColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: HugeIcon(
+                icon: icon,
+                size: 36,
+                color: KuwrirColors.primary,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: KuwrirColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: KuwrirColors.textPrimary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -455,7 +713,10 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: KuwrirColors.textSecondary),
               textAlign: TextAlign.center,
             ),
-            if (onRefresh != null) ...[const SizedBox(height: 16), TextButton(onPressed: onRefresh, child: const Text('Muat Ulang'))],
+            if (onRefresh != null) ...[
+              const SizedBox(height: 16),
+              TextButton(onPressed: onRefresh, child: const Text('Muat Ulang')),
+            ],
           ],
         ),
       ),
@@ -474,7 +735,14 @@ class _SoftListTile extends StatelessWidget {
   final VoidCallback onTap;
   final EdgeInsets margin;
 
-  const _SoftListTile({required this.leading, required this.title, required this.subtitle, this.trailing, required this.onTap, this.margin = EdgeInsets.zero});
+  const _SoftListTile({
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    required this.onTap,
+    this.margin = EdgeInsets.zero,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -505,14 +773,20 @@ class _SoftListTile extends StatelessWidget {
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.5, color: KuwrirColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: KuwrirColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -578,7 +852,10 @@ class _StatusBadge extends StatelessWidget {
     final c = _color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(7)),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(7),
+      ),
       child: Text(
         _label,
         style: TextStyle(fontSize: 10.5, color: c, fontWeight: FontWeight.w700),
@@ -615,7 +892,10 @@ class _PromoScreenState extends State<_PromoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(title: const Text('Promo'), backgroundColor: KuwrirColors.background),
+      appBar: AppBar(
+        title: const Text('Promo'),
+        backgroundColor: KuwrirColors.background,
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         color: KuwrirColors.primary,
@@ -631,8 +911,14 @@ class _PromoScreenState extends State<_PromoScreen> {
                 builder: (context, constraints) => SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: _EmptyState(icon: HugeIcons.strokeRoundedDiscountTag01, title: 'Belum ada promo aktif', subtitle: 'Pantau terus untuk penawaran terbaik'),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: _EmptyState(
+                      icon: HugeIcons.strokeRoundedDiscountTag01,
+                      title: 'Belum ada promo aktif',
+                      subtitle: 'Pantau terus untuk penawaran terbaik',
+                    ),
                   ),
                 ),
               );
@@ -661,11 +947,20 @@ class _PromoStyle {
 _PromoStyle _promoStyle(String type) {
   switch (type) {
     case 'fixed':
-      return const _PromoStyle(KuwrirColors.accent, HugeIcons.strokeRoundedSavings);
+      return const _PromoStyle(
+        KuwrirColors.accent,
+        HugeIcons.strokeRoundedSavings,
+      );
     case 'free_delivery':
-      return const _PromoStyle(KuwrirColors.warning, HugeIcons.strokeRoundedDeliveryBox01);
+      return const _PromoStyle(
+        KuwrirColors.warning,
+        HugeIcons.strokeRoundedDeliveryBox01,
+      );
     default:
-      return const _PromoStyle(KuwrirColors.primary, HugeIcons.strokeRoundedPercent);
+      return const _PromoStyle(
+        KuwrirColors.primary,
+        HugeIcons.strokeRoundedPercent,
+      );
   }
 }
 
@@ -686,14 +981,24 @@ class _PromoCard extends StatelessWidget {
     }
   }
 
-  String _fmt(double v) => v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  String _fmt(double v) => v
+      .toStringAsFixed(0)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
 
   Future<void> _copyCode(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: promo.code));
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Kode ${promo.code} disalin'), backgroundColor: KuwrirColors.primaryDark, behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kode ${promo.code} disalin'),
+          backgroundColor: KuwrirColors.primaryDark,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -707,7 +1012,13 @@ class _PromoCard extends StatelessWidget {
         color: KuwrirColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: KuwrirColors.border),
-        boxShadow: [BoxShadow(color: KuwrirColors.textPrimary.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: KuwrirColors.textPrimary.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -729,18 +1040,36 @@ class _PromoCard extends StatelessWidget {
               children: [
                 Text(
                   _valueLabel,
-                  style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, color: style.color),
+                  style: TextStyle(
+                    fontSize: 17.5,
+                    fontWeight: FontWeight.w800,
+                    color: style.color,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(promo.title, style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 13, height: 1.35)),
-                if (promo.minOrder > 0 || (promo.type == 'percentage' && promo.maxDiscount > 0)) ...[
+                Text(
+                  promo.title,
+                  style: TextStyle(
+                    color: KuwrirColors.textSecondary,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                if (promo.minOrder > 0 ||
+                    (promo.type == 'percentage' && promo.maxDiscount > 0)) ...[
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      if (promo.minOrder > 0) _PromoInfoChip(text: 'Min. belanja Rp ${_fmt(promo.minOrder)}'),
-                      if (promo.type == 'percentage' && promo.maxDiscount > 0) _PromoInfoChip(text: 'Maks. Rp ${_fmt(promo.maxDiscount)}'),
+                      if (promo.minOrder > 0)
+                        _PromoInfoChip(
+                          text: 'Min. belanja Rp ${_fmt(promo.minOrder)}',
+                        ),
+                      if (promo.type == 'percentage' && promo.maxDiscount > 0)
+                        _PromoInfoChip(
+                          text: 'Maks. Rp ${_fmt(promo.maxDiscount)}',
+                        ),
                     ],
                   ),
                 ],
@@ -774,7 +1103,11 @@ class _PromoInfoChip extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 11,
+          color: KuwrirColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -800,15 +1133,28 @@ class DottedCodeChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          HugeIcon(icon: HugeIcons.strokeRoundedTicket01, size: 16, color: color),
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedTicket01,
+            size: 16,
+            color: color,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               code,
-              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-          HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: 15, color: color.withValues(alpha: 0.7)),
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCopy01,
+            size: 15,
+            color: color.withValues(alpha: 0.7),
+          ),
         ],
       ),
     );
@@ -825,7 +1171,14 @@ class _PromoHeroFallback extends StatelessWidget {
       height: 92,
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [style.color.withValues(alpha: 0.16), style.color.withValues(alpha: 0.05)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: LinearGradient(
+          colors: [
+            style.color.withValues(alpha: 0.16),
+            style.color.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       child: Center(
         child: HugeIcon(icon: style.icon, size: 34, color: style.color),
@@ -854,7 +1207,9 @@ class _ChatListScreenState extends State<_ChatListScreen> {
       final api = context.read<ApiClient>();
       if (await api.isAuthenticated()) {
         final orders = await api.getMyOrders();
-        _activeOrders = orders.where((o) => _chatStatuses.contains(o.status)).toList();
+        _activeOrders = orders
+            .where((o) => _chatStatuses.contains(o.status))
+            .toList();
       }
     } catch (_) {}
     _loaded = true;
@@ -868,7 +1223,10 @@ class _ChatListScreenState extends State<_ChatListScreen> {
     }
     return Scaffold(
       backgroundColor: KuwrirColors.background,
-      appBar: AppBar(title: const Text('Chat'), backgroundColor: KuwrirColors.background),
+      appBar: AppBar(
+        title: const Text('Chat'),
+        backgroundColor: KuwrirColors.background,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -881,46 +1239,117 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                     leading: Container(
                       width: 44,
                       height: 44,
-                      decoration: BoxDecoration(color: KuwrirColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                      child: HugeIcon(icon: HugeIcons.strokeRoundedCustomerService01, color: KuwrirColors.primary, size: 20),
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCustomerService01,
+                        color: KuwrirColors.primary,
+                        size: 20,
+                      ),
                     ),
                     title: 'Bantuan & Support',
                     subtitle: 'Chat dengan tim admin Cocourir',
-                    trailing: HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, color: KuwrirColors.textHint),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())),
+                    trailing: HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
+                      color: KuwrirColors.textHint,
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SupportChatScreen(),
+                      ),
+                    ),
                   ),
                   if (_activeOrders.isEmpty) ...[
                     const SizedBox(height: 40),
-                    _EmptyState(icon: HugeIcons.strokeRoundedChat, title: 'Tidak ada chat pesanan aktif', subtitle: 'Chat muncul saat pesanan sedang diproses'),
+                    _EmptyState(
+                      icon: HugeIcons.strokeRoundedChat,
+                      title: 'Tidak ada chat pesanan aktif',
+                      subtitle: 'Chat muncul saat pesanan sedang diproses',
+                    ),
                   ] else ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
                       child: Text(
                         'PESANAN AKTIF',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: KuwrirColors.textHint),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: KuwrirColors.textHint,
+                        ),
                       ),
                     ),
-                    for (final o in _activeOrders)
+                    for (final o in _activeOrders) ...[
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _SoftListTile(
                           leading: Container(
                             width: 44,
                             height: 44,
-                            decoration: BoxDecoration(color: KuwrirColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                            child: HugeIcon(icon: HugeIcons.strokeRoundedDeliveryBox01, color: KuwrirColors.warning, size: 20),
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.primary.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedStore01,
+                              color: KuwrirColors.primary,
+                              size: 20,
+                            ),
                           ),
-                          title: '#${o.orderNumber}',
-                          subtitle: o.merchantName ?? o.senderName ?? '-',
+                          title: o.merchantName ?? '-',
+                          subtitle: '#${o.orderNumber} · Chat Merchant',
                           trailing: _StatusBadge(o.status),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ChatScreen(orderId: o.id, orderNumber: o.orderNumber),
+                              builder: (_) => ChatScreen(
+                                orderId: o.id,
+                                orderNumber: o.orderNumber,
+                                channel: ChatChannel.merchant,
+                                counterpartLabel: o.merchantName ?? 'Merchant',
+                              ),
                             ),
                           ),
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SoftListTile(
+                          leading: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: KuwrirColors.warning.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedDeliveryBox01,
+                              color: KuwrirColors.warning,
+                              size: 20,
+                            ),
+                          ),
+                          title: 'Driver',
+                          subtitle: '#${o.orderNumber} · Chat Driver',
+                          trailing: _StatusBadge(o.status),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                orderId: o.id,
+                                orderNumber: o.orderNumber,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),

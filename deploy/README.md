@@ -43,9 +43,9 @@ Repo → Settings → Secrets and variables → Actions:
 | `VPS_USER` | deploy-backend, deploy-admin | SSH user (e.g. `deploy`) |
 | `VPS_SSH_KEY` | deploy-backend, deploy-admin | Private key for that user (PEM format) |
 | `FIREBASE_SERVICE_ACCOUNT` | firebase-distribution | Raw JSON of a Firebase service account key |
-| `FIREBASE_APP_ID_CUSTOMER` | firebase-distribution | Firebase App ID for `com.enak.enak_customer` |
-| `FIREBASE_APP_ID_DRIVER` | firebase-distribution | Firebase App ID for `com.enak.enak_driver` |
-| `FIREBASE_APP_ID_RESTAURANT` | firebase-distribution | Firebase App ID for `com.enak.kuwrir_merchant` |
+| `FIREBASE_APP_ID_CUSTOMER` | firebase-distribution | Firebase App ID for `com.kuwrir.customer` |
+| `FIREBASE_APP_ID_DRIVER` | firebase-distribution | Firebase App ID for `com.kuwrir.driver` |
+| `FIREBASE_APP_ID_MERCHANT` | firebase-distribution | Firebase App ID for `com.kuwrir.merchant` |
 
 `GITHUB_TOKEN` (used to push to GHCR) is provided automatically by Actions —
 no setup needed, but the repo's package visibility defaults to **private**,
@@ -129,26 +129,27 @@ Update `shared/kuwrir_shared/lib/src/api/api_config.dart` `baseUrl` to
 `http://<VPS_IP>:8090/api/v1` so the 3 Flutter apps talk to the VPS instead of
 a local LAN IP.
 
-## 3. Firebase App Distribution setup (one-time, no project exists yet)
+## 3. Firebase App Distribution setup
 
-1. Go to the [Firebase console](https://console.firebase.google.com/) and
-   create a new project (e.g. "KUWRIR").
-2. Add 3 Android apps to the project with these exact package names:
-   - `com.enak.enak_customer`
-   - `com.enak.enak_driver`
-   - `com.enak.kuwrir_merchant`
-   You don't need to download `google-services.json` or add the Firebase SDK
-   to the apps — App Distribution only needs the App ID.
-3. For each app, go to **Project settings → General**, scroll to "Your apps",
-   and copy the **App ID** (format `1:1234567890:android:abcdef1234567890`).
+The `kuwrir-3495d` Firebase project and its 3 Android apps
+(`com.kuwrir.customer`, `com.kuwrir.driver`, `com.kuwrir.merchant`) already
+exist — this section is just where to find the values these secrets need,
+not a from-scratch setup.
+
+1. Go to the [Firebase console](https://console.firebase.google.com/) →
+   `kuwrir-3495d` project.
+2. For each of the 3 Android apps, go to **Project settings → General**,
+   scroll to "Your apps", and copy the **App ID** (format
+   `1:1234567890:android:abcdef1234567890` — also readable straight out of
+   each app's `android/app/google-services.json` as `mobilesdk_app_id`).
    Set these as `FIREBASE_APP_ID_CUSTOMER`, `FIREBASE_APP_ID_DRIVER`,
-   `FIREBASE_APP_ID_RESTAURANT`.
-4. Create a service account for CI: **Project settings → Service accounts →
+   `FIREBASE_APP_ID_MERCHANT`.
+3. Create a service account for CI: **Project settings → Service accounts →
    Generate new private key**, then grant it the **Firebase App Distribution
    Admin** role under [IAM](https://console.cloud.google.com/iam-admin/iam)
    for the project. Paste the full JSON content into the
    `FIREBASE_SERVICE_ACCOUNT` secret.
-5. In **App Distribution → Testers & Groups**, create a group named `testers`
+4. In **App Distribution → Testers & Groups**, create a group named `testers`
    and add the email addresses of people who should receive new builds. (The
    workflows upload to the `testers` group by default — change the `groups:`
    input in `.github/workflows/firebase-distribution.yml` if you want a

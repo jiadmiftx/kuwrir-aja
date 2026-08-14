@@ -6,6 +6,7 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/store_cubit.dart';
 import 'promo_codes_screen.dart';
 import 'banner_ads_screen.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -245,7 +246,7 @@ class _StoreScreenState extends State<StoreScreen> {
                     child: Column(
                       children: [
                         _InfoRow(
-                          icon: Icons.storefront_outlined,
+                          icon: HugeIcons.strokeRoundedStore01,
                           label: 'Nama Toko',
                           value: merchant.name,
                           onTap: () => _editDetail(
@@ -257,7 +258,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                         const _Hairline(),
                         _InfoRow(
-                          icon: Icons.call_outlined,
+                          icon: HugeIcons.strokeRoundedCall02,
                           label: 'Telepon',
                           value: merchant.phone ?? 'Belum diisi',
                           onTap: () => _editDetail(
@@ -269,7 +270,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                         const _Hairline(),
                         _InfoRow(
-                          icon: Icons.location_on_outlined,
+                          icon: HugeIcons.strokeRoundedLocation01,
                           label: 'Alamat',
                           value: merchant.address,
                           onTap: () => _editDetail(
@@ -281,7 +282,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                         const _Hairline(),
                         _InfoRow(
-                          icon: Icons.star_rounded,
+                          icon: HugeIcons.strokeRoundedStar,
                           label: 'Rating',
                           value: '${merchant.rating.toStringAsFixed(1)} · ${merchant.totalReviews} ulasan',
                         ),
@@ -332,7 +333,7 @@ class _StoreScreenState extends State<StoreScreen> {
                     child: Column(
                       children: [
                         _InfoRow(
-                          icon: Icons.sell_outlined,
+                          icon: HugeIcons.strokeRoundedDiscountTag01,
                           label: 'Kode diskon buat pelangganmu sendiri',
                           value: 'Kode Promo',
                           onTap: () => Navigator.push(
@@ -342,7 +343,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                         const _Hairline(),
                         _InfoRow(
-                          icon: Icons.campaign_outlined,
+                          icon: HugeIcons.strokeRoundedMegaphone01,
                           label: 'Tampil di carousel utama halaman depan',
                           value: 'Iklan Banner Homepage',
                           onTap: () => Navigator.push(
@@ -533,7 +534,7 @@ class _StoreHero extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.add_photo_alternate_outlined, color: KuwrirColors.primary, size: 28),
+                            HugeIcon(icon: HugeIcons.strokeRoundedCameraAdd01, color: KuwrirColors.primary, size: 28),
                             const SizedBox(height: 6),
                             Text('Tambah banner toko',
                                 style: TextStyle(color: KuwrirColors.primary, fontSize: 12.5, fontWeight: FontWeight.w600)),
@@ -559,7 +560,7 @@ class _StoreHero extends StatelessWidget {
                       child: SafeArea(
                         bottom: false,
                         child: PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, color: Colors.white),
+                          icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical, color: Colors.white),
                           style: IconButton.styleFrom(backgroundColor: Colors.black26),
                           onSelected: (value) {
                             if (value == 'logout') onLogout();
@@ -607,7 +608,7 @@ class _StoreHero extends StatelessWidget {
                             ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                             : merchant.logoUrl != null
                                 ? Image.network(merchant.logoUrl!, fit: BoxFit.cover)
-                                : Icon(Icons.storefront, color: KuwrirColors.primary, size: 30),
+                                : HugeIcon(icon: HugeIcons.strokeRoundedStore01, color: KuwrirColors.primary, size: 30),
                       ),
                     ),
                   ),
@@ -622,7 +623,7 @@ class _StoreHero extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: KuwrirColors.surface, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                        child: const HugeIcon(icon: HugeIcons.strokeRoundedCamera01, size: 12, color: Colors.white),
                       ),
                     ),
                 ],
@@ -659,7 +660,7 @@ class _EditChip extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.edit_outlined, size: 12, color: Colors.white),
+          HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 12, color: Colors.white),
           SizedBox(width: 4),
           Text('Ganti', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
         ],
@@ -718,7 +719,7 @@ class _Hairline extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
   final String value;
   final VoidCallback? onTap;
@@ -734,7 +735,7 @@ class _InfoRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: KuwrirColors.textSecondary),
+            HugeIcon(icon: icon, size: 20, color: KuwrirColors.textSecondary),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -746,7 +747,7 @@ class _InfoRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null) Icon(Icons.edit_outlined, size: 16, color: KuwrirColors.textHint),
+            if (onTap != null) HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 16, color: KuwrirColors.textHint),
           ],
         ),
       ),
