@@ -48,6 +48,9 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
 		orders.GET("/:id/chat/stream", h.StreamChat)
+		orders.GET("/:id/merchant-chat", h.GetMerchantChat)
+		orders.POST("/:id/merchant-chat", h.SendMerchantChat)
+		orders.GET("/:id/merchant-chat/stream", h.StreamMerchantChat)
 		orders.GET("/:id/modification-request", h.GetModificationRequest)
 		orders.POST("/:id/modification-request/:reqId/resolve", h.ResolveModificationRequest)
 	}
@@ -904,7 +907,101 @@ func (h *RestaurantOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/:id/request-item-change", h.RequestItemChange)
 		orders.POST("/:id/preparing", h.MarkPreparing)
 		orders.POST("/:id/ready", h.MarkReady)
+		orders.GET("/:id/chat", h.GetChat)
+		orders.POST("/:id/chat", h.SendChat)
+		orders.GET("/:id/chat/stream", h.StreamChat)
 	}
+}
+
+// GetChat is the merchant's read side of the customer↔merchant chat thread.
+func (h *RestaurantOrderHandler) GetChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ?", orderID, merchant.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var msgs []model.ChatMessage
+	h.db.Where("order_id = ? AND channel = ?", orderID, "merchant").Order("created_at ASC").Find(&msgs)
+	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// StreamChat is the merchant's SSE side of the customer↔merchant chat
+// thread.
+func (h *RestaurantOrderHandler) StreamChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ?", orderID, merchant.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	streamChatEvents(c, order.ID.String(), "merchant")
+}
+
+// SendChat sends a chat message from merchant to customer.
+func (h *RestaurantOrderHandler) SendChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		Text string `json:"text" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND merchant_id = ?", orderID, merchant.ID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	senderUID, _ := uuid.Parse(userID)
+	orderUID, _ := uuid.Parse(orderID)
+	msg := model.ChatMessage{
+		OrderID:    orderUID,
+		Channel:    "merchant",
+		SenderID:   senderUID,
+		SenderRole: "merchant",
+		Text:       req.Text,
+	}
+	h.db.Create(&msg)
+	service.PublishChatEvent(chatEventKey(orderID, "merchant"))
+
+	if order.CustomerID != nil {
+		service.SendToUser(h.db, *order.CustomerID,
+			fmt.Sprintf("Pesan dari %s 💬", merchant.Name),
+			req.Text,
+			map[string]string{"order_id": orderID, "type": "merchant_chat"},
+		)
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
 // ActiveOrders returns orders for the merchant owner
@@ -917,18 +1014,61 @@ func (h *RestaurantOrderHandler) ActiveOrders(c *gin.Context) {
 		return
 	}
 
+	// Recently cancelled orders are included (bounded to the last 3 days) so
+	// a merchant who just cancelled one, or whose customer cancelled after
+	// an item-unavailable flag, sees that reflected here instead of the
+	// order silently vanishing — full order history belongs elsewhere, this
+	// is still meant to be a live working list, not an archive.
 	var orders []model.Order
-	h.db.Where("merchant_id = ? AND status IN ? AND (payment_type = ? OR payment_status = ?)", merchant.ID,
-		[]string{
-			string(model.OrderStatusPending),
-			string(model.OrderStatusConfirmed),
-			string(model.OrderStatusPreparing),
-			string(model.OrderStatusReady),
-		}, "cash", "paid").
+	h.db.Where("merchant_id = ?", merchant.ID).
+		Where(
+			"(status IN ? OR (status = ? AND cancelled_at > ?))",
+			[]string{
+				string(model.OrderStatusPending),
+				string(model.OrderStatusConfirmed),
+				string(model.OrderStatusPreparing),
+				string(model.OrderStatusReady),
+			},
+			string(model.OrderStatusCancelled),
+			time.Now().Add(-3*24*time.Hour),
+		).
+		Where("(payment_type = ? OR payment_status = ?)", "cash", "paid").
 		Preload("Customer").
 		Preload("Items").
 		Order("created_at ASC").
 		Find(&orders)
+
+	// Attach a summary of each order's most recently *replaced* item so the
+	// merchant can tell "customer already resolved the item-unavailable flag
+	// I sent" — nothing else on the order signals this once the order's own
+	// status is unchanged (still confirmed/preparing). Cancelled-via-
+	// modification-request orders don't need this: they already show up
+	// with cancellation_reason set, same as any other cancellation.
+	orderIDs := make([]string, len(orders))
+	for i, o := range orders {
+		orderIDs[i] = o.ID.String()
+	}
+	if len(orderIDs) > 0 {
+		var modRequests []model.OrderModificationRequest
+		h.db.Where("order_id IN ? AND status = ?", orderIDs, "replaced").
+			Order("resolved_at DESC").
+			Find(&modRequests)
+		latestByOrder := map[string]model.OrderModificationRequest{}
+		for _, m := range modRequests {
+			key := m.OrderID.String()
+			if _, seen := latestByOrder[key]; !seen {
+				latestByOrder[key] = m
+			}
+		}
+		for i, o := range orders {
+			if m, ok := latestByOrder[o.ID.String()]; ok {
+				orders[i].LastModification = &model.OrderModificationSummary{
+					Status:     m.Status,
+					ResolvedAt: m.ResolvedAt,
+				}
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
@@ -1557,7 +1697,7 @@ func (h *DriverOrderHandler) GetChat(c *gin.Context) {
 	}
 
 	var msgs []model.ChatMessage
-	h.db.Where("order_id = ?", orderID).Order("created_at ASC").Find(&msgs)
+	h.db.Where("order_id = ? AND channel = ?", orderID, "driver").Order("created_at ASC").Find(&msgs)
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -1580,7 +1720,7 @@ func (h *DriverOrderHandler) StreamChat(c *gin.Context) {
 		return
 	}
 
-	streamChatEvents(c, order.ID.String())
+	streamChatEvents(c, order.ID.String(), "driver")
 }
 
 // SendChat sends a chat message from driver to customer.
@@ -1612,12 +1752,13 @@ func (h *DriverOrderHandler) SendChat(c *gin.Context) {
 	orderUID, _ := uuid.Parse(orderID)
 	msg := model.ChatMessage{
 		OrderID:    orderUID,
+		Channel:    "driver",
 		SenderID:   senderUID,
 		SenderRole: "driver",
 		Text:       req.Text,
 	}
 	h.db.Create(&msg)
-	service.PublishChatEvent(orderID)
+	service.PublishChatEvent(chatEventKey(orderID, "driver"))
 
 	// Notify customer
 	if order.CustomerID != nil {
@@ -1929,7 +2070,7 @@ func (h *Handler) GetChat(c *gin.Context) {
 	}
 
 	var msgs []model.ChatMessage
-	h.db.Where("order_id = ?", orderID).Order("created_at ASC").Find(&msgs)
+	h.db.Where("order_id = ? AND channel = ?", orderID, "driver").Order("created_at ASC").Find(&msgs)
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
 }
 
@@ -1948,19 +2089,105 @@ func (h *Handler) StreamChat(c *gin.Context) {
 		return
 	}
 
-	streamChatEvents(c, order.ID.String())
+	streamChatEvents(c, order.ID.String(), "driver")
 }
 
-// streamChatEvents is the shared SSE loop for both the customer and driver
+// GetMerchantChat is the customer's read side of the customer↔merchant chat
+// thread — same shape as GetChat, just scoped to the "merchant" channel
+// instead of "driver" so the two threads never mix.
+func (h *Handler) GetMerchantChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	var msgs []model.ChatMessage
+	h.db.Where("order_id = ? AND channel = ?", orderID, "merchant").Order("created_at ASC").Find(&msgs)
+	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// StreamMerchantChat is the customer's SSE side of the customer↔merchant
+// chat thread.
+func (h *Handler) StreamMerchantChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	streamChatEvents(c, order.ID.String(), "merchant")
+}
+
+// SendMerchantChat sends a chat message from customer to merchant.
+func (h *Handler) SendMerchantChat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		Text string `json:"text" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	senderUID, _ := uuid.Parse(userID)
+	orderUID, _ := uuid.Parse(orderID)
+	msg := model.ChatMessage{
+		OrderID:    orderUID,
+		Channel:    "merchant",
+		SenderID:   senderUID,
+		SenderRole: "customer",
+		Text:       req.Text,
+	}
+	h.db.Create(&msg)
+	service.PublishChatEvent(chatEventKey(orderID, "merchant"))
+
+	if order.MerchantID != nil {
+		var merchant model.Merchant
+		if h.db.Where("id = ?", *order.MerchantID).First(&merchant).Error == nil {
+			service.SendToUser(h.db, merchant.UserID,
+				"Pesan dari Customer 💬",
+				req.Text,
+				map[string]string{"order_id": orderID, "type": "merchant_chat"},
+			)
+		}
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
+// chatEventKey composes the key chat_events.go's broadcaster is keyed by —
+// an order can have both a driver thread and a merchant thread open at
+// once, so the trigger events need to stay scoped to the right one instead
+// of both threads refetching on every message in either.
+func chatEventKey(orderID, channel string) string {
+	return orderID + ":" + channel
+}
+
+// streamChatEvents is the shared SSE loop for the customer/driver/merchant
 // chat streams — they differ only in the ownership check performed before
 // calling this.
-func streamChatEvents(c *gin.Context, orderID string) {
+func streamChatEvents(c *gin.Context, orderID, channel string) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 
-	events, unsubscribe := service.SubscribeChatEvents(orderID)
+	events, unsubscribe := service.SubscribeChatEvents(chatEventKey(orderID, channel))
 	defer unsubscribe()
 
 	heartbeat := time.NewTicker(20 * time.Second)
@@ -2003,12 +2230,13 @@ func (h *Handler) SendChat(c *gin.Context) {
 	orderUID, _ := uuid.Parse(orderID)
 	msg := model.ChatMessage{
 		OrderID:    orderUID,
+		Channel:    "driver",
 		SenderID:   senderUID,
 		SenderRole: "customer",
 		Text:       req.Text,
 	}
 	h.db.Create(&msg)
-	service.PublishChatEvent(orderID)
+	service.PublishChatEvent(chatEventKey(orderID, "driver"))
 
 	// Notify driver if assigned
 	if order.DriverID != nil {

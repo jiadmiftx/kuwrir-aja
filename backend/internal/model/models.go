@@ -443,12 +443,25 @@ type Order struct {
 	ReadyForReturnAt *time.Time `json:"ready_for_return_at,omitempty"` // selesai dikerjakan
 	ReturnedAt      *time.Time `json:"returned_at,omitempty"`        // barang sudah dikembalikan ke customer
 
+	// LastModification is a lightweight summary of the most recently resolved
+	// item-replacement request on this order (see OrderModificationRequest) —
+	// not persisted (gorm:"-"), populated only by the merchant order list
+	// (RestaurantOrderHandler.ActiveOrders) so a merchant can tell "customer
+	// already resolved the item-unavailable flag I sent" without any other
+	// signal on the order card itself.
+	LastModification *OrderModificationSummary `gorm:"-" json:"last_modification,omitempty"`
+
 	// Relations
 	Customer *User       `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
 	Merchant *Merchant   `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
 	Driver   *Driver     `gorm:"foreignKey:DriverID" json:"driver,omitempty"`
 	Items    []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 	Review   *Review     `gorm:"foreignKey:OrderID" json:"review,omitempty"`
+}
+
+type OrderModificationSummary struct {
+	Status     string     `json:"status"` // "replaced" | "cancelled"
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
 }
 
 // IsAwaitingMerchantAction reports whether the merchant can legally
@@ -865,12 +878,18 @@ type WalletTopupRequest struct {
 	ExpiredAt       *time.Time `json:"expired_at,omitempty"`
 }
 
-// ChatMessage stores in-order chat between customer and driver.
+// ChatMessage stores in-order chat, either the customer↔driver thread or the
+// customer↔merchant thread — Channel keeps the two separate even though they
+// share this table, since a customer can have both open on the same order
+// and a message meant for one shouldn't appear in the other. Channel
+// defaults to "driver" so existing rows (all pre-dating the merchant thread)
+// keep behaving exactly as before.
 type ChatMessage struct {
 	Base
 	OrderID    uuid.UUID `gorm:"type:uuid;not null;index" json:"order_id"`
+	Channel    string    `gorm:"type:varchar(20);not null;default:'driver';index" json:"channel"` // driver | merchant
 	SenderID   uuid.UUID `gorm:"type:uuid;not null" json:"sender_id"`
-	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | driver
+	SenderRole string    `gorm:"type:varchar(20);not null" json:"sender_role"` // customer | driver | merchant
 	Text       string    `gorm:"type:text;not null" json:"text"`
 }
 
