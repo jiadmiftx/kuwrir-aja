@@ -544,7 +544,7 @@ func (h *Handler) MarkReturned(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
 			return
 		}
-		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+		if err := service.CreditWallet(tx, driver.UserID, model.RoleDriver, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
 			return
@@ -557,7 +557,7 @@ func (h *Handler) MarkReturned(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit merchant wallet"})
 			return
 		}
-		if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+		if err := service.CreditWallet(tx, driver.UserID, model.RoleDriver, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to credit driver wallet"})
 			return

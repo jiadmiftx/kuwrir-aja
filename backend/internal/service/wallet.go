@@ -9,12 +9,15 @@ import (
 	"github.com/kuwrir-platform/backend/internal/model"
 )
 
-// GetOrCreateWallet returns the wallet for a user, creating one if it doesn't exist.
-func GetOrCreateWallet(tx *gorm.DB, userID uuid.UUID) (*model.Wallet, error) {
+// GetOrCreateWallet returns a user's wallet for one specific role, creating
+// one if it doesn't exist. A person with multiple roles attached to the
+// same account (model.UserRole) has up to three independent Wallet rows —
+// role is never inferred, callers pass exactly the role the money belongs to.
+func GetOrCreateWallet(tx *gorm.DB, userID uuid.UUID, role model.Role) (*model.Wallet, error) {
 	var wallet model.Wallet
-	err := tx.Where("user_id = ?", userID).First(&wallet).Error
+	err := tx.Where("user_id = ? AND role = ?", userID, role).First(&wallet).Error
 	if err == gorm.ErrRecordNotFound {
-		wallet = model.Wallet{UserID: userID}
+		wallet = model.Wallet{UserID: userID, Role: role}
 		if err = tx.Create(&wallet).Error; err != nil {
 			return nil, fmt.Errorf("create wallet: %w", err)
 		}
@@ -23,10 +26,10 @@ func GetOrCreateWallet(tx *gorm.DB, userID uuid.UUID) (*model.Wallet, error) {
 	return &wallet, err
 }
 
-// CreditWallet adds amount to a user's wallet balance and records a ledger entry.
-// Must be called inside a DB transaction.
-func CreditWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string, orderID *uuid.UUID, notes string) error {
-	wallet, err := GetOrCreateWallet(tx, userID)
+// CreditWallet adds amount to a user's role-scoped wallet balance and
+// records a ledger entry. Must be called inside a DB transaction.
+func CreditWallet(tx *gorm.DB, userID uuid.UUID, role model.Role, amount float64, category string, orderID *uuid.UUID, notes string) error {
+	wallet, err := GetOrCreateWallet(tx, userID, role)
 	if err != nil {
 		return err
 	}
@@ -34,7 +37,7 @@ func CreditWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string
 	newBalance := wallet.Balance + amount
 
 	if err := tx.Model(wallet).Updates(map[string]interface{}{
-		"balance":     newBalance,
+		"balance":      newBalance,
 		"total_earned": gorm.Expr("total_earned + ?", amount),
 	}).Error; err != nil {
 		return fmt.Errorf("credit wallet: %w", err)
@@ -65,13 +68,14 @@ func CreditMerchantWallet(tx *gorm.DB, merchantID uuid.UUID, amount float64, cat
 	if err := tx.Select("id", "user_id").First(&merchant, "id = ?", merchantID).Error; err != nil {
 		return fmt.Errorf("resolve merchant owner: %w", err)
 	}
-	return CreditWallet(tx, merchant.UserID, amount, category, orderID, notes)
+	return CreditWallet(tx, merchant.UserID, model.RoleMerchant, amount, category, orderID, notes)
 }
 
-// DebitWallet subtracts amount from a user's wallet balance and records a ledger entry.
-// Returns error if balance is insufficient. Must be called inside a DB transaction.
-func DebitWallet(tx *gorm.DB, userID uuid.UUID, amount float64, category string, orderID *uuid.UUID, notes string) error {
-	wallet, err := GetOrCreateWallet(tx, userID)
+// DebitWallet subtracts amount from a user's role-scoped wallet balance and
+// records a ledger entry. Returns error if balance is insufficient. Must be
+// called inside a DB transaction.
+func DebitWallet(tx *gorm.DB, userID uuid.UUID, role model.Role, amount float64, category string, orderID *uuid.UUID, notes string) error {
+	wallet, err := GetOrCreateWallet(tx, userID, role)
 	if err != nil {
 		return err
 	}
@@ -109,5 +113,5 @@ func DebitMerchantWallet(tx *gorm.DB, merchantID uuid.UUID, amount float64, cate
 	if err := tx.Select("id", "user_id").First(&merchant, "id = ?", merchantID).Error; err != nil {
 		return fmt.Errorf("resolve merchant owner: %w", err)
 	}
-	return DebitWallet(tx, merchant.UserID, amount, category, orderID, notes)
+	return DebitWallet(tx, merchant.UserID, model.RoleMerchant, amount, category, orderID, notes)
 }

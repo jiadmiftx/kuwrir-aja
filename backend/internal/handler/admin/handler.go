@@ -1755,7 +1755,7 @@ func (h *Handler) AdminCancelOrder(c *gin.Context) {
 	if order.PaymentStatus == "paid" && order.CustomerID != nil {
 		refundNotes := "Admin cancelled order " + order.OrderNumber + ": " + req.Reason
 		orderUUID := order.ID
-		_ = service.CreditWallet(tx, *order.CustomerID, order.Total, "refund", &orderUUID, refundNotes)
+		_ = service.CreditWallet(tx, *order.CustomerID, model.RoleCustomer, order.Total, "refund", &orderUUID, refundNotes)
 	}
 
 	// Create audit refund record
@@ -1920,7 +1920,7 @@ func (h *Handler) ProcessRefund(c *gin.Context) {
 
 		// For online paid orders: credit customer wallet
 		if order.PaymentStatus == "paid" && order.CustomerID != nil {
-			_ = service.CreditWallet(tx, *order.CustomerID, order.Total, "refund", &orderUUID, refundNotes)
+			_ = service.CreditWallet(tx, *order.CustomerID, model.RoleCustomer, order.Total, "refund", &orderUUID, refundNotes)
 		}
 		// For COD: refund is manual cash — just record the approval; admin handles cash separately
 	}

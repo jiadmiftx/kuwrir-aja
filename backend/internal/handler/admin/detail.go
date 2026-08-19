@@ -36,7 +36,7 @@ func (h *Handler) GetMerchantDetail(c *gin.Context) {
 
 	var wallet model.Wallet
 	walletTxns := []model.WalletTransaction{}
-	if h.db.Where("user_id = ?", merchant.UserID).First(&wallet).Error == nil {
+	if h.db.Where("user_id = ? AND role = ?", merchant.UserID, model.RoleMerchant).First(&wallet).Error == nil {
 		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
 	}
 
@@ -97,7 +97,7 @@ func (h *Handler) GetDriverDetail(c *gin.Context) {
 
 	var wallet model.Wallet
 	walletTxns := []model.WalletTransaction{}
-	if h.db.Where("user_id = ?", driver.UserID).First(&wallet).Error == nil {
+	if h.db.Where("user_id = ? AND role = ?", driver.UserID, model.RoleDriver).First(&wallet).Error == nil {
 		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
 	}
 
@@ -125,10 +125,8 @@ func (h *Handler) GetDriverDetail(c *gin.Context) {
 }
 
 // GetCustomerDetail returns a single customer's full profile: account
-// info, saved addresses, and order/spending history. Customers don't get
-// a Wallet row today (only merchant/driver earn into one), so there's no
-// e-wallet section here — refund requests double as the closest thing to
-// a customer-facing money ledger and are included instead.
+// info, saved addresses, order/spending history, and their customer-role
+// wallet (top-ups/refunds) + recent transactions.
 func (h *Handler) GetCustomerDetail(c *gin.Context) {
 	id := c.Param("id")
 
@@ -155,12 +153,12 @@ func (h *Handler) GetCustomerDetail(c *gin.Context) {
 
 	var wallet model.Wallet
 	walletTxns := []model.WalletTransaction{}
-	if h.db.Where("user_id = ?", id).First(&wallet).Error == nil {
+	if h.db.Where("user_id = ? AND role = ?", id, model.RoleCustomer).First(&wallet).Error == nil {
 		h.db.Where("wallet_id = ?", wallet.ID).Order("created_at DESC").Limit(detailRecentLimit).Find(&walletTxns)
 	}
 
 	var bankAccount model.BankAccount
-	hasBankAccount := h.db.Where("user_id = ?", id).First(&bankAccount).Error == nil
+	hasBankAccount := h.db.Where("user_id = ? AND role = ?", id, model.RoleCustomer).First(&bankAccount).Error == nil
 
 	c.JSON(http.StatusOK, gin.H{
 		"customer":     customer,

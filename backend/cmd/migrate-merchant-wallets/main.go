@@ -79,7 +79,7 @@ func main() {
 
 	for _, p := range phantoms {
 		err := db.Transaction(func(tx *gorm.DB) error {
-			real, err := service.GetOrCreateWallet(tx, p.RealUserID)
+			real, err := service.GetOrCreateWallet(tx, p.RealUserID, model.RoleMerchant)
 			if err != nil {
 				return err
 			}

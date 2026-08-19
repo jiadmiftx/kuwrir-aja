@@ -40,7 +40,7 @@ func (h *Handler) RegisterRoutes(customer *gin.RouterGroup) {
 
 func (h *Handler) GetWallet(c *gin.Context) {
 	userID := mustParseUUID(c.GetString("user_id"))
-	wallet, err := service.GetOrCreateWallet(h.db, userID)
+	wallet, err := service.GetOrCreateWallet(h.db, userID, model.RoleCustomer)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return
@@ -50,7 +50,7 @@ func (h *Handler) GetWallet(c *gin.Context) {
 
 func (h *Handler) GetTransactions(c *gin.Context) {
 	userID := mustParseUUID(c.GetString("user_id"))
-	wallet, txs, err := service.GetWalletTransactions(h.db, userID)
+	wallet, txs, err := service.GetWalletTransactions(h.db, userID, model.RoleCustomer)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return
@@ -72,7 +72,7 @@ func (h *Handler) Withdraw(c *gin.Context) {
 		return
 	}
 
-	result, err := service.ProcessWithdrawal(h.db, h.duitku(), userID, req.Amount, req.BankCode, req.BankAccountNumber, req.BankAccountName)
+	result, err := service.ProcessWithdrawal(h.db, h.duitku(), userID, model.RoleCustomer, req.Amount, req.BankCode, req.BankAccountNumber, req.BankAccountName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

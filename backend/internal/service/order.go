@@ -50,7 +50,7 @@ func CancelOrderAndRefund(db *gorm.DB, order *model.Order, reason string) error 
 	}
 
 	if order.PaymentStatus == "paid" && order.CustomerID != nil {
-		if err := CreditWallet(tx, *order.CustomerID, order.Total, "refund", &order.ID, reason); err != nil {
+		if err := CreditWallet(tx, *order.CustomerID, model.RoleCustomer, order.Total, "refund", &order.ID, reason); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("refund customer wallet: %w", err)
 		}

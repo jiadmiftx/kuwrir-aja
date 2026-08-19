@@ -60,7 +60,7 @@ func ResolveWithdrawalStatus(db *gorm.DB, duitku *DuitkuClient, wr *model.Withdr
 		}
 		tx := db.Begin()
 		notes := fmt.Sprintf("Withdrawal to %s %s (reconciled)", wr.BankCode, wr.BankAccountNumber)
-		if err := DebitWallet(tx, wallet.UserID, wr.Amount, "withdrawal", nil, notes); err != nil {
+		if err := DebitWallet(tx, wallet.UserID, wallet.Role, wr.Amount, "withdrawal", nil, notes); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("debit wallet: %w", err)
 		}

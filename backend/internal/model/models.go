@@ -735,12 +735,16 @@ type MerchantPayablePayment struct {
 // WALLET & PAYMENT MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Wallet holds the earnings balance for a driver or merchant.
-// One wallet per user. Credits happen automatically on order completion;
-// debits happen on withdrawal.
+// Wallet holds the earnings balance for one role of one user — a person
+// with customer + driver + merchant roles attached to the same account
+// (model.UserRole) gets up to three independent Wallet rows, not one shared
+// balance, so driver earnings/merchant payouts/customer top-ups never mix.
+// One wallet per (user, role). Credits happen automatically on order
+// completion; debits happen on withdrawal.
 type Wallet struct {
 	Base
-	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_wallet_user_role" json:"user_id"`
+	Role           Role      `gorm:"type:varchar(20);not null;default:'';uniqueIndex:idx_wallet_user_role" json:"role"`
 	Balance        float64   `gorm:"default:0" json:"balance"`         // available to withdraw
 	TotalEarned    float64   `gorm:"default:0" json:"total_earned"`    // lifetime credits
 	TotalWithdrawn float64   `gorm:"default:0" json:"total_withdrawn"` // lifetime debits
@@ -854,11 +858,13 @@ type WithdrawalRequest struct {
 	Wallet Wallet `gorm:"foreignKey:WalletID" json:"wallet,omitempty"`
 }
 
-// BankAccount is a user's saved payout destination, one per user, so
-// withdrawal requests don't require re-entering bank details every time.
+// BankAccount is a user's saved payout destination — one per (user, role),
+// matching Wallet's per-role split, so a driver and merchant persona of the
+// same login can withdraw to different accounts instead of sharing one.
 type BankAccount struct {
 	Base
-	UserID        uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	UserID        uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_bankaccount_user_role" json:"user_id"`
+	Role          Role      `gorm:"type:varchar(20);not null;default:'';uniqueIndex:idx_bankaccount_user_role" json:"role"`
 	BankCode      string    `gorm:"type:varchar(20);not null" json:"bank_code"`
 	AccountNumber string    `gorm:"type:varchar(50);not null" json:"account_number"`
 	AccountName   string    `gorm:"type:varchar(100);not null" json:"account_name"`

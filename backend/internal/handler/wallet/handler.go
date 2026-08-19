@@ -46,7 +46,7 @@ func (h *Handler) RegisterMerchantRoutes(merchant *gin.RouterGroup) {
 func (h *Handler) GetDriverWallet(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	wallet, err := service.GetOrCreateWallet(h.db, mustParseUUID(userID))
+	wallet, err := service.GetOrCreateWallet(h.db, mustParseUUID(userID), model.RoleDriver)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return
@@ -64,12 +64,12 @@ func (h *Handler) GetDriverWallet(c *gin.Context) {
 
 func (h *Handler) GetDriverTransactions(c *gin.Context) {
 	userID := c.GetString("user_id")
-	h.getTransactions(c, userID)
+	h.getTransactions(c, userID, model.RoleDriver)
 }
 
 func (h *Handler) DriverWithdraw(c *gin.Context) {
 	userID := c.GetString("user_id")
-	h.withdraw(c, userID)
+	h.withdraw(c, userID, model.RoleDriver)
 }
 
 // DriverCODDeposit records that a driver has handed over COD cash to the platform.
@@ -135,7 +135,7 @@ func (h *Handler) DriverCODDeposit(c *gin.Context) {
 func (h *Handler) GetMerchantWallet(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	wallet, err := service.GetOrCreateWallet(h.db, mustParseUUID(userID))
+	wallet, err := service.GetOrCreateWallet(h.db, mustParseUUID(userID), model.RoleMerchant)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return
@@ -146,12 +146,12 @@ func (h *Handler) GetMerchantWallet(c *gin.Context) {
 
 func (h *Handler) GetMerchantTransactions(c *gin.Context) {
 	userID := c.GetString("user_id")
-	h.getTransactions(c, userID)
+	h.getTransactions(c, userID, model.RoleMerchant)
 }
 
 func (h *Handler) MerchantWithdraw(c *gin.Context) {
 	userID := c.GetString("user_id")
-	h.withdraw(c, userID)
+	h.withdraw(c, userID, model.RoleMerchant)
 }
 
 // --- Shared helpers ---
@@ -165,7 +165,7 @@ type WithdrawRequest struct {
 	BankAccountName   string  `json:"bank_account_name"`
 }
 
-func (h *Handler) withdraw(c *gin.Context, userID string) {
+func (h *Handler) withdraw(c *gin.Context, userID string, role model.Role) {
 	var req WithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -173,7 +173,7 @@ func (h *Handler) withdraw(c *gin.Context, userID string) {
 	}
 
 	uid := mustParseUUID(userID)
-	result, err := service.ProcessWithdrawal(h.db, h.duitku(), uid, req.Amount, req.BankCode, req.BankAccountNumber, req.BankAccountName)
+	result, err := service.ProcessWithdrawal(h.db, h.duitku(), uid, role, req.Amount, req.BankCode, req.BankAccountNumber, req.BankAccountName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -187,8 +187,8 @@ func (h *Handler) withdraw(c *gin.Context, userID string) {
 	})
 }
 
-func (h *Handler) getTransactions(c *gin.Context, userID string) {
-	wallet, txs, err := service.GetWalletTransactions(h.db, mustParseUUID(userID))
+func (h *Handler) getTransactions(c *gin.Context, userID string, role model.Role) {
+	wallet, txs, err := service.GetWalletTransactions(h.db, mustParseUUID(userID), role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wallet"})
 		return

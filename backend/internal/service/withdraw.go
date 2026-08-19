@@ -11,9 +11,9 @@ import (
 )
 
 // GetWalletTransactions returns the most recent ledger entries for a
-// user's wallet. Shared by driver/merchant/customer wallet handlers.
-func GetWalletTransactions(db *gorm.DB, userID uuid.UUID) (*model.Wallet, []model.WalletTransaction, error) {
-	wallet, err := GetOrCreateWallet(db, userID)
+// user's role-scoped wallet. Shared by driver/merchant/customer wallet handlers.
+func GetWalletTransactions(db *gorm.DB, userID uuid.UUID, role model.Role) (*model.Wallet, []model.WalletTransaction, error) {
+	wallet, err := GetOrCreateWallet(db, userID, role)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,18 +41,18 @@ type WithdrawResult struct {
 // reconciliation sweeper). If bankCode/accountNumber/accountName are all
 // empty, falls back to the user's saved BankAccount; if provided, they're
 // also upserted into BankAccount so future withdrawals can omit them.
-func ProcessWithdrawal(db *gorm.DB, duitku *DuitkuClient, userID uuid.UUID, amount float64, bankCode, bankAccountNumber, bankAccountName string) (*WithdrawResult, error) {
+func ProcessWithdrawal(db *gorm.DB, duitku *DuitkuClient, userID uuid.UUID, role model.Role, amount float64, bankCode, bankAccountNumber, bankAccountName string) (*WithdrawResult, error) {
 	if bankCode == "" && bankAccountNumber == "" && bankAccountName == "" {
 		var saved model.BankAccount
-		if err := db.Where("user_id = ?", userID).First(&saved).Error; err != nil {
+		if err := db.Where("user_id = ? AND role = ?", userID, role).First(&saved).Error; err != nil {
 			return nil, fmt.Errorf("no bank account provided or saved")
 		}
 		bankCode, bankAccountNumber, bankAccountName = saved.BankCode, saved.AccountNumber, saved.AccountName
 	} else {
 		var saved model.BankAccount
-		err := db.Where("user_id = ?", userID).First(&saved).Error
+		err := db.Where("user_id = ? AND role = ?", userID, role).First(&saved).Error
 		if err == gorm.ErrRecordNotFound {
-			db.Create(&model.BankAccount{UserID: userID, BankCode: bankCode, AccountNumber: bankAccountNumber, AccountName: bankAccountName})
+			db.Create(&model.BankAccount{UserID: userID, Role: role, BankCode: bankCode, AccountNumber: bankAccountNumber, AccountName: bankAccountName})
 		} else if err == nil {
 			db.Model(&saved).Updates(map[string]interface{}{
 				"bank_code": bankCode, "account_number": bankAccountNumber, "account_name": bankAccountName,
@@ -60,7 +60,7 @@ func ProcessWithdrawal(db *gorm.DB, duitku *DuitkuClient, userID uuid.UUID, amou
 		}
 	}
 
-	wallet, err := GetOrCreateWallet(db, userID)
+	wallet, err := GetOrCreateWallet(db, userID, role)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get wallet: %w", err)
 	}
@@ -95,7 +95,7 @@ func ProcessWithdrawal(db *gorm.DB, duitku *DuitkuClient, userID uuid.UUID, amou
 	if status == "success" {
 		tx := db.Begin()
 		notes := fmt.Sprintf("Withdrawal to %s %s", bankCode, bankAccountNumber)
-		if err := DebitWallet(tx, userID, amount, "withdrawal", nil, notes); err != nil {
+		if err := DebitWallet(tx, userID, role, amount, "withdrawal", nil, notes); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to debit wallet: %w", err)
 		}

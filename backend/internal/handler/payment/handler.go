@@ -314,7 +314,7 @@ func (h *Handler) handleTopupCallback(merchantOrderID, resultCode string) {
 		return
 	}
 	notes := fmt.Sprintf("Wallet top-up %s", merchantOrderID)
-	if err := service.CreditWallet(tx, topup.UserID, topup.Amount, "topup", nil, notes); err != nil {
+	if err := service.CreditWallet(tx, topup.UserID, model.RoleCustomer, topup.Amount, "topup", nil, notes); err != nil {
 		tx.Rollback()
 		return
 	}
@@ -403,7 +403,7 @@ func CreditWalletsForOnlineOrder(db *gorm.DB, order model.Order) error {
 	if order.DriverID != nil {
 		var driver model.Driver
 		if db.Where("id = ?", *order.DriverID).First(&driver).Error == nil {
-			if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNote); err != nil {
+			if err := service.CreditWallet(tx, driver.UserID, model.RoleDriver, order.DriverEarning, "order_earning", &orderUUID, driverNote); err != nil {
 				tx.Rollback()
 				return err
 			}

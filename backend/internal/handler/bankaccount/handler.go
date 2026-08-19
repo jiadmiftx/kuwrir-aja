@@ -1,8 +1,11 @@
 // Package bankaccount lets any authenticated user (customer, driver, or
-// merchant owner) save one payout bank account, so withdrawal requests
-// don't require re-entering bank details every time. Routes are
-// registered under whichever role groups need them — the handler itself
-// is role-agnostic, keyed only off the JWT's user_id.
+// merchant owner) save one payout bank account per role, so withdrawal
+// requests don't require re-entering bank details every time. Mounted once
+// on the generic `protected` group (any authenticated role) rather than
+// per role-specific group — registering the same literal path multiple
+// times would panic — so the role is read from the JWT's own `user_role`
+// claim (set at login, see middleware.AuthMiddleware) instead of being
+// implied by which route group registered it.
 package bankaccount
 
 import (
@@ -34,9 +37,10 @@ func (h *Handler) Get(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
 		return
 	}
+	role := model.Role(c.GetString("user_role"))
 
 	var account model.BankAccount
-	if err := h.db.Where("user_id = ?", userID).First(&account).Error; err != nil {
+	if err := h.db.Where("user_id = ? AND role = ?", userID, role).First(&account).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No bank account saved"})
 		return
 	}
@@ -49,6 +53,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
 		return
 	}
+	role := model.Role(c.GetString("user_role"))
 
 	var req struct {
 		BankCode      string `json:"bank_code" binding:"required"`
@@ -61,11 +66,12 @@ func (h *Handler) Upsert(c *gin.Context) {
 	}
 
 	var account model.BankAccount
-	err = h.db.Where("user_id = ?", userID).First(&account).Error
+	err = h.db.Where("user_id = ? AND role = ?", userID, role).First(&account).Error
 	switch err {
 	case gorm.ErrRecordNotFound:
 		account = model.BankAccount{
 			UserID:        userID,
+			Role:          role,
 			BankCode:      req.BankCode,
 			AccountNumber: req.AccountNumber,
 			AccountName:   req.AccountName,

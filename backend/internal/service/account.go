@@ -22,8 +22,12 @@ func DeleteUserAccount(db *gorm.DB, user model.User) (blockReason string, err er
 		return "Masih ada saldo COD di tangan driver, setor dulu sebelum menghapus akun", nil
 	}
 
-	var wallet model.Wallet
-	if db.Where("user_id = ?", user.ID).First(&wallet).Error == nil && wallet.Balance > 0 {
+	// A person can hold up to one Wallet row per role (customer/driver/
+	// merchant) — block deletion if ANY of them still has money, not just
+	// whichever role's row happens to be found first.
+	var walletCount int64
+	db.Model(&model.Wallet{}).Where("user_id = ? AND balance > 0", user.ID).Count(&walletCount)
+	if walletCount > 0 {
 		return "Masih ada saldo wallet, tarik/settle dulu sebelum menghapus akun", nil
 	}
 

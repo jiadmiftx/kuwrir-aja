@@ -1658,7 +1658,7 @@ func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 			return err
 		}
 		if order.DriverEarning > 0 {
-			if err := service.CreditWallet(tx, driver.UserID, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
+			if err := service.CreditWallet(tx, driver.UserID, model.RoleDriver, order.DriverEarning, "order_earning", &orderUUID, driverNotes); err != nil {
 				return err
 			}
 		}
@@ -2028,7 +2028,7 @@ func (h *Handler) ResolveModificationRequest(c *gin.Context) {
 		// New total is cheaper — refund the difference if this order was
 		// already paid online; a cash order just collects less on delivery.
 		if order.PaymentStatus == "paid" && order.CustomerID != nil {
-			if err := service.CreditWallet(tx, *order.CustomerID, -delta, "refund", &order.ID,
+			if err := service.CreditWallet(tx, *order.CustomerID, model.RoleCustomer, -delta, "refund", &order.ID,
 				fmt.Sprintf("Selisih harga penggantian item, order #%s", order.OrderNumber)); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund difference"})

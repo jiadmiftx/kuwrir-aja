@@ -127,6 +127,15 @@ func main() {
 
 	normalizeLegacyPhones(db)
 
+	// Wallet/BankAccount split from one-per-user to one-per-(user,role) —
+	// AutoMigrate's ADD COLUMN for the new `role` column defaults every
+	// existing row to '' (see model.Wallet/model.BankAccount doc comments).
+	// Backfill each such row to the role the account originally registered
+	// under (User.Role) — the pragmatic default since pre-split balances
+	// can't be un-mixed after the fact; idempotent via the `role = ''` guard.
+	db.Exec(`UPDATE wallets w SET role = u.role FROM users u WHERE w.user_id = u.id AND w.role = ''`)
+	db.Exec(`UPDATE bank_accounts b SET role = u.role FROM users u WHERE b.user_id = u.id AND b.role = ''`)
+
 	// AutoMigrate's ADD COLUMN for admin_tier (added after this table
 	// already had rows) leaves existing rows NULL, not "" — and scanning a
 	// NULL SQL value into a plain Go string field errors ("converting NULL
