@@ -328,20 +328,26 @@ func (h *Handler) Login(c *gin.Context) {
 }
 
 const (
-	otpTTL             = 5 * time.Minute
-	otpResendCooldown  = 60 * time.Second
-	otpMaxPerHour      = 5
-	otpMaxVerifyTries  = 5
+	otpTTL            = 5 * time.Minute
+	otpResendCooldown = 60 * time.Second
+	otpMaxPerHour     = 5
+	otpMaxVerifyTries = 5
 
-	// testerPhone/testerOTP: a fixed account for app-store reviewers, who
-	// can't receive a real WhatsApp OTP. Requesting a code for this exact
-	// number always succeeds with this fixed code instead of sending a real
-	// WhatsApp message — everything else (rate limits, expiry, role
-	// attachment) behaves identically to a real number. Keep this in sync
-	// with what's listed in each store's "Sign-in details" review field.
-	testerPhone = "+6281199998888"
-	testerOTP   = "123456"
+	// testerOTP: the fixed code issued to any phone in testerPhones instead
+	// of a real WhatsApp OTP — everything else (rate limits, expiry, role
+	// attachment) behaves identically to a real number. Keep the original
+	// entry in sync with what's listed in each store's "Sign-in details"
+	// review field; the rest are internal test accounts.
+	testerOTP = "123456"
 )
+
+// testerPhones: fixed accounts that never receive a real WhatsApp OTP.
+// +6281199998888 is the app-store reviewer number (see testerOTP doc); the
+// others are internal test accounts added the same way for manual testing.
+var testerPhones = map[string]bool{
+	"+6281199998888": true,
+	"+628199991111":  true,
+}
 
 func hashOTP(code string) string {
 	sum := sha256.Sum256([]byte(code))
@@ -391,7 +397,7 @@ func (h *Handler) RequestOTP(c *gin.Context) {
 		return
 	}
 
-	isTester := req.Phone == testerPhone
+	isTester := testerPhones[req.Phone]
 
 	var code string
 	if isTester {
