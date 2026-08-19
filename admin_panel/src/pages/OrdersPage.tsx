@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card'
-import { Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck, Trash2, Loader2 } from 'lucide-react'
+import {
+  Search, Clock, CheckCircle, Truck, Package, XCircle, UserCheck, Trash2, Loader2,
+  ChevronUp, MapPin, Store, Star, Bike,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api'
 
@@ -44,6 +47,9 @@ interface Order {
   app_service_fee?: number
   created_at: string
   driver_id?: string | null
+  pickup_address?: string
+  dropoff_address?: string
+  distance_km?: number
   customer?: { name: string }
   merchant?: {
     name: string
@@ -109,8 +115,10 @@ export default function OrdersPage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
-  // Assign driver dialog
-  const [assignOrder, setAssignOrder] = useState<Order | null>(null)
+  // Assign driver — inline panel expanded under the order row, not a modal,
+  // so the operator keeps the order (and the rest of the list) in view
+  // while comparing candidates instead of losing context behind a popup.
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([])
   const [driversLoading, setDriversLoading] = useState(false)
   const [selectedDriver, setSelectedDriver] = useState('')
@@ -144,8 +152,12 @@ export default function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datePeriod, customFrom, customTo])
 
-  const openAssignDialog = async (order: Order) => {
-    setAssignOrder(order)
+  const toggleAssignPanel = async (order: Order) => {
+    if (expandedOrderId === order.id) {
+      setExpandedOrderId(null)
+      return
+    }
+    setExpandedOrderId(order.id)
     setSelectedDriver(order.driver_id || '')
     setNearbyDrivers([])
     setDriversLoading(true)
@@ -160,18 +172,18 @@ export default function OrdersPage() {
     }
   }
 
-  const handleAssign = async () => {
-    if (!assignOrder || !selectedDriver) return
+  const handleAssign = async (orderId: string) => {
+    if (!selectedDriver) return
     setAssigning(true)
     try {
-      const res = await apiFetch(`/api/v1/admin/orders/${assignOrder.id}/assign-driver`, {
+      const res = await apiFetch(`/api/v1/admin/orders/${orderId}/assign-driver`, {
         method: 'POST',
         body: JSON.stringify({ driver_id: selectedDriver }),
       })
       const data = await res.json()
       if (res.ok) {
         toast.success(`Driver assigned: ${data.driver_name}`)
-        setAssignOrder(null)
+        setExpandedOrderId(null)
         fetchOrders()
       } else {
         toast.error(data.error || 'Failed to assign driver')
@@ -389,7 +401,8 @@ export default function OrdersPage() {
                     const cfg = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100', icon: Clock }
                     const platformCut = (order.platform_markup || 0) + (order.delivery_commission || 0) + (order.app_service_fee || 0)
                     return (
-                      <TableRow key={order.id}>
+                      <Fragment key={order.id}>
+                      <TableRow>
                         <TableCell>
                           <input
                             type="checkbox"
@@ -479,11 +492,15 @@ export default function OrdersPage() {
                             {order.status === 'ready' && (
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => openAssignDialog(order)}
+                                variant={expandedOrderId === order.id ? 'secondary' : 'outline'}
+                                onClick={() => toggleAssignPanel(order)}
                                 className="text-xs"
                               >
-                                <UserCheck className="mr-1 h-3 w-3" />
+                                {expandedOrderId === order.id ? (
+                                  <ChevronUp className="mr-1 h-3 w-3" />
+                                ) : (
+                                  <UserCheck className="mr-1 h-3 w-3" />
+                                )}
                                 {order.driver_id ? 'Ganti Driver' : 'Assign Driver'}
                               </Button>
                             )}
@@ -498,6 +515,23 @@ export default function OrdersPage() {
                           </div>
                         </TableCell>
                       </TableRow>
+                      {expandedOrderId === order.id && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={11} className="bg-muted/30 p-0">
+                            <AssignDriverPanel
+                              order={order}
+                              drivers={nearbyDrivers}
+                              loading={driversLoading}
+                              selectedDriver={selectedDriver}
+                              onSelectDriver={setSelectedDriver}
+                              assigning={assigning}
+                              onAssign={() => handleAssign(order.id)}
+                              onCancel={() => setExpandedOrderId(null)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </Fragment>
                     )
                   })}
                 </TableBody>
@@ -506,54 +540,6 @@ export default function OrdersPage() {
           </Tabs>
         </CardContent>
       </Card>
-
-      {/* Assign Driver Dialog */}
-      <Dialog open={!!assignOrder} onOpenChange={(open) => !open && setAssignOrder(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Assign Driver — {assignOrder?.order_number}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            {driversLoading ? (
-              <p className="text-muted-foreground text-sm text-center py-4">Memuat driver terdekat...</p>
-            ) : nearbyDrivers.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-4">Tidak ada driver online saat ini.</p>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {nearbyDrivers.map((d) => (
-                  <div
-                    key={d.id}
-                    onClick={() => setSelectedDriver(d.id)}
-                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedDriver === d.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium">{d.user?.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {d.vehicle_type} · {d.vehicle_plate} · ⭐ {d.rating.toFixed(1)} · {d.total_delivered} antar
-                      </div>
-                      <div className={`text-xs ${d.active_orders > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                        {d.active_orders > 0 ? `${d.active_orders} order aktif` : 'Tidak ada order aktif'}
-                      </div>
-                    </div>
-                    <div className="text-right text-sm">
-                      <div className="font-bold text-primary">{d.distance_km.toFixed(1)} km</div>
-                      <div className="text-xs text-muted-foreground">dari merchant</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignOrder(null)}>Batal</Button>
-            <Button onClick={handleAssign} disabled={!selectedDriver || assigning}>
-              {assigning ? 'Menyimpan...' : 'Assign Driver Ini'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete confirmation (single or bulk) */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -578,6 +564,117 @@ export default function OrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function AssignDriverPanel({
+  order, drivers, loading, selectedDriver, onSelectDriver, assigning, onAssign, onCancel,
+}: {
+  order: Order
+  drivers: NearbyDriver[]
+  loading: boolean
+  selectedDriver: string
+  onSelectDriver: (id: string) => void
+  assigning: boolean
+  onAssign: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="px-6 py-5">
+      {/* Route context — the thing that actually matters when picking a driver,
+          previously only visible via a separate hover card, if at all. */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <Store className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="font-medium">{order.merchant?.name ?? 'Merchant'}</span>
+        {order.pickup_address && (
+          <span className="text-muted-foreground">{order.pickup_address}</span>
+        )}
+        <span className="text-muted-foreground">→</span>
+        <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="text-muted-foreground">
+          {order.dropoff_address || order.customer?.name || 'Customer'}
+        </span>
+        {typeof order.distance_km === 'number' && (
+          <Badge variant="outline" className="ml-1">{order.distance_km.toFixed(1)} km rute</Badge>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">Memuat driver terdekat...</p>
+      ) : drivers.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">Tidak ada driver online saat ini.</p>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-8" />
+                <TableHead>Driver</TableHead>
+                <TableHead>Kendaraan</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Order Aktif</TableHead>
+                <TableHead className="text-right">Jarak</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {drivers.map((d) => {
+                const selected = selectedDriver === d.id
+                return (
+                  <TableRow
+                    key={d.id}
+                    onClick={() => onSelectDriver(d.id)}
+                    className={`cursor-pointer ${selected ? 'bg-primary/5' : ''}`}
+                  >
+                    <TableCell>
+                      <span
+                        className={`block h-3.5 w-3.5 rounded-full border-2 ${
+                          selected ? 'border-primary bg-primary' : 'border-muted-foreground/30'
+                        }`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{d.user?.name}</div>
+                      <div className="text-xs text-muted-foreground">{d.user?.phone}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex items-center gap-1">
+                        <Bike className="h-3.5 w-3.5 text-muted-foreground" />
+                        {d.vehicle_type}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{d.vehicle_plate}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex items-center gap-1">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {d.rating.toFixed(1)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{d.total_delivered} antar</div>
+                    </TableCell>
+                    <TableCell>
+                      {d.active_orders > 0 ? (
+                        <Badge className="bg-amber-100 text-amber-800">{d.active_orders} aktif</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Kosong</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
+                      {d.distance_km.toFixed(1)} km
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={onCancel}>Batal</Button>
+        <Button size="sm" onClick={onAssign} disabled={!selectedDriver || assigning}>
+          {assigning ? 'Menyimpan...' : 'Tugaskan Driver'}
+        </Button>
+      </div>
     </div>
   )
 }
