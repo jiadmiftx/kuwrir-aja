@@ -442,6 +442,7 @@ class _ActiveOrderCard extends StatelessWidget {
                 OpenInMapsButton(
                   filled: true,
                   onTap: () => openInGoogleMaps(
+                    context: context,
                     merchantLat: _lat(order, 'pickup'),
                     merchantLng: _lng(order, 'pickup'),
                     customerLat: _lat(order, 'dropoff'),

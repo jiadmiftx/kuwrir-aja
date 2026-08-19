@@ -47,5 +47,18 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Needed for url_launcher's canLaunchUrl to see any app that can
+             open the Google Maps deep link (open_in_maps_button.dart) —
+             without this, Android 11+ package visibility makes canLaunchUrl
+             silently return false and the "Buka di Google Maps" button does
+             nothing, with no error shown. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
     </queries>
 </manifest>

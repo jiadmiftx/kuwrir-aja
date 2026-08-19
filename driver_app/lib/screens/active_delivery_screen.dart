@@ -90,6 +90,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
     final fallbackDistanceKm = (order['distance_km'] as num?)?.toDouble() ?? 0;
 
     void openMaps() => openInGoogleMaps(
+      context: context,
       merchantLat: pickupLat,
       merchantLng: pickupLng,
       customerLat: dropoffLat,

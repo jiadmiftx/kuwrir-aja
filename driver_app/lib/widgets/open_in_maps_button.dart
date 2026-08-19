@@ -8,7 +8,15 @@ import 'package:url_launcher/url_launcher.dart';
 /// device location itself — no billing, no Directions API key, no client-side
 /// location tracking needed. Plain https deep link, Google Maps computes the
 /// route itself.
+///
+/// Calls `launchUrl` directly instead of gating on `canLaunchUrl` first —
+/// `canLaunchUrl` needs a matching `<queries>` entry in AndroidManifest.xml
+/// (Android 11+ package visibility) to even report an https handler exists,
+/// and a missing/incomplete entry makes it silently return false, which
+/// made this button do nothing with no error shown. `launchUrl` itself
+/// throws instead, so a real failure is at least reported to [context].
 Future<void> openInGoogleMaps({
+  required BuildContext context,
   required double merchantLat,
   required double merchantLng,
   required double customerLat,
@@ -20,8 +28,14 @@ Future<void> openInGoogleMaps({
     '&destination=$customerLat,$customerLng'
     '&travelmode=driving',
   );
-  if (await canLaunchUrl(uri)) {
+  try {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak bisa membuka Google Maps')),
+      );
+    }
   }
 }
 
