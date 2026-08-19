@@ -89,6 +89,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                             onChanged: (v) =>
                                 setState(() => _agreedToTerms = v),
                           ),
+                          isAgreementSatisfied: () => _agreedToTerms,
                         ),
                         const SizedBox(height: 20),
                         Row(

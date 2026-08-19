@@ -12,11 +12,17 @@ enum _OtpStep { phone, code }
 /// field, so the field's own text never carries a redundant/wrong leading
 /// zero next to the visible "+62". Cursor position is preserved relative to
 /// the removed character.
-TextEditingValue _stripLeadingZero(TextEditingValue oldValue, TextEditingValue newValue) {
+TextEditingValue _stripLeadingZero(
+  TextEditingValue oldValue,
+  TextEditingValue newValue,
+) {
   if (!newValue.text.startsWith('0')) return newValue;
   final stripped = newValue.text.substring(1);
   final offset = (newValue.selection.baseOffset - 1).clamp(0, stripped.length);
-  return TextEditingValue(text: stripped, selection: TextSelection.collapsed(offset: offset));
+  return TextEditingValue(
+    text: stripped,
+    selection: TextSelection.collapsed(offset: offset),
+  );
 }
 
 class _Country {
@@ -75,6 +81,16 @@ class OtpFlow extends StatefulWidget {
   /// keyboard once the phone field is focused. Null renders nothing extra.
   final Widget? agreementSlot;
 
+  /// When set, gates "Kirim Kode OTP" itself: if this returns false, the
+  /// request is blocked and [agreementError] is shown instead of sending.
+  /// Without this, [agreementSlot] was purely decorative — the phone step
+  /// let the OTP go out regardless of whether it was checked, and by the
+  /// time [onVerify] could reject an unagreed request, the code step (which
+  /// never renders [agreementSlot]) had no way back to the checkbox short
+  /// of tapping "Ganti nomor HP" to leave the code they'd just received.
+  final bool Function()? isAgreementSatisfied;
+  final String agreementError;
+
   const OtpFlow({
     super.key,
     required this.onVerify,
@@ -84,6 +100,9 @@ class OtpFlow extends StatefulWidget {
     this.showHeaderIcon = true,
     this.showCountryCode = false,
     this.agreementSlot,
+    this.isAgreementSatisfied,
+    this.agreementError =
+        'Kamu harus menyetujui Syarat & Ketentuan terlebih dahulu',
   });
 
   @override
@@ -109,8 +128,9 @@ class _OtpFlowState extends State<OtpFlow> {
     super.dispose();
   }
 
-  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  void _showError(String msg) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
 
   void _startResendCooldown() {
     setState(() => _resendSeconds = 60);
@@ -150,6 +170,11 @@ class _OtpFlowState extends State<OtpFlow> {
 
   Future<void> _requestOtp() async {
     if (_phoneCtrl.text.trim().isEmpty) return;
+    if (widget.isAgreementSatisfied != null &&
+        !widget.isAgreementSatisfied!()) {
+      _showError(widget.agreementError);
+      return;
+    }
     FocusScope.of(context).unfocus();
     final phone = _backendPhone();
     setState(() => _loading = true);
@@ -194,80 +219,105 @@ class _OtpFlowState extends State<OtpFlow> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) {
-          final query = searchCtrl.text.trim().toLowerCase();
-          final filtered = query.isEmpty
-              ? _kCountries
-              : _kCountries
-                  .where((c) =>
-                      c.name.toLowerCase().contains(query) || c.dialCode.contains(query))
-                  .toList();
-          return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.7),
-            decoration: const BoxDecoration(
-              color: KuwrirColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: KuwrirColors.border,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text('Pilih Kode Negara',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: TextField(
-                      controller: searchCtrl,
-                      autofocus: false,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Cari negara',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder:
+          (sheetContext) => StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              final query = searchCtrl.text.trim().toLowerCase();
+              final filtered =
+                  query.isEmpty
+                      ? _kCountries
+                      : _kCountries
+                          .where(
+                            (c) =>
+                                c.name.toLowerCase().contains(query) ||
+                                c.dialCode.contains(query),
+                          )
+                          .toList();
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
+                ),
+                decoration: const BoxDecoration(
+                  color: KuwrirColors.surface,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: KuwrirColors.border,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'Pilih Kode Negara',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: TextField(
+                          controller: searchCtrl,
+                          autofocus: false,
+                          onChanged: (_) => setSheetState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Cari negara',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            isDense: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) {
+                            final c = filtered[i];
+                            return ListTile(
+                              leading: Text(
+                                c.flag,
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                              title: Text(
+                                c.name,
+                                style: const TextStyle(fontSize: 14.5),
+                              ),
+                              trailing: Text(
+                                c.dialCode,
+                                style: TextStyle(
+                                  color: KuwrirColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onTap: () => Navigator.pop(sheetContext, c),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) {
-                        final c = filtered[i];
-                        return ListTile(
-                          leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
-                          title: Text(c.name, style: const TextStyle(fontSize: 14.5)),
-                          trailing: Text(c.dialCode,
-                              style: TextStyle(color: KuwrirColors.textSecondary, fontWeight: FontWeight.w600)),
-                          onTap: () => Navigator.pop(sheetContext, c),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                ),
+              );
+            },
+          ),
     );
     if (picked != null) setState(() => _country = picked);
   }
@@ -288,9 +338,19 @@ class _OtpFlowState extends State<OtpFlow> {
           children: [
             Text(_country.flag, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 6),
-            Text(_country.dialCode, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+            Text(
+              _country.dialCode,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14.5,
+              ),
+            ),
             const SizedBox(width: 2),
-            Icon(Icons.keyboard_arrow_down, size: 18, color: KuwrirColors.textHint),
+            Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: KuwrirColors.textHint,
+            ),
           ],
         ),
       ),
@@ -316,7 +376,8 @@ class _OtpFlowState extends State<OtpFlow> {
         // as it's typed or pasted, rather than only normalizing it silently
         // once the request is sent. Without the chip, "0" is the expected
         // first digit of the local format, so leave it alone.
-        if (widget.showCountryCode) TextInputFormatter.withFunction(_stripLeadingZero),
+        if (widget.showCountryCode)
+          TextInputFormatter.withFunction(_stripLeadingZero),
       ],
       decoration: InputDecoration(
         labelText: 'Nomor HP',
@@ -332,24 +393,28 @@ class _OtpFlowState extends State<OtpFlow> {
         const SizedBox(height: 24),
         const Icon(Icons.sms_outlined, size: 56, color: KuwrirColors.primary),
         const SizedBox(height: 16),
-        Text(widget.headerTitle,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center),
+        Text(
+          widget.headerTitle,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
-        Text(widget.headerSubtitle,
-            style: TextStyle(color: KuwrirColors.textSecondary),
-            textAlign: TextAlign.center),
+        Text(
+          widget.headerSubtitle,
+          style: TextStyle(color: KuwrirColors.textSecondary),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 32),
       ],
       widget.showCountryCode
           ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _countryChip(),
-                const SizedBox(width: 10),
-                Expanded(child: phoneField),
-              ],
-            )
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _countryChip(),
+              const SizedBox(width: 10),
+              Expanded(child: phoneField),
+            ],
+          )
           : phoneField,
       if (widget.agreementSlot != null) ...[
         const SizedBox(height: 16),
@@ -360,11 +425,20 @@ class _OtpFlowState extends State<OtpFlow> {
         height: 50,
         child: FilledButton(
           onPressed: _loading ? null : _requestOtp,
-          child: _loading
-              ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Kirim Kode OTP', style: TextStyle(fontSize: 16)),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                  : const Text(
+                    'Kirim Kode OTP',
+                    style: TextStyle(fontSize: 16),
+                  ),
         ),
       ),
     ];
@@ -374,24 +448,39 @@ class _OtpFlowState extends State<OtpFlow> {
     return [
       if (widget.showHeaderIcon) ...[
         const SizedBox(height: 24),
-        const Icon(Icons.mark_email_read_outlined, size: 56, color: KuwrirColors.primary),
+        const Icon(
+          Icons.mark_email_read_outlined,
+          size: 56,
+          color: KuwrirColors.primary,
+        ),
         const SizedBox(height: 16),
-        const Text('Masukkan kode OTP',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center),
+        const Text(
+          'Masukkan kode OTP',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
       ] else
         const SizedBox(height: 4),
-      Text('Kode dikirim lewat WhatsApp ke ${_displayPhone()}',
-          style: TextStyle(color: KuwrirColors.textSecondary, fontSize: widget.showHeaderIcon ? 14 : 13.5),
-          textAlign: TextAlign.center),
+      Text(
+        'Kode dikirim lewat WhatsApp ke ${_displayPhone()}',
+        style: TextStyle(
+          color: KuwrirColors.textSecondary,
+          fontSize: widget.showHeaderIcon ? 14 : 13.5,
+        ),
+        textAlign: TextAlign.center,
+      ),
       const SizedBox(height: 32),
       TextField(
         controller: _codeCtrl,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 6,
-        style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          fontSize: 22,
+          letterSpacing: 8,
+          fontWeight: FontWeight.bold,
+        ),
         decoration: InputDecoration(
           counterText: '',
           hintText: '000000',
@@ -404,25 +493,37 @@ class _OtpFlowState extends State<OtpFlow> {
         height: 50,
         child: FilledButton(
           onPressed: _loading ? null : _verify,
-          child: _loading
-              ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(widget.verifyButtonLabel, style: const TextStyle(fontSize: 16)),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                  : Text(
+                    widget.verifyButtonLabel,
+                    style: const TextStyle(fontSize: 16),
+                  ),
         ),
       ),
       const SizedBox(height: 12),
       Center(
         child: TextButton(
           onPressed: (_loading || _resendSeconds > 0) ? null : _requestOtp,
-          child: Text(_resendSeconds > 0
-              ? 'Kirim ulang dalam ${_resendSeconds}s'
-              : 'Kirim ulang kode'),
+          child: Text(
+            _resendSeconds > 0
+                ? 'Kirim ulang dalam ${_resendSeconds}s'
+                : 'Kirim ulang kode',
+          ),
         ),
       ),
       Center(
         child: TextButton(
-          onPressed: _loading ? null : () => setState(() => _step = _OtpStep.phone),
+          onPressed:
+              _loading ? null : () => setState(() => _step = _OtpStep.phone),
           child: const Text('Ganti nomor HP'),
         ),
       ),
