@@ -454,23 +454,25 @@ export default function OrdersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {order.driver?.user?.name ? (
+                          {order.driver_id ? (
                             <HoverCard>
                               <HoverCardTrigger className="font-medium text-green-700 underline decoration-dotted">
-                                {order.driver.user.name}
+                                {order.driver?.user?.name || order.driver?.user?.phone || 'Driver'}
                               </HoverCardTrigger>
                               <HoverCardContent>
-                                <div className="font-semibold">{order.driver.user.name}</div>
+                                <div className="font-semibold">
+                                  {order.driver?.user?.name || order.driver?.user?.phone || 'Driver'}
+                                </div>
                                 <div className="mt-1 text-xs text-muted-foreground">
-                                  {order.driver.vehicle_type} · {order.driver.vehicle_plate}
+                                  {order.driver?.vehicle_type} · {order.driver?.vehicle_plate}
                                 </div>
                                 <div className="mt-2 flex items-center gap-3 text-xs">
-                                  <span>📞 {order.driver.user.phone || '-'}</span>
-                                  <span>⭐ {(order.driver.rating ?? 0).toFixed(1)}</span>
-                                  <span>📦 {order.driver.total_delivered ?? 0}</span>
+                                  <span>📞 {order.driver?.user?.phone || '-'}</span>
+                                  <span>⭐ {(order.driver?.rating ?? 0).toFixed(1)}</span>
+                                  <span>📦 {order.driver?.total_delivered ?? 0}</span>
                                 </div>
                                 <div className="mt-2 text-xs">
-                                  {order.driver.is_online ? (
+                                  {order.driver?.is_online ? (
                                     <span className="text-green-600">● Online</span>
                                   ) : (
                                     <span className="text-muted-foreground">● Offline</span>

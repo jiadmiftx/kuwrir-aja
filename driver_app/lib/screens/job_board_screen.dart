@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/job_board_cubit.dart';
 import '../cubits/active_delivery_cubit.dart';
+import '../services/location_service.dart';
 import '../widgets/open_in_maps_button.dart';
 import 'active_delivery_screen.dart';
 
@@ -363,20 +365,134 @@ String _fmtMoney(double v) => v
 /// the 1-tap Google Maps route CTA plus a "Lihat Detail" button that opens
 /// the full map/status-update screen for just that order. The board stays
 /// visible underneath; this never forces navigation.
-class _ActiveOrderCard extends StatelessWidget {
+class _ActiveOrderCard extends StatefulWidget {
   final Map<String, dynamic> order;
   const _ActiveOrderCard({required this.order});
 
   @override
+  State<_ActiveOrderCard> createState() => _ActiveOrderCardState();
+}
+
+class _ActiveOrderCardState extends State<_ActiveOrderCard> {
+  bool _updating = false;
+
+  Future<void> _markPickedUp() async {
+    final orderId = widget.order['id'] as String? ?? '';
+    final api = context.read<ApiClient>();
+    setState(() => _updating = true);
+    try {
+      await api.markPickedUp(orderId);
+      unawaited(LocationService.sendCurrentLocation(api));
+      if (mounted) context.read<JobBoardCubit>().loadJobs();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal konfirmasi pickup',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _updating = false);
+    }
+  }
+
+  Future<void> _markDelivered() async {
+    final orderId = widget.order['id'] as String? ?? '';
+    final api = context.read<ApiClient>();
+    setState(() => _updating = true);
+    try {
+      final result = await api.markDelivered(orderId);
+      unawaited(LocationService.sendCurrentLocation(api));
+      if (mounted) await _showDoneDialog(result);
+      if (mounted) context.read<JobBoardCubit>().loadJobs();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal konfirmasi pengiriman',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _updating = false);
+    }
+  }
+
+  Future<void> _showDoneDialog(Map<String, dynamic> result) {
+    final cashCollected = (result['cash_collected'] as num?)?.toDouble() ?? 0;
+    final driverEarning = (result['driver_earning'] as num?)?.toDouble() ?? 0;
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Pengiriman Selesai!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (cashCollected > 0)
+              Text(
+                'Uang COD diterima: Rp ${_fmtMoney(cashCollected)}',
+                style: const TextStyle(fontSize: 14.5),
+              ),
+            const SizedBox(height: 6),
+            Text(
+              'Penghasilan: Rp ${_fmtMoney(driverEarning)}',
+              style: const TextStyle(
+                fontSize: 15,
+                color: KuwrirColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: KuwrirColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text(
+                'Oke',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final order = widget.order;
     final orderNumber = order['order_number'] as String? ?? '-';
     final status = order['status'] as String? ?? 'ready';
+    final isPickedUp = status == 'picked_up';
     final merchantName =
         order['merchant_name'] as String? ??
         (order['merchant'] as Map?)?['name'] as String? ??
         'Merchant';
+    final pickupAddress = order['pickup_address'] as String? ?? '';
     final dropoffAddress = order['dropoff_address'] as String? ?? '';
+    final receiverName = order['receiver_name'] as String? ?? '';
     final driverEarning = (order['driver_earning'] as num?)?.toDouble() ?? 0;
+    final total = (order['total'] as num?)?.toDouble() ?? 0;
+    final paymentType = order['payment_type'] as String? ?? 'cash';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -401,46 +517,134 @@ class _ActiveOrderCard extends StatelessWidget {
                     color: KuwrirColors.primary,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: KuwrirColors.info.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: Text(
-                    status == 'picked_up'
-                        ? 'Menuju Customer'
-                        : 'Menuju Merchant',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: KuwrirColors.info,
-                    ),
+                Text(
+                  '#$orderNumber',
+                  style: TextStyle(fontSize: 12, color: KuwrirColors.textHint),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Two-stage progress: which leg of the trip this order is on,
+            // so a driver returning to the board (not just the detail
+            // screen) can tell at a glance whether they still need to swing
+            // by the merchant or are already headed to the customer.
+            _TripStageBar(isPickedUp: isPickedUp),
+            const SizedBox(height: 12),
+
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  isPickedUp ? Icons.person_outline : Icons.storefront_outlined,
+                  size: 16,
+                  color: isPickedUp ? KuwrirColors.error : KuwrirColors.warning,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isPickedUp
+                            ? (receiverName.isNotEmpty
+                                  ? receiverName
+                                  : 'Customer')
+                            : merchantName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                      Text(
+                        isPickedUp ? dropoffAddress : pickupAddress,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: KuwrirColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              '#$orderNumber',
-              style: TextStyle(fontSize: 12, color: KuwrirColors.textHint),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              status == 'picked_up' ? dropoffAddress : merchantName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13.5,
+
+            if (paymentType == 'cash' && isPickedUp) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: KuwrirColors.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 15,
+                      color: KuwrirColors.warning,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Tagih COD: Rp ${_fmtMoney(total)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.warning,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isPickedUp
+                      ? KuwrirColors.success
+                      : KuwrirColors.warning,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: _updating
+                    ? null
+                    : (isPickedUp ? _markDelivered : _markPickedUp),
+                child: _updating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        isPickedUp
+                            ? 'Selesai Diantarkan'
+                            : 'Sudah Diambil dari Merchant',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Row(
               children: [
                 OpenInMapsButton(
-                  filled: true,
                   onTap: () => openInGoogleMaps(
                     context: context,
                     merchantLat: _lat(order, 'pickup'),
@@ -450,7 +654,7 @@ class _ActiveOrderCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                TextButton(
+                TextButton.icon(
                   onPressed: () async {
                     await Navigator.push(
                       context,
@@ -466,7 +670,8 @@ class _ActiveOrderCard extends StatelessWidget {
                       context.read<JobBoardCubit>().loadJobs();
                     }
                   },
-                  child: const Text(
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text(
                     'Lihat Detail',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
@@ -475,6 +680,53 @@ class _ActiveOrderCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Two-segment "Ambil di Merchant -> Antar ke Customer" progress bar —
+/// makes the job board card itself (not just the detail screen) show which
+/// leg of the trip an order is on.
+class _TripStageBar extends StatelessWidget {
+  final bool isPickedUp;
+  const _TripStageBar({required this.isPickedUp});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _stageDot(done: true),
+        Expanded(
+          child: Container(
+            height: 2,
+            color: isPickedUp ? KuwrirColors.success : KuwrirColors.border,
+          ),
+        ),
+        _stageDot(done: isPickedUp),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 0,
+          child: Text(
+            isPickedUp ? 'Menuju Customer' : 'Menuju Merchant',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: isPickedUp ? KuwrirColors.success : KuwrirColors.warning,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _stageDot({required bool done}) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: done ? KuwrirColors.success : KuwrirColors.border,
       ),
     );
   }
