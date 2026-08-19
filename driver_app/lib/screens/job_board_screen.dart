@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
@@ -14,11 +15,6 @@ class JobBoardScreen extends StatefulWidget {
   @override
   State<JobBoardScreen> createState() => _JobBoardScreenState();
 }
-
-// Delete-account is implemented (see _deleteAccount below) but hidden from
-// the account menu for now, pending review — flip this back on when ready
-// instead of re-implementing.
-const _kShowDeleteAccount = false;
 
 class _JobBoardScreenState extends State<JobBoardScreen> {
   @override
@@ -81,31 +77,13 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.person_outline),
-                tooltip: 'Profil Saya',
-                onPressed: () => Navigator.pushNamed(context, '/profile'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.account_balance_wallet_outlined),
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedWallet01),
                 onPressed: () => Navigator.pushNamed(context, '/wallet'),
               ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  if (value == 'logout') _confirmLogout(context);
-                  if (value == 'delete') _deleteAccount(context);
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'logout', child: Text('Keluar')),
-                  if (_kShowDeleteAccount)
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'Hapus Akun',
-                        style: TextStyle(color: KuwrirColors.error),
-                      ),
-                    ),
-                ],
+              IconButton(
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedUser),
+                tooltip: 'Profil Saya',
+                onPressed: () => Navigator.pushNamed(context, '/profile'),
               ),
             ],
           ),
@@ -113,55 +91,6 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         );
       },
     );
-  }
-
-  Future<void> _confirmLogout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Keluar?'),
-        content: const Text('Anda akan keluar dari akun driver ini.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    final nav = Navigator.of(context);
-    await ApiClient().clearTokens();
-    nav.pushNamedAndRemoveUntil('/login', (_) => false);
-  }
-
-  Future<void> _deleteAccount(BuildContext context) async {
-    final confirmed = await showDeleteAccountDialog(context);
-    if (confirmed != true || !context.mounted) return;
-
-    try {
-      await ApiClient().deleteAccount();
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e is ApiException ? e.message : 'Gagal menghapus akun',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-    if (!context.mounted) return;
-    final nav = Navigator.of(context);
-    await ApiClient().clearTokens();
-    nav.pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   Widget _buildFoodTab(BuildContext context, JobBoardState state) {
@@ -179,8 +108,8 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.wifi_off,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedWifiOff01,
                   size: 36,
                   color: KuwrirColors.primary,
                 ),
@@ -242,8 +171,8 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                           color: KuwrirColors.primary.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Icons.inbox_outlined,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedInbox,
                           size: 36,
                           color: KuwrirColors.primary,
                         ),
@@ -540,8 +469,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isPickedUp ? Icons.person_outline : Icons.storefront_outlined,
+                HugeIcon(
+                  icon: isPickedUp ? HugeIcons.strokeRoundedUser : HugeIcons.strokeRoundedStore01,
                   size: 16,
                   color: isPickedUp ? KuwrirColors.error : KuwrirColors.warning,
                 ),
@@ -589,8 +518,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.payments_outlined,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedPaymentSuccess01,
                       size: 15,
                       color: KuwrirColors.warning,
                     ),
@@ -675,7 +604,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       context.read<JobBoardCubit>().loadJobs();
                     }
                   },
-                  icon: const Icon(Icons.map_outlined, size: 16),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedMaps, size: 16),
                   label: const Text(
                     'Lihat Detail',
                     style: TextStyle(fontWeight: FontWeight.w700),
@@ -923,7 +852,7 @@ class _JobCardState extends State<_JobCard> {
 
             // Pickup
             _AddressRow(
-              icon: Icons.storefront_outlined,
+              icon: HugeIcons.strokeRoundedStore01,
               iconColor: KuwrirColors.warning,
               label: 'Ambil di',
               name: merchantName,
@@ -933,7 +862,7 @@ class _JobCardState extends State<_JobCard> {
 
             // Dropoff
             _AddressRow(
-              icon: Icons.location_on_outlined,
+              icon: HugeIcons.strokeRoundedLocation01,
               iconColor: KuwrirColors.error,
               label: 'Antar ke',
               name: '',
@@ -950,8 +879,8 @@ class _JobCardState extends State<_JobCard> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.payments_outlined,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedPaymentSuccess01,
                       size: 16,
                       color: KuwrirColors.warning,
                     ),
@@ -1050,7 +979,7 @@ class _JobCardState extends State<_JobCard> {
 }
 
 class _AddressRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final Color iconColor;
   final String label;
   final String name;
@@ -1077,7 +1006,7 @@ class _AddressRow extends StatelessWidget {
             color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: iconColor, size: 17),
+          child: HugeIcon(icon: icon, color: iconColor, size: 17),
         ),
         const SizedBox(width: 10),
         Expanded(

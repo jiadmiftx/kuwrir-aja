@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/chat_cubit.dart';
@@ -92,7 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(Icons.chat_bubble_outline, size: 30, color: KuwrirColors.primary),
+                                child: HugeIcon(icon: HugeIcons.strokeRoundedMessage01, size: 30, color: KuwrirColors.primary),
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -222,7 +223,7 @@ class _InputBar extends StatelessWidget {
             color: KuwrirColors.primary,
             shape: const CircleBorder(),
             child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedSent, color: Colors.white, size: 20),
               onPressed: onSend,
             ),
           ),

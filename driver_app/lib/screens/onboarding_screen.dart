@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -55,16 +56,16 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           children: [
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(
-                Icons.camera_alt_outlined,
+              leading: HugeIcon(
+                icon: HugeIcons.strokeRoundedCamera01,
                 color: KuwrirColors.primary,
               ),
               title: const Text('Ambil Foto'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(
-                Icons.photo_library_outlined,
+              leading: HugeIcon(
+                icon: HugeIcons.strokeRoundedImage01,
                 color: KuwrirColors.primary,
               ),
               title: const Text('Pilih dari Galeri'),
@@ -255,11 +256,11 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _vehicleChip('motorcycle', Icons.two_wheeler, 'Motor'),
+                  _vehicleChip('motorcycle', HugeIcons.strokeRoundedMotorbike01, 'Motor'),
                   const SizedBox(width: 8),
-                  _vehicleChip('bicycle', Icons.pedal_bike, 'Sepeda'),
+                  _vehicleChip('bicycle', HugeIcons.strokeRoundedBicycle01, 'Sepeda'),
                   const SizedBox(width: 8),
-                  _vehicleChip('car', Icons.directions_car, 'Mobil'),
+                  _vehicleChip('car', HugeIcons.strokeRoundedCar01, 'Mobil'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -267,7 +268,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _field(
                 _plateCtrl,
                 'Nomor Plat (e.g. DR 1234 AB)',
-                Icons.confirmation_number_outlined,
+                HugeIcons.strokeRoundedTicket01,
                 validator: (v) =>
                     (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
               ),
@@ -278,12 +279,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     child: _field(
                       _brandCtrl,
                       'Merek (e.g. Honda)',
-                      Icons.info_outline,
+                      HugeIcons.strokeRoundedInformationCircle,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _field(_colorCtrl, 'Warna', Icons.palette_outlined),
+                    child: _field(_colorCtrl, 'Warna', HugeIcons.strokeRoundedPaintBrush01),
                   ),
                 ],
               ),
@@ -291,7 +292,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _field(
                 _yearCtrl,
                 'Tahun Kendaraan',
-                Icons.calendar_today_outlined,
+                HugeIcons.strokeRoundedCalendar01,
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 24),
@@ -311,7 +312,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _field(
                 _nikCtrl,
                 'NIK (sesuai KTP)',
-                Icons.badge_outlined,
+                HugeIcons.strokeRoundedBadge,
                 keyboardType: TextInputType.number,
                 validator: (v) =>
                     (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
@@ -320,7 +321,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _field(
                 _simNumberCtrl,
                 'Nomor SIM',
-                Icons.card_membership_outlined,
+                HugeIcons.strokeRoundedCreditCard,
                 validator: (v) =>
                     (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
               ),
@@ -328,7 +329,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _field(
                 _addressCtrl,
                 'Alamat Domisili',
-                Icons.home_outlined,
+                HugeIcons.strokeRoundedHome01,
                 validator: (v) =>
                     (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
               ),
@@ -357,35 +358,35 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               _docUploadTile(
                 'KTP',
                 'Foto KTP asli — wajah dan data jelas',
-                Icons.badge_outlined,
+                HugeIcons.strokeRoundedBadge,
                 _ktpFile,
                 () => _pick('ktp'),
               ),
               _docUploadTile(
                 'SIM C / SIM A',
                 'Foto SIM aktif (depan)',
-                Icons.card_membership_outlined,
+                HugeIcons.strokeRoundedCreditCard,
                 _simFile,
                 () => _pick('sim'),
               ),
               _docUploadTile(
                 'STNK',
                 'Foto STNK kendaraan yang dipakai',
-                Icons.article_outlined,
+                HugeIcons.strokeRoundedDocumentAttachment,
                 _stnkFile,
                 () => _pick('stnk'),
               ),
               _docUploadTile(
                 'Selfie dengan KTP',
                 'Foto wajah sambil memegang KTP',
-                Icons.face_outlined,
+                HugeIcons.strokeRoundedFaceId,
                 _selfieFile,
                 () => _pick('selfie'),
               ),
               _docUploadTile(
                 'Foto Kendaraan',
                 'Foto kendaraan tampak depan (plat terlihat)',
-                Icons.two_wheeler,
+                HugeIcons.strokeRoundedMotorbike01,
                 _vehiclePhotoFile,
                 () => _pick('vehicle_photo'),
               ),
@@ -411,8 +412,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      _allDocsPicked ? Icons.check_circle : Icons.info_outline,
+                    HugeIcon(
+                      icon: _allDocsPicked ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedInformationCircle,
                       color: _allDocsPicked
                           ? KuwrirColors.success
                           : KuwrirColors.warning,
@@ -473,7 +474,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     );
   }
 
-  Widget _vehicleChip(String value, IconData icon, String label) {
+  Widget _vehicleChip(String value, List<List<dynamic>> icon, String label) {
     final selected = _vehicleType == value;
     return Expanded(
       child: GestureDetector(
@@ -493,8 +494,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
+              HugeIcon(
+                icon: icon,
                 color: selected ? KuwrirColors.primary : KuwrirColors.textHint,
               ),
               const SizedBox(height: 4),
@@ -518,7 +519,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   Widget _docUploadTile(
     String title,
     String subtitle,
-    IconData icon,
+    List<List<dynamic>> icon,
     File? file,
     VoidCallback onTap,
   ) {
@@ -549,7 +550,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 : KuwrirColors.primary.withValues(alpha: 0.08),
             child: uploaded
                 ? Image.file(file, fit: BoxFit.cover)
-                : Icon(icon, color: KuwrirColors.primary, size: 20),
+                : HugeIcon(icon: icon, color: KuwrirColors.primary, size: 20),
           ),
         ),
         title: Text(
@@ -580,7 +581,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   Widget _field(
     TextEditingController ctrl,
     String label,
-    IconData icon, {
+    List<List<dynamic>> icon, {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
@@ -598,7 +599,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(color: KuwrirColors.textHint),
-          prefixIcon: Icon(icon, color: KuwrirColors.primary),
+          prefixIcon: HugeIcon(icon: icon, color: KuwrirColors.primary),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -625,7 +626,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     ? KuwrirColors.primary
                     : KuwrirColors.border,
                 child: done
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    ? const HugeIcon(icon: HugeIcons.strokeRoundedTick02, size: 14, color: Colors.white)
                     : Text(
                         '$step',
                         style: TextStyle(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter/material.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
@@ -93,7 +94,7 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.comment_outlined, size: 16, color: _status == 'rejected' ? KuwrirColors.error : KuwrirColors.info),
+                      HugeIcon(icon: HugeIcons.strokeRoundedComment01, size: 16, color: _status == 'rejected' ? KuwrirColors.error : KuwrirColors.info),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -114,7 +115,7 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
                   const CircularProgressIndicator()
                 else
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.refresh),
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
                     label: const Text('Cek Status'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: KuwrirColors.primary,
@@ -135,7 +136,7 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    icon: const Icon(Icons.upload_file_outlined),
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedFileUpload),
                     label: const Text('Kirim Ulang Dokumen', style: TextStyle(fontWeight: FontWeight.w700)),
                     onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
                   ),
@@ -160,21 +161,21 @@ class _DriverPendingScreenState extends State<DriverPendingScreen> {
           width: 88,
           height: 88,
           decoration: BoxDecoration(color: KuwrirColors.success.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(Icons.check_circle_outline, size: 40, color: KuwrirColors.success),
+          child: HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle01, size: 40, color: KuwrirColors.success),
         );
       case 'rejected':
         return Container(
           width: 88,
           height: 88,
           decoration: BoxDecoration(color: KuwrirColors.error.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(Icons.cancel_outlined, size: 40, color: KuwrirColors.error),
+          child: HugeIcon(icon: HugeIcons.strokeRoundedCancel01, size: 40, color: KuwrirColors.error),
         );
       default:
         return Container(
           width: 88,
           height: 88,
           decoration: BoxDecoration(color: KuwrirColors.warning.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(Icons.pending_actions_outlined, size: 40, color: KuwrirColors.warning),
+          child: HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: 40, color: KuwrirColors.warning),
         );
     }
   }

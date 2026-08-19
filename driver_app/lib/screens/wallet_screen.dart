@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/wallet_cubit.dart';
@@ -451,7 +452,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         color: KuwrirColors.error.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(11),
                       ),
-                      child: Icon(Icons.money_off_outlined, color: KuwrirColors.error, size: 19),
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedMoneyNotFound01, color: KuwrirColors.error, size: 19),
                     ),
                     const SizedBox(width: 12),
                     Text('Cash to Deposit',
@@ -543,7 +544,7 @@ class _TransactionTile extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(color: tint.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-          child: Icon(isCredit ? Icons.arrow_downward : Icons.arrow_upward, color: tint, size: 18),
+          child: HugeIcon(icon: isCredit ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowUp01, color: tint, size: 18),
         ),
         title: Text(_categoryLabel(tx.category), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         subtitle: Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'onboarding_screen.dart';
 
@@ -115,29 +116,29 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
               ),
               const SizedBox(height: 12),
 
-              _field(_nameCtrl, 'Nama Lengkap', Icons.person_outline,
+              _field(_nameCtrl, 'Nama Lengkap', HugeIcons.strokeRoundedUser,
                   validator: (v) => (v?.trim().isEmpty ?? true) ? 'Nama wajib diisi' : null),
               const SizedBox(height: 12),
-              _field(_phoneCtrl, 'Nomor HP', Icons.phone_outlined,
+              _field(_phoneCtrl, 'Nomor HP', HugeIcons.strokeRoundedCall,
                   keyboardType: TextInputType.phone,
                   validator: (v) => (v?.trim().length ?? 0) < 9 ? 'Nomor HP tidak valid' : null),
               const SizedBox(height: 12),
-              _field(_emailCtrl, 'Email', Icons.email_outlined,
+              _field(_emailCtrl, 'Email', HugeIcons.strokeRoundedMail01,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) => (v?.contains('@') ?? false) ? null : 'Email tidak valid'),
               const SizedBox(height: 12),
-              _field(_passwordCtrl, 'Password', Icons.lock_outline,
+              _field(_passwordCtrl, 'Password', HugeIcons.strokeRoundedSquareLock01,
                   obscure: _obscure,
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    icon: HugeIcon(
+                      icon: _obscure ? HugeIcons.strokeRoundedViewOffSlash : HugeIcons.strokeRoundedView,
                       color: KuwrirColors.textHint,
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                   validator: (v) => (v?.length ?? 0) < 6 ? 'Minimal 6 karakter' : null),
               const SizedBox(height: 12),
-              _field(_confirmCtrl, 'Konfirmasi Password', Icons.lock_outline,
+              _field(_confirmCtrl, 'Konfirmasi Password', HugeIcons.strokeRoundedSquareLock01,
                   obscure: true,
                   validator: (v) => v != _passwordCtrl.text ? 'Password tidak cocok' : null),
               const SizedBox(height: 24),
@@ -176,7 +177,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   Widget _field(
     TextEditingController ctrl,
     String label,
-    IconData icon, {
+    List<List<dynamic>> icon, {
     TextInputType? keyboardType,
     bool obscure = false,
     Widget? suffixIcon,
@@ -197,7 +198,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(color: KuwrirColors.textHint),
-          prefixIcon: Icon(icon, color: KuwrirColors.primary),
+          prefixIcon: HugeIcon(icon: icon, color: KuwrirColors.primary),
           suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -223,7 +224,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
                 radius: 14,
                 backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
                 child: done
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    ? const HugeIcon(icon: HugeIcons.strokeRoundedTick02, size: 14, color: Colors.white)
                     : Text('$step', style: TextStyle(color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),
               ),
               const SizedBox(width: 4),

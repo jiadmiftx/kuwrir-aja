@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hugeicons/hugeicons.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -175,7 +176,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(1.05, -0.8),
             child: _FloatingIcon(
-              icon: Icons.two_wheeler_outlined,
+              icon: HugeIcons.strokeRoundedMotorbike01,
               size: 48,
               angle: -0.3,
             ),
@@ -183,7 +184,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(-1.08, -0.06),
             child: _FloatingIcon(
-              icon: Icons.route_outlined,
+              icon: HugeIcons.strokeRoundedRoute01,
               size: 46,
               angle: 0.25,
             ),
@@ -191,7 +192,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(0.86, 0.88),
             child: _FloatingIcon(
-              icon: Icons.payments_outlined,
+              icon: HugeIcons.strokeRoundedPaymentSuccess01,
               size: 34,
               angle: 0.15,
             ),
@@ -199,7 +200,7 @@ class _LoginHeroState extends State<_LoginHero>
           const Align(
             alignment: Alignment(-0.8, 0.94),
             child: _FloatingIcon(
-              icon: Icons.local_shipping_outlined,
+              icon: HugeIcons.strokeRoundedDeliveryTruck01,
               size: 32,
               angle: -0.2,
             ),
@@ -269,7 +270,7 @@ class _LoginHeroState extends State<_LoginHero>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.bolt, size: 15, color: Colors.white),
+                          const HugeIcon(icon: HugeIcons.strokeRoundedFlash, size: 15, color: Colors.white),
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(
@@ -296,7 +297,7 @@ class _LoginHeroState extends State<_LoginHero>
 }
 
 class _FloatingIcon extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final double size;
   final double angle;
   const _FloatingIcon({
@@ -309,8 +310,8 @@ class _FloatingIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: angle * math.pi,
-      child: Icon(
-        icon,
+      child: HugeIcon(
+        icon: icon,
         size: size,
         color: Colors.white.withValues(alpha: 0.14),
       ),

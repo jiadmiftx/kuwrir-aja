@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -103,7 +104,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedMessage01),
             tooltip: 'Chat dengan Customer',
             onPressed: () => Navigator.push(
               context,
@@ -142,8 +143,8 @@ class ActiveDeliveryScreen extends StatelessWidget {
                           height: 48,
                           child: Tooltip(
                             message: 'Merchant (Pickup)',
-                            child: Icon(
-                              Icons.storefront,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedStore01,
                               color: KuwrirColors.warning,
                               size: 40,
                             ),
@@ -155,8 +156,8 @@ class ActiveDeliveryScreen extends StatelessWidget {
                           height: 48,
                           child: Tooltip(
                             message: 'Customer (Dropoff)',
-                            child: Icon(
-                              Icons.location_pin,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedPinLocation01,
                               color: KuwrirColors.error,
                               size: 40,
                             ),
@@ -252,21 +253,21 @@ class ActiveDeliveryScreen extends StatelessWidget {
                 // Location info
                 if (!isPickedUp) ...[
                   _InfoRow(
-                    icon: Icons.storefront_outlined,
+                    icon: HugeIcons.strokeRoundedStore01,
                     color: KuwrirColors.warning,
                     label: merchantName,
                     sub: pickupAddress,
                   ),
                 ] else ...[
                   _InfoRow(
-                    icon: Icons.person_outline,
+                    icon: HugeIcons.strokeRoundedUser,
                     color: KuwrirColors.info,
                     label: receiverName,
                     sub: receiverPhone,
                   ),
                   const SizedBox(height: 10),
                   _InfoRow(
-                    icon: Icons.location_on_outlined,
+                    icon: HugeIcons.strokeRoundedLocation01,
                     color: KuwrirColors.error,
                     label: dropoffAddress,
                     sub: '',
@@ -283,8 +284,8 @@ class ActiveDeliveryScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.payments_outlined,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedPaymentSuccess01,
                           color: KuwrirColors.warning,
                           size: 18,
                         ),
@@ -482,7 +483,7 @@ class _RoadDistanceLabelState extends State<_RoadDistanceLabel> {
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final Color color;
   final String label;
   final String sub;
@@ -507,7 +508,7 @@ class _InfoRow extends StatelessWidget {
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 17),
+          child: HugeIcon(icon: icon, color: color, size: 17),
         ),
         const SizedBox(width: 10),
         Expanded(

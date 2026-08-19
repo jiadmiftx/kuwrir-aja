@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 /// Service job board for drivers — two types of jobs:
@@ -114,7 +115,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green.shade200)),
                   child: Row(children: [
-                    const Icon(Icons.payments, color: Colors.green, size: 20),
+                    const HugeIcon(icon: HugeIcons.strokeRoundedPaymentSuccess01, color: Colors.green, size: 20),
                     const SizedBox(width: 8),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       const Text('Terima uang tunai COD:', style: TextStyle(color: Colors.green, fontSize: 12)),
@@ -166,7 +167,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
           title: const Text('Job Jasa'),
           bottom: TabBar(tabs: [
             Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.arrow_upward, size: 16),
+              const HugeIcon(icon: HugeIcons.strokeRoundedArrowUp01, size: 16),
               const SizedBox(width: 4),
               const Text('Jemput'),
               if (_pickupJobs.isNotEmpty) ...[
@@ -175,7 +176,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
               ],
             ])),
             Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.arrow_downward, size: 16),
+              const HugeIcon(icon: HugeIcons.strokeRoundedArrowDown01, size: 16),
               const SizedBox(width: 4),
               const Text('Antar Balik'),
               if (_returnJobs.isNotEmpty) ...[
@@ -197,7 +198,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
     if (jobs.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(isPickup ? Icons.inventory_2_outlined : Icons.local_shipping_outlined, size: 48, color: Colors.grey),
+          HugeIcon(icon: isPickup ? HugeIcons.strokeRoundedPackage : HugeIcons.strokeRoundedDeliveryTruck01, size: 48, color: Colors.grey),
           const SizedBox(height: 8),
           Text(isPickup ? 'Tidak ada job jemput tersedia' : 'Tidak ada job antar balik tersedia', style: const TextStyle(color: Colors.grey)),
         ]),
@@ -225,7 +226,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(isReturn ? Icons.arrow_downward : Icons.arrow_upward, size: 12, color: accent),
+                HugeIcon(icon: isReturn ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowUp01, size: 12, color: accent),
                 const SizedBox(width: 4),
                 Text(isReturn ? 'ANTAR BALIK + COD' : 'JEMPUT BARANG', style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.bold)),
               ]),
@@ -237,7 +238,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
 
           // Route
           _routeRow(
-            isReturn ? Icons.store : Icons.person,
+            isReturn ? HugeIcons.strokeRoundedStore01 : HugeIcons.strokeRoundedUser,
             isReturn ? 'Dari: ${job.merchantName}' : 'Dari: ${job.customerName}',
             job.pickupAddress,
           ),
@@ -246,7 +247,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
             child: Container(width: 2, height: 16, color: Colors.grey.shade200),
           ),
           _routeRow(
-            isReturn ? Icons.home : Icons.store,
+            isReturn ? HugeIcons.strokeRoundedHome01 : HugeIcons.strokeRoundedStore01,
             isReturn ? 'Ke: ${job.customerName}' : 'Ke: ${job.merchantName}',
             job.dropoffAddress,
           ),
@@ -262,7 +263,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
           Row(children: [
             Text('${job.distanceKm} km', style: const TextStyle(color: Colors.grey)),
             const SizedBox(width: 12),
-            Icon(Icons.paid, size: 16, color: accent),
+            HugeIcon(icon: HugeIcons.strokeRoundedMoney01, size: 16, color: accent),
             const SizedBox(width: 4),
             Text('Kamu dapat: ${_fmt(job.driverEarning)}', style: TextStyle(fontWeight: FontWeight.bold, color: accent)),
             if (isReturn) ...[
@@ -286,10 +287,10 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
     );
   }
 
-  Widget _routeRow(IconData icon, String title, String address) => Row(
+  Widget _routeRow(List<List<dynamic>> icon, String title, String address) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, size: 18, color: Colors.grey),
+      HugeIcon(icon: icon, size: 18, color: Colors.grey),
       const SizedBox(width: 8),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -331,7 +332,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(children: [
-                  Icon(step == 'heading_to_pickup' ? Icons.navigation : (step == 'picked_up' ? Icons.delivery_dining : Icons.check_circle),
+                  HugeIcon(icon: step == 'heading_to_pickup' ? HugeIcons.strokeRoundedNavigation01 : (step == 'picked_up' ? HugeIcons.strokeRoundedScooter01 : HugeIcons.strokeRoundedCheckmarkCircle02),
                       size: 48, color: isReturn ? Colors.green : KuwrirColors.primary),
                   const SizedBox(height: 8),
                   Text(stepLabel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -344,11 +345,11 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
             // Destination
             Card(
               child: ListTile(
-                leading: const Icon(Icons.location_on, color: KuwrirColors.primary),
+                leading: const HugeIcon(icon: HugeIcons.strokeRoundedLocation01, color: KuwrirColors.primary),
                 title: const Text('Tujuan Sekarang'),
                 subtitle: Text(currentAddress, style: const TextStyle(fontWeight: FontWeight.w600)),
                 trailing: IconButton(
-                  icon: const Icon(Icons.map),
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedMaps),
                   onPressed: () {},
                   tooltip: 'Buka Maps',
                 ),
@@ -369,7 +370,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
                   if (isReturn && step == 'picked_up') ...[
                     const Divider(height: 12),
                     Row(children: [
-                      const Icon(Icons.payments, color: Colors.green, size: 18),
+                      const HugeIcon(icon: HugeIcons.strokeRoundedPaymentSuccess01, color: Colors.green, size: 18),
                       const SizedBox(width: 6),
                       Text('Terima COD: ${_fmt(job.totalCod)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 15)),
                     ]),

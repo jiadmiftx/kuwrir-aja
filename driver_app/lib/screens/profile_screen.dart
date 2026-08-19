@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -158,8 +159,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: KuwrirColors.primary.withValues(
                           alpha: 0.08,
                         ),
-                        child: Icon(
-                          Icons.person_outline,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedUser,
                           size: 40,
                           color: KuwrirColors.primary,
                         ),
@@ -192,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       _ProfileRow(
-                        icon: Icons.badge_outlined,
+                        icon: HugeIcons.strokeRoundedBadge,
                         label: 'Nama',
                         value: _user?.name.isNotEmpty == true
                             ? _user!.name
@@ -207,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       Divider(height: 1, color: KuwrirColors.border),
                       _ProfileRow(
-                        icon: Icons.mail_outline,
+                        icon: HugeIcons.strokeRoundedMail01,
                         label: 'Email',
                         value: _user?.email.isNotEmpty == true
                             ? _user!.email
@@ -222,7 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       Divider(height: 1, color: KuwrirColors.border),
                       _ProfileRow(
-                        icon: Icons.call_outlined,
+                        icon: HugeIcons.strokeRoundedCall,
                         label: 'No. Telepon',
                         value: _user?.phone ?? '-',
                       ),
@@ -247,7 +248,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       children: [
                         _ProfileRow(
-                          icon: Icons.two_wheeler_outlined,
+                          icon: HugeIcons.strokeRoundedMotorbike01,
                           label: 'Kendaraan',
                           value:
                               '${app['vehicle_brand'] ?? ''} ${app['vehicle_type'] ?? '-'}'
@@ -255,13 +256,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         Divider(height: 1, color: KuwrirColors.border),
                         _ProfileRow(
-                          icon: Icons.confirmation_number_outlined,
+                          icon: HugeIcons.strokeRoundedTicket01,
                           label: 'Nomor Plat',
                           value: app['vehicle_plate'] as String? ?? '-',
                         ),
                         Divider(height: 1, color: KuwrirColors.border),
                         _ProfileRow(
-                          icon: Icons.card_membership_outlined,
+                          icon: HugeIcons.strokeRoundedCreditCard,
                           label: 'Nomor SIM',
                           value: app['license_number'] as String? ?? '-',
                         ),
@@ -284,8 +285,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: KuwrirColors.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
-                        Icons.account_balance_wallet_outlined,
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedWallet01,
                         size: 18,
                         color: KuwrirColors.primary,
                       ),
@@ -297,8 +298,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontSize: 14.5,
                       ),
                     ),
-                    trailing: Icon(
-                      Icons.chevron_right,
+                    trailing: HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
                       color: KuwrirColors.textHint,
                     ),
                     onTap: () => Navigator.pushNamed(context, '/wallet'),
@@ -310,7 +311,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    leading: Icon(Icons.logout, color: KuwrirColors.error),
+                    leading: HugeIcon(icon: HugeIcons.strokeRoundedLogout01, color: KuwrirColors.error),
                     title: Text(
                       'Keluar',
                       style: TextStyle(
@@ -327,8 +328,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    leading: Icon(
-                      Icons.delete_outline,
+                    leading: HugeIcon(
+                      icon: HugeIcons.strokeRoundedDelete02,
                       color: KuwrirColors.error,
                     ),
                     title: Text(
@@ -384,7 +385,7 @@ class _ProfileSoftPanel extends StatelessWidget {
 }
 
 class _ProfileRow extends StatelessWidget {
-  final IconData icon;
+  final List<List<dynamic>> icon;
   final String label;
   final String value;
   final VoidCallback? onTap;
@@ -405,7 +406,7 @@ class _ProfileRow extends StatelessWidget {
           color: KuwrirColors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 18, color: KuwrirColors.primary),
+        child: HugeIcon(icon: icon, size: 18, color: KuwrirColors.primary),
       ),
       title: Text(
         label,
@@ -416,7 +417,7 @@ class _ProfileRow extends StatelessWidget {
         style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
       ),
       trailing: onTap != null
-          ? Icon(Icons.edit_outlined, size: 18, color: KuwrirColors.textHint)
+          ? HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 18, color: KuwrirColors.textHint)
           : null,
       onTap: onTap,
     );

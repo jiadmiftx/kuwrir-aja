@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -62,7 +63,7 @@ class OpenInMapsButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.map_outlined, size: 16, color: KuwrirColors.primary),
+              HugeIcon(icon: HugeIcons.strokeRoundedMaps, size: 16, color: KuwrirColors.primary),
               const SizedBox(width: 6),
               Text(
                 'Buka di Google Maps',
