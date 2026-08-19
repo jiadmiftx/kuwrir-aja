@@ -1,14 +1,11 @@
 name: Firebase App Distribution
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'customer_app/**'
-      - 'driver_app/**'
-      - 'merchant_app/**'
-      - 'shared/**'
-      - '.github/workflows/firebase-distribution.yml'
+  # workflow_dispatch only, on purpose — the user tests client changes via
+  # `flutter run` locally, so pushes to customer_app/driver_app/merchant_app/
+  # shared no longer auto-trigger a Firebase App Distribution build. Run
+  # manually (Actions tab, or `gh workflow run firebase-distribution.yml`)
+  # when an internal-tester build is actually wanted.
   workflow_dispatch:
 
 jobs:
