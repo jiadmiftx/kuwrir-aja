@@ -666,9 +666,9 @@ func (h *Handler) GetSettlements(c *gin.Context) {
 		Scan(&pendingMerchantPayout)
 
 	c.JSON(http.StatusOK, gin.H{
-		"total_driver_cash":        totalDriverCash,
-		"total_platform_revenue":   totalPlatformRevenue,
-		"pending_merchant_payout":  pendingMerchantPayout,
+		"total_driver_cash":       totalDriverCash,
+		"total_platform_revenue":  totalPlatformRevenue,
+		"pending_merchant_payout": pendingMerchantPayout,
 	})
 }
 
@@ -706,9 +706,9 @@ func (h *Handler) ProcessMerchantSettlement(c *gin.Context) {
 	adminID := c.GetString("user_id")
 
 	var req struct {
-		PeriodStart string  `json:"period_start" binding:"required"` // "2026-06-01"
-		PeriodEnd   string  `json:"period_end" binding:"required"`   // "2026-06-30"
-		Reference   string  `json:"reference"`
+		PeriodStart string `json:"period_start" binding:"required"` // "2026-06-01"
+		PeriodEnd   string `json:"period_end" binding:"required"`   // "2026-06-30"
+		Reference   string `json:"reference"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -796,7 +796,7 @@ type PromoRequest struct {
 	Code        string  `json:"code" binding:"required"`
 	Title       string  `json:"title" binding:"required"`
 	Type        string  `json:"type" binding:"required"` // percentage, fixed, free_delivery
-	Value       float64 `json:"value"`                    // required > 0 unless type is free_delivery, checked below
+	Value       float64 `json:"value"`                   // required > 0 unless type is free_delivery, checked below
 	MinOrder    float64 `json:"min_order"`
 	MaxDiscount float64 `json:"max_discount"`
 	UsageLimit  int     `json:"usage_limit"`
@@ -1531,13 +1531,13 @@ func (h *Handler) UpdateDeliveryZone(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{
-		"city_name":        req.CityName,
-		"latitude":         req.Latitude,
-		"longitude":        req.Longitude,
-		"radius_km":        req.RadiusKm,
-		"base_fee":         req.BaseFee,
-		"per_km_fee":       req.PerKmFee,
-		"is_default":       req.IsDefault && parentUID == nil,
+		"city_name":         req.CityName,
+		"latitude":          req.Latitude,
+		"longitude":         req.Longitude,
+		"radius_km":         req.RadiusKm,
+		"base_fee":          req.BaseFee,
+		"per_km_fee":        req.PerKmFee,
+		"is_default":        req.IsDefault && parentUID == nil,
 		"is_active":         req.IsActive,
 		"osm_relation_id":   req.OsmRelationID,
 		"boundary_geo_json": req.BoundaryGeoJSON,
@@ -1630,15 +1630,32 @@ func (h *Handler) NearbyDriversForOrder(c *gin.Context) {
 	var drivers []model.Driver
 	h.db.Preload("User").Where("is_online = ? AND is_available = ?", true, true).Find(&drivers)
 
+	// How many orders each driver is already carrying (admin-assigned or
+	// in-progress) — surfaced alongside distance so admin can judge load, not
+	// just proximity, before stacking another order onto a driver.
+	var counts []struct {
+		DriverID uuid.UUID
+		Count    int64
+	}
+	h.db.Model(&model.Order{}).
+		Select("driver_id, count(*) as count").
+		Where("driver_id IS NOT NULL AND status IN ?", []model.OrderStatus{model.OrderStatusReady, model.OrderStatusPickedUp}).
+		Group("driver_id").Scan(&counts)
+	countByDriver := make(map[uuid.UUID]int64, len(counts))
+	for _, cnt := range counts {
+		countByDriver[cnt.DriverID] = cnt.Count
+	}
+
 	type DriverWithDistance struct {
 		model.Driver
-		DistanceKm float64 `json:"distance_km"`
+		DistanceKm   float64 `json:"distance_km"`
+		ActiveOrders int64   `json:"active_orders"`
 	}
 
 	var result []DriverWithDistance
 	for _, d := range drivers {
 		dist := haversineKm(order.PickupLat, order.PickupLng, d.Latitude, d.Longitude)
-		result = append(result, DriverWithDistance{Driver: d, DistanceKm: dist})
+		result = append(result, DriverWithDistance{Driver: d, DistanceKm: dist, ActiveOrders: countByDriver[d.ID]})
 	}
 
 	sort.Slice(result, func(i, j int) bool {
@@ -1648,8 +1665,12 @@ func (h *Handler) NearbyDriversForOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"drivers": result, "order_id": orderID})
 }
 
-// AssignDriverToOrder pre-assigns a specific driver to a ready order.
-// The assigned driver sees it exclusively; other drivers cannot accept it.
+// AssignDriverToOrder pre-assigns a specific driver to an order that's
+// confirmed, preparing, or already ready — admin can line a driver up early
+// for an order that needs a long prep time so they're already en route/
+// standing by once it's ready, not just once it is. The driver still can't
+// tap "Terima" (AcceptDelivery) until the order actually reaches ready;
+// until then driver_app shows it as "assigned, waiting on merchant".
 func (h *Handler) AssignDriverToOrder(c *gin.Context) {
 	orderID := c.Param("id")
 	adminID := c.GetString("user_id")
@@ -1663,9 +1684,12 @@ func (h *Handler) AssignDriverToOrder(c *gin.Context) {
 		return
 	}
 
+	assignableStatuses := []model.OrderStatus{
+		model.OrderStatusConfirmed, model.OrderStatusPreparing, model.OrderStatusReady,
+	}
 	var order model.Order
-	if err := h.db.First(&order, "id = ? AND status = ?", orderID, model.OrderStatusReady).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or not in ready state"})
+	if err := h.db.First(&order, "id = ? AND status IN ?", orderID, assignableStatuses).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not found or not assignable in its current state"})
 		return
 	}
 
@@ -1935,4 +1959,3 @@ func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
 			math.Sin(dLng/2)*math.Sin(dLng/2)
 	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
-

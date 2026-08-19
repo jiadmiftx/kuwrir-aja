@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/job_board_cubit.dart';
 import '../cubits/active_delivery_cubit.dart';
+import '../widgets/open_in_maps_button.dart';
 import 'active_delivery_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
@@ -23,84 +24,86 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
     return BlocConsumer<JobBoardCubit, JobBoardState>(
       listener: (context, state) {
         if (state is JobBoardError) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(state.message)));
-        }
-        if (state is JobBoardResumeDelivery) {
-          context.read<ActiveDeliveryCubit>().setOrder(state.order);
-          Navigator.push(
+          ScaffoldMessenger.of(
             context,
-            MaterialPageRoute(builder: (_) => const ActiveDeliveryScreen()),
-          ).then((_) {
-            if (context.mounted) {
-              context.read<JobBoardCubit>().resetAfterDelivery();
-            }
-          });
+          ).showSnackBar(SnackBar(content: Text(state.message)));
         }
       },
       builder: (context, state) {
         final isOnline = state is JobBoardLoaded && state.isOnline;
 
         return Scaffold(
-            backgroundColor: KuwrirColors.background,
-            appBar: AppBar(
-              title: const Text('Job Board'),
-              actions: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (isOnline ? KuwrirColors.success : KuwrirColors.textHint).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(7),
+          backgroundColor: KuwrirColors.background,
+          appBar: AppBar(
+            title: const Text('Job Board'),
+            actions: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          (isOnline
+                                  ? KuwrirColors.success
+                                  : KuwrirColors.textHint)
+                              .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Text(
+                      isOnline ? 'ONLINE' : 'OFFLINE',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: isOnline
+                            ? KuwrirColors.success
+                            : KuwrirColors.textHint,
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
+                  ),
+                  Switch(
+                    value: isOnline,
+                    onChanged: (val) {
+                      final cubit = context.read<JobBoardCubit>();
+                      if (val) {
+                        cubit.goOnline();
+                      } else {
+                        cubit.goOffline();
+                      }
+                    },
+                    activeTrackColor: KuwrirColors.success,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                onPressed: () => Navigator.pushNamed(context, '/wallet'),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'logout') _confirmLogout(context);
+                  if (value == 'delete') _deleteAccount(context);
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'logout', child: Text('Keluar')),
+                  if (_kShowDeleteAccount)
+                    PopupMenuItem(
+                      value: 'delete',
                       child: Text(
-                        isOnline ? 'ONLINE' : 'OFFLINE',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: isOnline ? KuwrirColors.success : KuwrirColors.textHint,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        'Hapus Akun',
+                        style: TextStyle(color: KuwrirColors.error),
                       ),
                     ),
-                    Switch(
-                      value: isOnline,
-                      onChanged: (val) {
-                        final cubit = context.read<JobBoardCubit>();
-                        if (val) {
-                          cubit.goOnline();
-                        } else {
-                          cubit.goOffline();
-                        }
-                      },
-                      activeTrackColor: KuwrirColors.success,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                ),
-                IconButton(
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  onPressed: () => Navigator.pushNamed(context, '/wallet'),
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'logout') _confirmLogout(context);
-                    if (value == 'delete') _deleteAccount(context);
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'logout', child: Text('Keluar')),
-                    if (_kShowDeleteAccount)
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Hapus Akun', style: TextStyle(color: KuwrirColors.error)),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            body: _buildFoodTab(context, state),
-          );
+                ],
+              ),
+            ],
+          ),
+          body: _buildFoodTab(context, state),
+        );
       },
     );
   }
@@ -112,7 +115,10 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         title: const Text('Keluar?'),
         content: const Text('Anda akan keluar dari akun driver ini.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: KuwrirColors.error),
             onPressed: () => Navigator.pop(ctx, true),
@@ -136,7 +142,11 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e is ApiException ? e.message : 'Gagal menghapus akun')),
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal menghapus akun',
+            ),
+          ),
         );
       }
       return;
@@ -162,12 +172,20 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                   color: KuwrirColors.primary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.wifi_off, size: 36, color: KuwrirColors.primary),
+                child: Icon(
+                  Icons.wifi_off,
+                  size: 36,
+                  color: KuwrirColors.primary,
+                ),
               ),
               const SizedBox(height: 20),
               Text(
                 'Anda sedang offline',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: KuwrirColors.textPrimary),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: KuwrirColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -181,12 +199,25 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
       );
     }
 
-    if (state is JobBoardLoading || state is JobBoardAccepting || state is JobBoardResumeDelivery) {
+    if (state is JobBoardLoading || state is JobBoardAccepting) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (state is JobBoardLoaded) {
-      if (state.jobs.isEmpty) {
+      final myActive = state.myActiveOrders;
+      final pending = <Map<String, dynamic>>[];
+      final others = <Map<String, dynamic>>[];
+      for (final job in state.jobs) {
+        final assignment = job['assignment_status'] as String? ?? 'unassigned';
+        if (assignment == 'mine_active') continue; // already shown via myActive
+        if (assignment == 'mine_pending') {
+          pending.add(job);
+        } else {
+          others.add(job);
+        }
+      }
+
+      if (myActive.isEmpty && pending.isEmpty && others.isEmpty) {
         return RefreshIndicator(
           onRefresh: () => context.read<JobBoardCubit>().loadJobs(),
           child: ListView(
@@ -204,18 +235,29 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                           color: KuwrirColors.primary.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.inbox_outlined, size: 36, color: KuwrirColors.primary),
+                        child: Icon(
+                          Icons.inbox_outlined,
+                          size: 36,
+                          color: KuwrirColors.primary,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Belum ada pesanan tersedia',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: KuwrirColors.textPrimary),
+                        'Belum ada pesanan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: KuwrirColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Tarik ke bawah untuk refresh',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: KuwrirColors.textHint),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: KuwrirColors.textHint,
+                        ),
                       ),
                     ],
                   ),
@@ -228,12 +270,27 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
 
       return RefreshIndicator(
         onRefresh: () => context.read<JobBoardCubit>().loadJobs(),
-        child: ListView.builder(
+        child: ListView(
           padding: const EdgeInsets.all(20),
-          itemCount: state.jobs.length,
-          itemBuilder: (context, i) {
-            return _JobCard(job: state.jobs[i]);
-          },
+          children: [
+            if (myActive.isNotEmpty) ...[
+              _SectionHeader('Sedang Kamu Antar'),
+              const SizedBox(height: 10),
+              ...myActive.map((o) => _ActiveOrderCard(order: o)),
+              const SizedBox(height: 8),
+            ],
+            if (pending.isNotEmpty) ...[
+              _SectionHeader('Ditugaskan Untukmu'),
+              const SizedBox(height: 10),
+              ...pending.map((job) => _JobCard(job: job)),
+              const SizedBox(height: 8),
+            ],
+            if (others.isNotEmpty) ...[
+              _SectionHeader('Pesanan Lain'),
+              const SizedBox(height: 10),
+              ...others.map((job) => _OtherJobCard(job: job)),
+            ],
+          ],
         ),
       );
     }
@@ -243,7 +300,10 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(state.message, style: TextStyle(color: KuwrirColors.textSecondary)),
+            Text(
+              state.message,
+              style: TextStyle(color: KuwrirColors.textSecondary),
+            ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: () => context.read<JobBoardCubit>().loadJobs(),
@@ -255,6 +315,242 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
     }
 
     return const SizedBox.shrink();
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title.toUpperCase(),
+      style: TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
+        color: KuwrirColors.textHint,
+      ),
+    );
+  }
+}
+
+double _lat(Map<String, dynamic> order, String key) {
+  if (key == 'pickup') {
+    final merchant = order['merchant'] as Map<String, dynamic>?;
+    return (merchant?['latitude'] as num?)?.toDouble() ?? -8.7185;
+  }
+  return (order['dropoff_lat'] as num?)?.toDouble() ?? -8.7185;
+}
+
+double _lng(Map<String, dynamic> order, String key) {
+  if (key == 'pickup') {
+    final merchant = order['merchant'] as Map<String, dynamic>?;
+    return (merchant?['longitude'] as num?)?.toDouble() ?? 116.3516;
+  }
+  return (order['dropoff_lng'] as num?)?.toDouble() ?? 116.3516;
+}
+
+String _fmtMoney(double v) => v
+    .toStringAsFixed(0)
+    .replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+
+/// Card for an order the driver has already accepted and is carrying — shows
+/// the 1-tap Google Maps route CTA plus a "Lihat Detail" button that opens
+/// the full map/status-update screen for just that order. The board stays
+/// visible underneath; this never forces navigation.
+class _ActiveOrderCard extends StatelessWidget {
+  final Map<String, dynamic> order;
+  const _ActiveOrderCard({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final orderNumber = order['order_number'] as String? ?? '-';
+    final status = order['status'] as String? ?? 'ready';
+    final merchantName =
+        order['merchant_name'] as String? ??
+        (order['merchant'] as Map?)?['name'] as String? ??
+        'Merchant';
+    final dropoffAddress = order['dropoff_address'] as String? ?? '';
+    final driverEarning = (order['driver_earning'] as num?)?.toDouble() ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: KuwrirColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: KuwrirColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Rp ${_fmtMoney(driverEarning)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: KuwrirColors.primary,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: KuwrirColors.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Text(
+                    status == 'picked_up'
+                        ? 'Menuju Customer'
+                        : 'Menuju Merchant',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: KuwrirColors.info,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '#$orderNumber',
+              style: TextStyle(fontSize: 12, color: KuwrirColors.textHint),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              status == 'picked_up' ? dropoffAddress : merchantName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                OpenInMapsButton(
+                  filled: true,
+                  onTap: () => openInGoogleMaps(
+                    merchantLat: _lat(order, 'pickup'),
+                    merchantLng: _lng(order, 'pickup'),
+                    customerLat: _lat(order, 'dropoff'),
+                    customerLng: _lng(order, 'dropoff'),
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider<ActiveDeliveryCubit>(
+                          create: (ctx) =>
+                              ActiveDeliveryCubit(ctx.read<ApiClient>(), order),
+                          child: const ActiveDeliveryScreen(),
+                        ),
+                      ),
+                    );
+                    if (context.mounted) {
+                      context.read<JobBoardCubit>().loadJobs();
+                    }
+                  },
+                  child: const Text(
+                    'Lihat Detail',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Read-only card for an order not assigned to this driver — either still
+/// unassigned (waiting on admin) or already taken by another driver. Full
+/// board visibility per the requested change; no action available here.
+class _OtherJobCard extends StatelessWidget {
+  final Map<String, dynamic> job;
+  const _OtherJobCard({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    final assignment = job['assignment_status'] as String? ?? 'unassigned';
+    final isTaken = assignment == 'other';
+    final orderNumber = job['order_number'] as String? ?? '-';
+    final merchantName = job['merchant_name'] as String? ?? 'Merchant';
+    final dropoffAddress = job['dropoff_address'] as String? ?? '';
+
+    return Opacity(
+      opacity: 0.65,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: KuwrirColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: KuwrirColors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '#$orderNumber',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: KuwrirColors.textHint,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$merchantName → $dropoffAddress',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: (isTaken ? KuwrirColors.textHint : KuwrirColors.warning)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Text(
+                isTaken ? 'Diambil Driver Lain' : 'Menunggu Admin',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: isTaken ? KuwrirColors.textHint : KuwrirColors.warning,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -281,6 +577,13 @@ class _JobCardState extends State<_JobCard> {
     final dropoffAddress = job['dropoff_address'] as String? ?? '';
     final paymentType = job['payment_type'] as String? ?? 'cash';
     final total = (job['total'] as num?)?.toDouble() ?? 0;
+    // Admin can pre-assign a driver as early as confirmed/preparing (see
+    // backend AssignDriverToOrder) so they're lined up before the order is
+    // actually ready — but AcceptDelivery still only lets the driver confirm
+    // once it hits ready, so the button stays disabled/informational until
+    // then instead of letting them tap into a guaranteed-400 request.
+    final status = job['status'] as String? ?? 'ready';
+    final isReady = status == 'ready';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -305,7 +608,7 @@ class _JobCardState extends State<_JobCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Rp ${_fmt(driverEarning)}',
+                  'Rp ${_fmtMoney(driverEarning)}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -314,15 +617,26 @@ class _JobCardState extends State<_JobCard> {
                 ),
                 Row(
                   children: [
-                    Text('${distanceKm.toStringAsFixed(1)} km',
-                        style: TextStyle(
-                            color: KuwrirColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 13)),
+                    Text(
+                      '${distanceKm.toStringAsFixed(1)} km',
+                      style: TextStyle(
+                        color: KuwrirColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
-                        color: (paymentType == 'cash' ? KuwrirColors.warning : KuwrirColors.info)
-                            .withValues(alpha: 0.1),
+                        color:
+                            (paymentType == 'cash'
+                                    ? KuwrirColors.warning
+                                    : KuwrirColors.info)
+                                .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Text(
@@ -330,7 +644,9 @@ class _JobCardState extends State<_JobCard> {
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: paymentType == 'cash' ? KuwrirColors.warning : KuwrirColors.info,
+                          color: paymentType == 'cash'
+                              ? KuwrirColors.warning
+                              : KuwrirColors.info,
                         ),
                       ),
                     ),
@@ -339,8 +655,10 @@ class _JobCardState extends State<_JobCard> {
               ],
             ),
             const SizedBox(height: 4),
-            Text('#$orderNumber',
-                style: TextStyle(fontSize: 12, color: KuwrirColors.textHint)),
+            Text(
+              '#$orderNumber',
+              style: TextStyle(fontSize: 12, color: KuwrirColors.textHint),
+            ),
             const SizedBox(height: 10),
             Divider(height: 1, color: KuwrirColors.border),
             const SizedBox(height: 12),
@@ -374,12 +692,19 @@ class _JobCardState extends State<_JobCard> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.payments_outlined, size: 16, color: KuwrirColors.warning),
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 16,
+                      color: KuwrirColors.warning,
+                    ),
                     const SizedBox(width: 6),
                     Text(
-                      'Tagih COD: Rp ${_fmt(total)}',
+                      'Tagih COD: Rp ${_fmtMoney(total)}',
                       style: TextStyle(
-                          fontWeight: FontWeight.w700, color: KuwrirColors.warning, fontSize: 13),
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.warning,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -387,55 +712,83 @@ class _JobCardState extends State<_JobCard> {
             ],
 
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: KuwrirColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+            if (!isReady)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: KuwrirColors.textHint.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                onPressed: _accepting ? null : () => _accept(context, orderId, job),
-                child: _accepting
-                    ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Text('Ambil Pesanan',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: KuwrirColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Menunggu Merchant Siapkan Pesanan',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: KuwrirColors.textHint,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: KuwrirColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: _accepting
+                      ? null
+                      : () => _accept(context, orderId),
+                  child: _accepting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Terima Tugas',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _accept(
-      BuildContext context, String orderId, Map<String, dynamic> job) async {
+  Future<void> _accept(BuildContext context, String orderId) async {
     setState(() => _accepting = true);
-    final result = await context.read<JobBoardCubit>().acceptJob(orderId);
+    await context.read<JobBoardCubit>().acceptJob(orderId);
     if (!mounted) return;
     setState(() => _accepting = false);
-
-    if (result != null) {
-      context.read<ActiveDeliveryCubit>().setOrder(
-          result['order'] as Map<String, dynamic>? ?? job);
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ActiveDeliveryScreen()),
-      );
-      // Driver returned from active delivery — reset to offline so they
-      // can manually go online to receive more orders.
-      if (mounted) context.read<JobBoardCubit>().resetAfterDelivery();
-    }
   }
-
-  String _fmt(double v) => v.toStringAsFixed(0)
-      .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
 }
 
 class _AddressRow extends StatelessWidget {
@@ -473,13 +826,25 @@ class _AddressRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: TextStyle(color: KuwrirColors.textHint, fontSize: 11.5)),
+              Text(
+                label,
+                style: TextStyle(color: KuwrirColors.textHint, fontSize: 11.5),
+              ),
               if (name.isNotEmpty)
-                Text(name,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-              Text(address,
-                  style: TextStyle(fontSize: 12, color: KuwrirColors.textSecondary)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                ),
+              Text(
+                address,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: KuwrirColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),

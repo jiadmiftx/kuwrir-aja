@@ -3,8 +3,6 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 
 abstract class ActiveDeliveryState {}
 
-class ActiveDeliveryIdle extends ActiveDeliveryState {}
-
 class ActiveDeliveryActive extends ActiveDeliveryState {
   final Map<String, dynamic> order;
   ActiveDeliveryActive(this.order);
@@ -30,10 +28,16 @@ class ActiveDeliveryError extends ActiveDeliveryState {
   ActiveDeliveryError(this.message);
 }
 
+/// One order's delivery-detail state. Constructed fresh per detail-screen
+/// visit (see ActiveDeliveryScreen), not a single app-lifetime singleton —
+/// now that a driver can carry several concurrent orders, a shared singleton
+/// would have the same leaked/overwritten-state problem OrderTrackingCubit
+/// had earlier this session (see customer_app/lib/cubits/order_tracking_cubit.dart).
 class ActiveDeliveryCubit extends Cubit<ActiveDeliveryState> {
   final ApiClient _api;
 
-  ActiveDeliveryCubit(this._api) : super(ActiveDeliveryIdle());
+  ActiveDeliveryCubit(this._api, Map<String, dynamic> initialOrder)
+    : super(ActiveDeliveryActive(initialOrder));
 
   void setOrder(Map<String, dynamic> order) {
     emit(ActiveDeliveryActive(order));
@@ -70,6 +74,4 @@ class ActiveDeliveryCubit extends Cubit<ActiveDeliveryState> {
       }
     }
   }
-
-  void reset() => emit(ActiveDeliveryIdle());
 }

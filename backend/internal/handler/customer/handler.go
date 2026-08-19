@@ -1434,7 +1434,15 @@ func (h *DriverOrderHandler) SetDriverStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": status, "is_online": req.Online})
 }
 
-// AvailableOrders returns ready orders that need a driver
+// AvailableOrders returns every ready order in the driver's zone (regardless
+// of assignment state — the driver_app job board renders it split into
+// "assigned to you" / "taken by another driver" / "unassigned, awaiting
+// admin" sections, so a driver can see the whole board even though, per
+// AcceptDelivery below, only admin-pre-assigned *ready* orders are actually
+// accept-able by them), plus any confirmed/preparing order admin already
+// pre-assigned to this specific driver — so a driver lined up early (per
+// admin.AssignDriverToOrder) sees "assigned, waiting on merchant" instead of
+// the order only appearing once it happens to hit ready.
 func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -1450,25 +1458,48 @@ func (h *DriverOrderHandler) AvailableOrders(c *gin.Context) {
 	}
 
 	var orders []model.Order
-	// Show: (a) unassigned orders, OR (b) orders admin pre-assigned to this
-	// specific driver that they haven't accepted yet (accepted_at still
-	// nil) — once accepted, it must drop out of this list even though
-	// driver_id still matches, or it just keeps reappearing on every poll.
+	earlyStatuses := []model.OrderStatus{model.OrderStatusConfirmed, model.OrderStatusPreparing}
+	query := h.db.Where("status = ? OR (status IN ? AND driver_id = ?)", model.OrderStatusReady, earlyStatuses, driver.ID)
 	// If driver has a zone, only show orders from that zone (or orders with no zone = legacy/fallback)
-	query := h.db.Where("status = ? AND (driver_id IS NULL OR (driver_id = ? AND accepted_at IS NULL))", model.OrderStatusReady, driver.ID)
 	if driver.ZoneID != nil {
 		query = query.Where("zone_id = ? OR zone_id IS NULL", driver.ZoneID)
 	}
 	query.Preload("Merchant").Preload("Customer").Order("created_at ASC").Find(&orders)
 
-	c.JSON(http.StatusOK, gin.H{"orders": orders})
+	// AssignmentStatus tells the client which job-board section this order
+	// belongs in without it needing to know (or compare against) its own
+	// driver_id or any other driver's identity. "mine_active" (already
+	// accepted) is also returned by CurrentDelivery below — included here too
+	// so a driver going back online mid-delivery still sees it on the board.
+	type OrderWithAssignment struct {
+		model.Order
+		AssignmentStatus string `json:"assignment_status"` // "mine_pending" | "mine_active" | "other" | "unassigned"
+	}
+	result := make([]OrderWithAssignment, 0, len(orders))
+	for _, o := range orders {
+		status := "unassigned"
+		if o.DriverID != nil {
+			switch {
+			case *o.DriverID != driver.ID:
+				status = "other"
+			case o.AcceptedAt != nil:
+				status = "mine_active"
+			default:
+				status = "mine_pending"
+			}
+		}
+		result = append(result, OrderWithAssignment{Order: o, AssignmentStatus: status})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"orders": result})
 }
 
-// CurrentDelivery returns the order the driver has already accepted (or is
-// mid-delivery on), if any — so the app can resume the active-delivery
-// screen after a restart instead of showing an empty job board with no way
-// back to an order that's already theirs (it's intentionally excluded from
-// AvailableOrders once accepted_at is set).
+// CurrentDelivery returns every order the driver has already accepted (or is
+// mid-delivery on) — a driver may be carrying more than one concurrently, all
+// admin-assigned — so the app can resume every in-progress delivery after a
+// restart instead of showing an empty job board with no way back to orders
+// that are already theirs (each is intentionally excluded from
+// AvailableOrders's accept-able set once accepted_at is set).
 func (h *DriverOrderHandler) CurrentDelivery(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -1478,20 +1509,20 @@ func (h *DriverOrderHandler) CurrentDelivery(c *gin.Context) {
 		return
 	}
 
-	var order model.Order
-	err := h.db.Preload("Merchant").Preload("Customer").
+	var orders []model.Order
+	h.db.Preload("Merchant").Preload("Customer").
 		Where("driver_id = ? AND accepted_at IS NOT NULL AND status IN ?",
 			driver.ID, []model.OrderStatus{model.OrderStatusReady, model.OrderStatusPickedUp}).
-		Order("accepted_at DESC").First(&order).Error
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"order": nil})
-		return
-	}
+		Order("accepted_at DESC").Find(&orders)
 
-	c.JSON(http.StatusOK, gin.H{"order": order})
+	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }
 
-// AcceptDelivery assigns the driver to an order: ready → picked_up flow
+// AcceptDelivery lets a driver confirm an order admin already pre-assigned to
+// them (driver_id set, accepted_at still nil) — there is no self-service
+// "claim an unassigned order" path; assignment is admin-only (see
+// admin.AssignDriverToOrder), driver_app just surfaces a "Terima" action for
+// whatever's pre-assigned. ready → picked_up flow continues via MarkPickedUp.
 func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 	orderID := c.Param("id")
 	userID := c.GetString("user_id")
@@ -1503,9 +1534,7 @@ func (h *DriverOrderHandler) AcceptDelivery(c *gin.Context) {
 	}
 
 	var order model.Order
-	// Allow accept if: not yet assigned to anyone, OR admin pre-assigned to
-	// this driver and they haven't accepted it yet.
-	if err := h.db.Where("id = ? AND status = ? AND (driver_id IS NULL OR (driver_id = ? AND accepted_at IS NULL))",
+	if err := h.db.Where("id = ? AND status = ? AND driver_id = ? AND accepted_at IS NULL",
 		orderID, model.OrderStatusReady, driver.ID).First(&order).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Order not available for pickup"})
 		return

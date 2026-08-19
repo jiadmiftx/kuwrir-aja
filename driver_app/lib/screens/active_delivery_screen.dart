@@ -3,31 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../cubits/active_delivery_cubit.dart';
+import '../widgets/open_in_maps_button.dart';
 import 'chat_screen.dart';
 
-/// Opens the device's Google Maps app (or a browser fallback) with a driving
-/// route from the merchant to the customer. Plain https deep link — Google
-/// Maps computes the route itself, so this needs no API key and no billing,
-/// unlike the paid Directions API.
-Future<void> _openInGoogleMaps({
-  required double originLat,
-  required double originLng,
-  required double destLat,
-  required double destLng,
-}) async {
-  final uri = Uri.parse(
-    'https://www.google.com/maps/dir/?api=1'
-    '&origin=$originLat,$originLng'
-    '&destination=$destLat,$destLng'
-    '&travelmode=driving',
-  );
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-}
-
+/// Detail view for one order — reached via "Lihat Detail" from the job
+/// board, never forced. Has a real back button so the driver can return to
+/// the board (which may show several concurrent active orders) at any time.
 class ActiveDeliveryScreen extends StatelessWidget {
   const ActiveDeliveryScreen({super.key});
 
@@ -45,19 +27,6 @@ class ActiveDeliveryScreen extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        if (state is ActiveDeliveryIdle) {
-          return Scaffold(
-            backgroundColor: KuwrirColors.background,
-            appBar: AppBar(title: const Text('Pengiriman Aktif')),
-            body: Center(
-              child: Text(
-                'Tidak ada pengiriman aktif',
-                style: TextStyle(color: KuwrirColors.textSecondary),
-              ),
-            ),
-          );
-        }
-
         Map<String, dynamic>? order;
         bool isLoading = false;
 
@@ -120,11 +89,17 @@ class ActiveDeliveryScreen extends StatelessWidget {
     final focusLng = isPickedUp ? dropoffLng : pickupLng;
     final fallbackDistanceKm = (order['distance_km'] as num?)?.toDouble() ?? 0;
 
+    void openMaps() => openInGoogleMaps(
+      merchantLat: pickupLat,
+      merchantLng: pickupLng,
+      customerLat: dropoffLat,
+      customerLng: dropoffLng,
+    );
+
     return Scaffold(
       backgroundColor: KuwrirColors.background,
       appBar: AppBar(
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
-        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
@@ -150,12 +125,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
                   options: MapOptions(
                     initialCenter: LatLng(focusLat, focusLng),
                     initialZoom: 15,
-                    onTap: (tapPosition, point) => _openInGoogleMaps(
-                      originLat: pickupLat,
-                      originLng: pickupLng,
-                      destLat: dropoffLat,
-                      destLng: dropoffLng,
-                    ),
+                    onTap: (tapPosition, point) => openMaps(),
                   ),
                   children: [
                     TileLayer(
@@ -213,14 +183,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
                 Positioned(
                   right: 12,
                   bottom: 12,
-                  child: _OpenMapsButton(
-                    onTap: () => _openInGoogleMaps(
-                      originLat: pickupLat,
-                      originLng: pickupLng,
-                      destLat: dropoffLat,
-                      destLng: dropoffLng,
-                    ),
-                  ),
+                  child: OpenInMapsButton(onTap: openMaps),
                 ),
               ],
             ),
@@ -443,7 +406,6 @@ class ActiveDeliveryScreen extends StatelessWidget {
               ),
               onPressed: () {
                 Navigator.of(ctx).pop();
-                context.read<ActiveDeliveryCubit>().reset();
                 Navigator.of(context).pop();
               },
               child: const Text(
@@ -463,44 +425,6 @@ class ActiveDeliveryScreen extends StatelessWidget {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
-}
-
-/// Small pill overlay on the map, bottom-right, so "open in Google Maps" is a
-/// discoverable action instead of relying on an implicit tap-anywhere gesture.
-class _OpenMapsButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _OpenMapsButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: KuwrirColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      elevation: 3,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.map_outlined, size: 16, color: KuwrirColors.primary),
-              const SizedBox(width: 6),
-              Text(
-                'Buka di Google Maps',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: KuwrirColors.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Road-following distance/duration for this delivery. Shows the straight-line

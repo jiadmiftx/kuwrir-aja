@@ -11,13 +11,11 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
 import 'cubits/job_board_cubit.dart';
-import 'cubits/active_delivery_cubit.dart';
 import 'cubits/wallet_cubit.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/job_board_screen.dart';
-import 'screens/active_delivery_screen.dart';
 import 'screens/wallet_screen.dart';
 
 @pragma('vm:entry-point')
@@ -39,7 +37,6 @@ void main() async {
         child: MultiBlocProvider(
           providers: [
             BlocProvider(create: (_) => JobBoardCubit(apiClient)),
-            BlocProvider(create: (_) => ActiveDeliveryCubit(apiClient)),
             BlocProvider(create: (_) => DriverWalletCubit(apiClient)),
           ],
           child: const KuwrirDriverApp(),
@@ -67,7 +64,6 @@ class KuwrirDriverApp extends StatelessWidget {
         '/register': (context) => const DriverRegisterScreen(),
         '/pending': (context) => const DriverPendingScreen(),
         '/job_board': (context) => const AppLockGate(child: JobBoardScreen()),
-        '/active_delivery': (context) => const ActiveDeliveryScreen(),
         '/wallet': (context) => const WalletScreen(),
       },
     );

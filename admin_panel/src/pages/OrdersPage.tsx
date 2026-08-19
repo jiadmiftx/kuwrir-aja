@@ -65,6 +65,7 @@ interface Order {
 interface NearbyDriver {
   id: string
   distance_km: number
+  active_orders: number
   user?: { name: string; phone: string }
   vehicle_type: string
   vehicle_plate: string
@@ -531,6 +532,9 @@ export default function OrdersPage() {
                       <div className="font-medium">{d.user?.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {d.vehicle_type} · {d.vehicle_plate} · ⭐ {d.rating.toFixed(1)} · {d.total_delivered} antar
+                      </div>
+                      <div className={`text-xs ${d.active_orders > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                        {d.active_orders > 0 ? `${d.active_orders} order aktif` : 'Tidak ada order aktif'}
                       </div>
                     </div>
                     <div className="text-right text-sm">
