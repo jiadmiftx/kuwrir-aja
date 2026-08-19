@@ -79,6 +79,12 @@ interface NearbyDriver {
   total_delivered: number
 }
 
+// Mirrors backend admin.AssignDriverToOrder's assignableStatuses — admin can
+// line a driver up as early as confirmed/preparing (useful for orders with a
+// long prep time) so they're ready to go the moment the order hits ready,
+// not just assignable once it already has.
+const ASSIGNABLE_STATUSES = new Set(['confirmed', 'preparing', 'ready'])
+
 type DatePeriod = 'all' | 'today' | 'week' | 'month' | 'year' | 'custom'
 
 function getDateRange(period: DatePeriod, customFrom: string, customTo: string): { from?: string; to?: string } {
@@ -461,7 +467,7 @@ export default function OrdersPage() {
                                 </div>
                               </HoverCardContent>
                             </HoverCard>
-                          ) : order.status === 'ready'
+                          ) : ASSIGNABLE_STATUSES.has(order.status)
                             ? <span className="text-orange-500">Unassigned</span>
                             : <span className="text-muted-foreground">—</span>
                           }
@@ -489,7 +495,7 @@ export default function OrdersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            {order.status === 'ready' && (
+                            {ASSIGNABLE_STATUSES.has(order.status) && (
                               <Button
                                 size="sm"
                                 variant={expandedOrderId === order.id ? 'secondary' : 'outline'}
