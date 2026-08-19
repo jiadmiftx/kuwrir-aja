@@ -55,12 +55,18 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           children: [
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(Icons.camera_alt_outlined, color: KuwrirColors.primary),
+              leading: Icon(
+                Icons.camera_alt_outlined,
+                color: KuwrirColors.primary,
+              ),
               title: const Text('Ambil Foto'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library_outlined, color: KuwrirColors.primary),
+              leading: Icon(
+                Icons.photo_library_outlined,
+                color: KuwrirColors.primary,
+              ),
               title: const Text('Pilih dari Galeri'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -70,17 +76,31 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     );
     if (src == null) return;
 
-    final xfile = await _picker.pickImage(source: src, imageQuality: 80, maxWidth: 1200);
+    final xfile = await _picker.pickImage(
+      source: src,
+      imageQuality: 80,
+      maxWidth: 1200,
+    );
     if (xfile == null) return;
 
     final file = File(xfile.path);
     setState(() {
       switch (docType) {
-        case 'ktp':           _ktpFile = file; break;
-        case 'sim':           _simFile = file; break;
-        case 'stnk':          _stnkFile = file; break;
-        case 'selfie':        _selfieFile = file; break;
-        case 'vehicle_photo': _vehiclePhotoFile = file; break;
+        case 'ktp':
+          _ktpFile = file;
+          break;
+        case 'sim':
+          _simFile = file;
+          break;
+        case 'stnk':
+          _stnkFile = file;
+          break;
+        case 'selfie':
+          _selfieFile = file;
+          break;
+        case 'vehicle_photo':
+          _vehiclePhotoFile = file;
+          break;
       }
     });
   }
@@ -96,7 +116,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_allDocsPicked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Semua dokumen wajib diupload'), backgroundColor: KuwrirColors.warning),
+        SnackBar(
+          content: const Text('Semua dokumen wajib diupload'),
+          backgroundColor: KuwrirColors.warning,
+        ),
       );
       return;
     }
@@ -124,7 +147,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         'vehicle_photo': _vehiclePhotoFile!,
       };
       for (final entry in docs.entries) {
-        req.files.add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+        req.files.add(
+          await http.MultipartFile.fromPath(entry.key, entry.value.path),
+        );
       }
 
       final streamed = await req.send();
@@ -133,7 +158,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       if (!mounted) return;
 
       if (res.statusCode == 200 || res.statusCode == 201) {
-        Navigator.pushReplacement(
+        // push (not pushReplacement) here — onAgree below still needs this
+        // screen's own `context`/`mounted` alive to navigate onward once the
+        // agreement is accepted; pushReplacement would dispose this State
+        // before onAgree runs, making `mounted` permanently false and
+        // silently stranding the user on the agreement screen.
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => AgreementReviewScreen(
@@ -147,7 +177,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 if (!mounted) return;
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const DriverPendingScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const DriverPendingScreen(),
+                  ),
                 );
               },
             ),
@@ -155,12 +187,18 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload gagal: ${res.body}'), backgroundColor: KuwrirColors.error),
+          SnackBar(
+            content: Text('Upload gagal: ${res.body}'),
+            backgroundColor: KuwrirColors.error,
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: KuwrirColors.error),
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: KuwrirColors.error,
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -169,9 +207,13 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
   @override
   void dispose() {
-    _plateCtrl.dispose(); _yearCtrl.dispose();
-    _colorCtrl.dispose(); _brandCtrl.dispose();
-    _nikCtrl.dispose(); _simNumberCtrl.dispose(); _addressCtrl.dispose();
+    _plateCtrl.dispose();
+    _yearCtrl.dispose();
+    _colorCtrl.dispose();
+    _brandCtrl.dispose();
+    _nikCtrl.dispose();
+    _simNumberCtrl.dispose();
+    _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -202,7 +244,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               ),
               const SizedBox(height: 12),
 
-              Text('Jenis Kendaraan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: KuwrirColors.textPrimary)),
+              Text(
+                'Jenis Kendaraan',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13.5,
+                  color: KuwrirColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -215,19 +264,36 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               ),
               const SizedBox(height: 14),
 
-              _field(_plateCtrl, 'Nomor Plat (e.g. DR 1234 AB)', Icons.confirmation_number_outlined,
-                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              _field(
+                _plateCtrl,
+                'Nomor Plat (e.g. DR 1234 AB)',
+                Icons.confirmation_number_outlined,
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _field(_brandCtrl, 'Merek (e.g. Honda)', Icons.info_outline)),
+                  Expanded(
+                    child: _field(
+                      _brandCtrl,
+                      'Merek (e.g. Honda)',
+                      Icons.info_outline,
+                    ),
+                  ),
                   const SizedBox(width: 12),
-                  Expanded(child: _field(_colorCtrl, 'Warna', Icons.palette_outlined)),
+                  Expanded(
+                    child: _field(_colorCtrl, 'Warna', Icons.palette_outlined),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              _field(_yearCtrl, 'Tahun Kendaraan', Icons.calendar_today_outlined,
-                  keyboardType: TextInputType.number),
+              _field(
+                _yearCtrl,
+                'Tahun Kendaraan',
+                Icons.calendar_today_outlined,
+                keyboardType: TextInputType.number,
+              ),
               const SizedBox(height: 24),
 
               // Personal data — needed to fill in the partnership agreement shown
@@ -242,15 +308,30 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              _field(_nikCtrl, 'NIK (sesuai KTP)', Icons.badge_outlined,
-                  keyboardType: TextInputType.number,
-                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              _field(
+                _nikCtrl,
+                'NIK (sesuai KTP)',
+                Icons.badge_outlined,
+                keyboardType: TextInputType.number,
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
+              ),
               const SizedBox(height: 12),
-              _field(_simNumberCtrl, 'Nomor SIM', Icons.card_membership_outlined,
-                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              _field(
+                _simNumberCtrl,
+                'Nomor SIM',
+                Icons.card_membership_outlined,
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
+              ),
               const SizedBox(height: 12),
-              _field(_addressCtrl, 'Alamat Domisili', Icons.home_outlined,
-                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null),
+              _field(
+                _addressCtrl,
+                'Alamat Domisili',
+                Icons.home_outlined,
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Wajib diisi' : null,
+              ),
               const SizedBox(height: 24),
 
               // Documents
@@ -266,7 +347,10 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               const SizedBox(height: 4),
               Text(
                 'Semua dokumen wajib. Foto harus jelas dan terbaca.',
-                style: TextStyle(color: KuwrirColors.textSecondary, fontSize: 12.5),
+                style: TextStyle(
+                  color: KuwrirColors.textSecondary,
+                  fontSize: 12.5,
+                ),
               ),
               const SizedBox(height: 14),
 
@@ -311,14 +395,28 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: (_allDocsPicked ? KuwrirColors.success : KuwrirColors.warning).withValues(alpha: 0.08),
+                  color:
+                      (_allDocsPicked
+                              ? KuwrirColors.success
+                              : KuwrirColors.warning)
+                          .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: (_allDocsPicked ? KuwrirColors.success : KuwrirColors.warning).withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color:
+                        (_allDocsPicked
+                                ? KuwrirColors.success
+                                : KuwrirColors.warning)
+                            .withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(_allDocsPicked ? Icons.check_circle : Icons.info_outline,
-                        color: _allDocsPicked ? KuwrirColors.success : KuwrirColors.warning),
+                    Icon(
+                      _allDocsPicked ? Icons.check_circle : Icons.info_outline,
+                      color: _allDocsPicked
+                          ? KuwrirColors.success
+                          : KuwrirColors.warning,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -326,7 +424,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                             ? 'Semua dokumen siap diupload!'
                             : '${[_ktpFile, _simFile, _stnkFile, _selfieFile, _vehiclePhotoFile].where((f) => f == null).length} dokumen belum diupload',
                         style: TextStyle(
-                          color: _allDocsPicked ? KuwrirColors.success : KuwrirColors.warning,
+                          color: _allDocsPicked
+                              ? KuwrirColors.success
+                              : KuwrirColors.warning,
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
@@ -349,8 +449,21 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                   ),
                   onPressed: _loading ? null : _submit,
                   child: _loading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Kirim Pendaftaran', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Kirim Pendaftaran',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -369,15 +482,32 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? KuwrirColors.primary.withValues(alpha: 0.08) : KuwrirColors.surface,
+            color: selected
+                ? KuwrirColors.primary.withValues(alpha: 0.08)
+                : KuwrirColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? KuwrirColors.primary : KuwrirColors.border, width: selected ? 1.5 : 1),
+            border: Border.all(
+              color: selected ? KuwrirColors.primary : KuwrirColors.border,
+              width: selected ? 1.5 : 1,
+            ),
           ),
           child: Column(
             children: [
-              Icon(icon, color: selected ? KuwrirColors.primary : KuwrirColors.textHint),
+              Icon(
+                icon,
+                color: selected ? KuwrirColors.primary : KuwrirColors.textHint,
+              ),
               const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 12, color: selected ? KuwrirColors.primary : KuwrirColors.textSecondary, fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected
+                      ? KuwrirColors.primary
+                      : KuwrirColors.textSecondary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+                ),
+              ),
             ],
           ),
         ),
@@ -385,7 +515,13 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     );
   }
 
-  Widget _docUploadTile(String title, String subtitle, IconData icon, File? file, VoidCallback onTap) {
+  Widget _docUploadTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    File? file,
+    VoidCallback onTap,
+  ) {
     final uploaded = file != null;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -408,25 +544,46 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           child: Container(
             width: 44,
             height: 44,
-            color: uploaded ? KuwrirColors.success.withValues(alpha: 0.1) : KuwrirColors.primary.withValues(alpha: 0.08),
+            color: uploaded
+                ? KuwrirColors.success.withValues(alpha: 0.1)
+                : KuwrirColors.primary.withValues(alpha: 0.08),
             child: uploaded
                 ? Image.file(file, fit: BoxFit.cover)
                 : Icon(icon, color: KuwrirColors.primary, size: 20),
           ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        subtitle: Text(uploaded ? 'Sudah diupload' : subtitle,
-            style: TextStyle(fontSize: 12, color: uploaded ? KuwrirColors.success : KuwrirColors.textHint)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        subtitle: Text(
+          uploaded ? 'Sudah diupload' : subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: uploaded ? KuwrirColors.success : KuwrirColors.textHint,
+          ),
+        ),
         trailing: TextButton(
           onPressed: onTap,
-          child: Text(uploaded ? 'Ganti' : 'Upload', style: TextStyle(color: uploaded ? KuwrirColors.success : KuwrirColors.primary, fontWeight: FontWeight.w700)),
+          child: Text(
+            uploaded ? 'Ganti' : 'Upload',
+            style: TextStyle(
+              color: uploaded ? KuwrirColors.success : KuwrirColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _field(TextEditingController ctrl, String label, IconData icon,
-      {TextInputType? keyboardType, String? Function(String?)? validator}) {
+  Widget _field(
+    TextEditingController ctrl,
+    String label,
+    IconData icon, {
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: KuwrirColors.surface,
@@ -464,14 +621,36 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: done || active ? KuwrirColors.primary : KuwrirColors.border,
+                backgroundColor: done || active
+                    ? KuwrirColors.primary
+                    : KuwrirColors.border,
                 child: done
                     ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : Text('$step', style: TextStyle(color: active ? Colors.white : KuwrirColors.textHint, fontSize: 12)),
+                    : Text(
+                        '$step',
+                        style: TextStyle(
+                          color: active ? Colors.white : KuwrirColors.textHint,
+                          fontSize: 12,
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
-              Expanded(child: Text(steps[i], style: TextStyle(fontSize: 12, color: active ? KuwrirColors.primary : KuwrirColors.textHint, fontWeight: active ? FontWeight.w700 : FontWeight.normal))),
-              if (i < steps.length - 1) Expanded(child: Container(height: 1, color: KuwrirColors.border)),
+              Expanded(
+                child: Text(
+                  steps[i],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: active
+                        ? KuwrirColors.primary
+                        : KuwrirColors.textHint,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (i < steps.length - 1)
+                Expanded(
+                  child: Container(height: 1, color: KuwrirColors.border),
+                ),
             ],
           ),
         );

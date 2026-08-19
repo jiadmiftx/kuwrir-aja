@@ -35,7 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (userID != null) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => DriverOnboardingScreen(userID: userID, userName: userName)),
+          MaterialPageRoute(
+            builder: (_) =>
+                DriverOnboardingScreen(userID: userID, userName: userName),
+          ),
         );
         return;
       }
@@ -85,7 +88,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Dengan melanjutkan, kamu setuju dengan Syarat & Ketentuan serta Kebijakan Privasi Cocourir',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11.5, color: KuwrirColors.textHint, height: 1.4),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: KuwrirColors.textHint,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
@@ -118,7 +125,8 @@ class _LoginHero extends StatefulWidget {
   State<_LoginHero> createState() => _LoginHeroState();
 }
 
-class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMixin {
+class _LoginHeroState extends State<_LoginHero>
+    with SingleTickerProviderStateMixin {
   int _taglineIndex = 0;
   Timer? _timer;
   late final AnimationController _pulseCtrl;
@@ -128,10 +136,14 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
     super.initState();
     _timer = Timer.periodic(const Duration(milliseconds: 2600), (_) {
       if (!mounted) return;
-      setState(() => _taglineIndex = (_taglineIndex + 1) % _kHeroTaglines.length);
+      setState(
+        () => _taglineIndex = (_taglineIndex + 1) % _kHeroTaglines.length,
+      );
     });
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))
-      ..repeat(reverse: true);
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -143,7 +155,10 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
 
   @override
   Widget build(BuildContext context) {
-    final heroHeight = (MediaQuery.of(context).size.height * 0.58).clamp(360.0, 480.0);
+    final heroHeight = (MediaQuery.of(context).size.height * 0.58).clamp(
+      360.0,
+      480.0,
+    );
     return Container(
       height: heroHeight,
       width: double.infinity,
@@ -157,10 +172,38 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
-          const Align(alignment: Alignment(1.05, -0.8), child: _FloatingIcon(icon: Icons.two_wheeler_outlined, size: 48, angle: -0.3)),
-          const Align(alignment: Alignment(-1.08, -0.06), child: _FloatingIcon(icon: Icons.route_outlined, size: 46, angle: 0.25)),
-          const Align(alignment: Alignment(0.86, 0.88), child: _FloatingIcon(icon: Icons.payments_outlined, size: 34, angle: 0.15)),
-          const Align(alignment: Alignment(-0.8, 0.94), child: _FloatingIcon(icon: Icons.local_shipping_outlined, size: 32, angle: -0.2)),
+          const Align(
+            alignment: Alignment(1.05, -0.8),
+            child: _FloatingIcon(
+              icon: Icons.two_wheeler_outlined,
+              size: 48,
+              angle: -0.3,
+            ),
+          ),
+          const Align(
+            alignment: Alignment(-1.08, -0.06),
+            child: _FloatingIcon(
+              icon: Icons.route_outlined,
+              size: 46,
+              angle: 0.25,
+            ),
+          ),
+          const Align(
+            alignment: Alignment(0.86, 0.88),
+            child: _FloatingIcon(
+              icon: Icons.payments_outlined,
+              size: 34,
+              angle: 0.15,
+            ),
+          ),
+          const Align(
+            alignment: Alignment(-0.8, 0.94),
+            child: _FloatingIcon(
+              icon: Icons.local_shipping_outlined,
+              size: 32,
+              angle: -0.2,
+            ),
+          ),
           Positioned.fill(
             child: SafeArea(
               bottom: false,
@@ -171,11 +214,17 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     ScaleTransition(
-                      scale: Tween(begin: 1.0, end: 1.035)
-                          .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOutSine)),
+                      scale: Tween(begin: 1.0, end: 1.035).animate(
+                        CurvedAnimation(
+                          parent: _pulseCtrl,
+                          curve: Curves.easeInOutSine,
+                        ),
+                      ),
                       child: SizedBox(
                         width: 236,
-                        child: SvgPicture.asset('assets/images/cocourir_driver_logo.svg'),
+                        child: SvgPicture.asset(
+                          'assets/images/cocourir_driver_logo.svg',
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -188,22 +237,31 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
                           child: SlideTransition(
-                            position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero)
-                                .animate(animation),
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.35),
+                              end: Offset.zero,
+                            ).animate(animation),
                             child: child,
                           ),
                         ),
                         child: Text(
                           _kHeroTaglines[_taglineIndex],
                           key: ValueKey(_taglineIndex),
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
                     ),
                     const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(20),
@@ -213,8 +271,16 @@ class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMi
                         children: [
                           const Icon(Icons.bolt, size: 15, color: Colors.white),
                           const SizedBox(width: 5),
-                          Text('Lihat estimasi pendapatan sebelum ambil orderan',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 12, fontWeight: FontWeight.w600)),
+                          Flexible(
+                            child: Text(
+                              'Lihat estimasi pendapatan sebelum ambil orderan',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -233,13 +299,21 @@ class _FloatingIcon extends StatelessWidget {
   final IconData icon;
   final double size;
   final double angle;
-  const _FloatingIcon({required this.icon, required this.size, required this.angle});
+  const _FloatingIcon({
+    required this.icon,
+    required this.size,
+    required this.angle,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: angle * math.pi,
-      child: Icon(icon, size: size, color: Colors.white.withValues(alpha: 0.14)),
+      child: Icon(
+        icon,
+        size: size,
+        color: Colors.white.withValues(alpha: 0.14),
+      ),
     );
   }
 }
