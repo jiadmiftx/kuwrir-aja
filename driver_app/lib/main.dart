@@ -16,6 +16,7 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/pending_screen.dart';
 import 'screens/job_board_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/wallet_screen.dart';
 
 @pragma('vm:entry-point')
@@ -65,6 +66,7 @@ class KuwrirDriverApp extends StatelessWidget {
         '/pending': (context) => const DriverPendingScreen(),
         '/job_board': (context) => const AppLockGate(child: JobBoardScreen()),
         '/wallet': (context) => const WalletScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

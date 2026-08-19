@@ -81,6 +81,11 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                 ],
               ),
               IconButton(
+                icon: const Icon(Icons.person_outline),
+                tooltip: 'Profil Saya',
+                onPressed: () => Navigator.pushNamed(context, '/profile'),
+              ),
+              IconButton(
                 icon: const Icon(Icons.account_balance_wallet_outlined),
                 onPressed: () => Navigator.pushNamed(context, '/wallet'),
               ),
