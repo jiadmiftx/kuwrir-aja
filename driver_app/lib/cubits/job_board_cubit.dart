@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import '../services/location_service.dart';
 
 abstract class JobBoardState {}
 
@@ -33,6 +34,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   final ApiClient _api;
   bool _isOnline = false;
   Timer? _pollTimer;
+  Timer? _locationTimer;
 
   JobBoardCubit(this._api) : super(JobBoardOffline()) {
     _resumeIfActive();
@@ -49,6 +51,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
         _isOnline = true;
         await loadJobs();
         _startPolling();
+        unawaited(LocationService.sendCurrentLocation(_api));
       }
     } catch (_) {
       // No active delivery, or the check failed — falling through to the
@@ -59,6 +62,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   @override
   Future<void> close() {
     _pollTimer?.cancel();
+    _locationTimer?.cancel();
     return super.close();
   }
 
@@ -69,6 +73,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
       _isOnline = true;
       await loadJobs();
       _startPolling();
+      unawaited(LocationService.sendCurrentLocation(_api));
     } on ApiException catch (e) {
       emit(JobBoardError(e.message));
     } catch (_) {
@@ -93,11 +98,22 @@ class JobBoardCubit extends Cubit<JobBoardState> {
       const Duration(seconds: 10),
       (_) => _silentRefresh(),
     );
+    // Light foreground location ping so admin's assign-driver distance
+    // figure doesn't go stale during a long idle-online stretch — separate,
+    // much slower cadence than the job-board poll, and a single GPS fix
+    // each time, not a continuous stream.
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => LocationService.sendCurrentLocation(_api),
+    );
   }
 
   void _stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    _locationTimer?.cancel();
+    _locationTimer = null;
   }
 
   Future<void> _silentRefresh() async {
@@ -144,6 +160,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
     emit(JobBoardAccepting(orderId));
     try {
       final result = await _api.acceptDelivery(orderId);
+      unawaited(LocationService.sendCurrentLocation(_api));
       // Stay on the board — accepting just moves this order from "assigned
       // to you" into "sedang kamu antar", not into a separate forced screen.
       await loadJobs();

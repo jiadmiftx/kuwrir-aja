@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import '../services/location_service.dart';
 
 abstract class ActiveDeliveryState {}
 
@@ -49,6 +51,7 @@ class ActiveDeliveryCubit extends Cubit<ActiveDeliveryState> {
       emit(ActiveDeliveryMarkingPickup(current.order));
       try {
         final result = await _api.markPickedUp(orderId);
+        unawaited(LocationService.sendCurrentLocation(_api));
         final updated = Map<String, dynamic>.from(current.order)
           ..addAll(result['order'] as Map<String, dynamic>? ?? {});
         emit(ActiveDeliveryActive(updated));
@@ -66,6 +69,7 @@ class ActiveDeliveryCubit extends Cubit<ActiveDeliveryState> {
       emit(ActiveDeliveryMarkingDelivered(current.order));
       try {
         final result = await _api.markDelivered(orderId);
+        unawaited(LocationService.sendCurrentLocation(_api));
         emit(ActiveDeliveryDone(result));
       } on ApiException catch (e) {
         emit(ActiveDeliveryError(e.message));

@@ -319,18 +319,23 @@ type ProductVariant struct {
 // Driver represents a delivery driver
 type Driver struct {
 	Base
-	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
-	VehicleType    string    `gorm:"not null" json:"vehicle_type"` // "motorcycle", "bicycle"
-	VehiclePlate   string    `gorm:"not null" json:"vehicle_plate"`
-	LicenseNumber  string    `json:"license_number"` // Nomor SIM
-	Address        string    `json:"address,omitempty"`
-	Latitude       float64   `json:"latitude"`
-	Longitude      float64   `json:"longitude"`
-	IsOnline       bool      `gorm:"default:false" json:"is_online"`
-	IsAvailable    bool      `gorm:"default:true" json:"is_available"`
-	Rating         float64   `gorm:"default:5.0" json:"rating"`
-	TotalDelivered int       `gorm:"default:0" json:"total_delivered"`
-	CodHolding     float64   `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
+	UserID        uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	VehicleType   string    `gorm:"not null" json:"vehicle_type"` // "motorcycle", "bicycle"
+	VehiclePlate  string    `gorm:"not null" json:"vehicle_plate"`
+	LicenseNumber string    `json:"license_number"` // Nomor SIM
+	Address       string    `json:"address,omitempty"`
+	Latitude      float64   `json:"latitude"`
+	Longitude     float64   `json:"longitude"`
+	// LocationUpdatedAt is set by DriverOrderHandler.UpdateLocation, sent as
+	// a side-effect of going online/accepting/pickup/delivered plus a light
+	// foreground poll — nil/old means Latitude/Longitude are stale or were
+	// never actually reported, not a live position.
+	LocationUpdatedAt *time.Time `json:"location_updated_at,omitempty"`
+	IsOnline          bool       `gorm:"default:false" json:"is_online"`
+	IsAvailable       bool       `gorm:"default:true" json:"is_available"`
+	Rating            float64    `gorm:"default:5.0" json:"rating"`
+	TotalDelivered    int        `gorm:"default:0" json:"total_delivered"`
+	CodHolding        float64    `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
 
 	// Partnership agreement acceptance — snapshot of the exact rendered
 	// contract text the driver agreed to, so admin can review precisely

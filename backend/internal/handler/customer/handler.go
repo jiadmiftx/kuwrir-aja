@@ -1351,6 +1351,7 @@ func NewDriverOrderHandler(db *gorm.DB, cfg *config.Config) *DriverOrderHandler 
 func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 	// Driver status toggle
 	r.PATCH("/driver/status", h.SetDriverStatus)
+	r.PATCH("/driver/location", h.UpdateLocation)
 
 	orders := r.Group("/driver-orders")
 	{
@@ -1432,6 +1433,38 @@ func (h *DriverOrderHandler) SetDriverStatus(c *gin.Context) {
 		status = "online"
 	}
 	c.JSON(http.StatusOK, gin.H{"status": status, "is_online": req.Online})
+}
+
+// UpdateLocation records a driver's current position — sent by driver_app as
+// a lightweight side-effect of things that already happen (going online,
+// accepting a job, marking pickup/delivered), plus a light foreground poll
+// while online, rather than a continuous background GPS stream. This is
+// what admin.NearbyDriversForOrder's distance-to-order figure is based on;
+// LocationUpdatedAt lets that UI show how stale a given reading is instead
+// of presenting a possibly-old position as live.
+func (h *DriverOrderHandler) UpdateLocation(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req struct {
+		Latitude  float64 `json:"latitude" binding:"required"`
+		Longitude float64 `json:"longitude" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+	if err := h.db.Model(&model.Driver{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+		"latitude":            req.Latitude,
+		"longitude":           req.Longitude,
+		"location_updated_at": &now,
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update location"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Location updated"})
 }
 
 // AvailableOrders returns every ready order in the driver's zone (regardless

@@ -794,6 +794,16 @@ class ApiClient {
     await patch('/driver/status', {'online': online});
   }
 
+  /// Sent as a side-effect of going online/accepting/pickup/delivered, plus
+  /// a light foreground poll while online — not a continuous background GPS
+  /// stream. Backend: DriverOrderHandler.UpdateLocation.
+  Future<void> updateDriverLocation(double latitude, double longitude) async {
+    await patch('/driver/location', {
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+  }
+
   Future<List<Map<String, dynamic>>> getAvailableJobs() async {
     final data = await get('/driver-orders/available');
     final list = data['orders'] as List<dynamic>? ?? [];

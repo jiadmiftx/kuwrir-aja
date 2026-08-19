@@ -72,11 +72,22 @@ interface NearbyDriver {
   id: string
   distance_km: number
   active_orders: number
+  location_updated_at?: string | null
   user?: { name: string; phone: string }
   vehicle_type: string
   vehicle_plate: string
   rating: number
   total_delivered: number
+}
+
+/** "5 menit lalu" / "Belum pernah" — how stale a driver's last GPS report is. */
+function locationAgeLabel(iso?: string | null): { label: string; stale: boolean } {
+  if (!iso) return { label: 'Lokasi belum pernah dilaporkan', stale: true }
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (minutes < 1) return { label: 'Baru saja', stale: false }
+  if (minutes < 60) return { label: `${minutes} menit lalu`, stale: minutes > 10 }
+  const hours = Math.round(minutes / 60)
+  return { label: `${hours} jam lalu`, stale: true }
 }
 
 // Mirrors backend admin.AssignDriverToOrder's assignableStatuses — admin can
@@ -626,6 +637,7 @@ function AssignDriverPanel({
             <TableBody>
               {drivers.map((d) => {
                 const selected = selectedDriver === d.id
+                const age = locationAgeLabel(d.location_updated_at)
                 return (
                   <TableRow
                     key={d.id}
@@ -664,8 +676,11 @@ function AssignDriverPanel({
                         <Badge variant="outline" className="text-muted-foreground">Kosong</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-semibold text-primary">
-                      {d.distance_km.toFixed(1)} km
+                    <TableCell className="text-right">
+                      <div className="font-semibold text-primary">{d.distance_km.toFixed(1)} km</div>
+                      <div className={`text-xs ${age.stale ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                        {age.label}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
