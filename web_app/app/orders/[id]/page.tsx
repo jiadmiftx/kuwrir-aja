@@ -26,6 +26,11 @@ import { useOrderStatusStream } from "@/lib/hooks/useOrderStatusStream";
 import { useSseSignal } from "@/lib/hooks/useSseSignal";
 import type { Product, ProductVariant } from "@/lib/api/types";
 
+// Refund request is built and working end-to-end but disabled in the UI
+// for now (business decision, not ready to expose) — flip this back to
+// true to bring the button/form back rather than re-deriving them.
+const REFUND_ACTION_ENABLED = false;
+
 const MODIFICATION_REASON_LABELS: Record<string, string> = {
   stok_habis: "Stok habis",
   toko_tutup: "Toko tutup",
@@ -164,7 +169,8 @@ function OrderDetailContent() {
   if (!o) return <div className="p-4 text-sm text-(--color-ink-faint)">Memuat...</div>;
 
   const canCancel = o.status === "pending";
-  const canRefund = o.status === "delivered" || o.status === "cancelled";
+  const canRefund =
+    REFUND_ACTION_ENABLED && (o.status === "delivered" || o.status === "cancelled");
 
   return (
     <div className="pb-6">
