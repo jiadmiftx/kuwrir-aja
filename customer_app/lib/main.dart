@@ -85,8 +85,17 @@ class KuwrirCustomerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final apiClient = ApiClient();
+    // App-lifetime singleton, same as apiClient above (no dispose — this
+    // widget only ever builds once at the app root in practice).
+    final chatUnread = ChatUnreadService(
+      fetch: apiClient.getChatUnreadCount,
+      pushSignal: NotificationService.onPushData,
+    )..start();
     return MultiRepositoryProvider(
-      providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
+      providers: [
+        RepositoryProvider<ApiClient>.value(value: apiClient),
+        RepositoryProvider<ChatUnreadService>.value(value: chatUnread),
+      ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider(create: (_) => LocationCubit()..init()),
@@ -267,26 +276,95 @@ class _CustomerHomeState extends State<CustomerHome> {
           if ((i == 2 || i == 3) && !await ensureLoggedIn(context)) return;
           if (mounted) setState(() => _idx = i);
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: HugeIcon(icon: HugeIcons.strokeRoundedHome01),
             selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedHome01),
             label: 'Beranda',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
             selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
             label: 'Promo',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
             selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
             label: 'Orders',
           ),
           NavigationDestination(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedChat),
-            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedChat01),
+            icon: _ChatTabIcon(icon: HugeIcons.strokeRoundedChat),
+            selectedIcon: _ChatTabIcon(icon: HugeIcons.strokeRoundedChat01),
             label: 'Chat',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chat tab icon with an unread-count badge — sums order-chat (driver +
+/// merchant channels) and support unread from [ChatUnreadService].
+class _ChatTabIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  const _ChatTabIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HugeIcon(icon: icon),
+          if (count.total > 0)
+            Positioned(
+              right: -6,
+              top: -4,
+              child: UnreadBadge(count: count.total),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The 44x44 leading icon used by every row in the Chat tab (support, chat
+/// merchant, chat driver), with an unread-count badge overlaid top-right —
+/// [unreadCount] picks the relevant number out of [ChatUnreadCount] so one
+/// widget covers all three row kinds.
+class _ChatEntryIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final Color color;
+  final int Function(ChatUnreadCount) unreadCount;
+  const _ChatEntryIcon({
+    required this.icon,
+    required this.color,
+    required this.unreadCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: HugeIcon(icon: icon, color: color, size: 20),
+          ),
+          Positioned(
+            right: -4,
+            top: -4,
+            child: UnreadBadge(count: unreadCount(count)),
           ),
         ],
       ),
@@ -1236,18 +1314,10 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                 padding: const EdgeInsets.all(20),
                 children: [
                   _SoftListTile(
-                    leading: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedCustomerService01,
-                        color: KuwrirColors.primary,
-                        size: 20,
-                      ),
+                    leading: _ChatEntryIcon(
+                      icon: HugeIcons.strokeRoundedCustomerService01,
+                      color: KuwrirColors.primary,
+                      unreadCount: (c) => c.support,
                     ),
                     title: 'Bantuan & Support',
                     subtitle: 'Chat dengan tim admin Cocourir',
@@ -1286,20 +1356,10 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _SoftListTile(
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.primary.withValues(
-                                alpha: 0.08,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedStore01,
-                              color: KuwrirColors.primary,
-                              size: 20,
-                            ),
+                          leading: _ChatEntryIcon(
+                            icon: HugeIcons.strokeRoundedStore01,
+                            color: KuwrirColors.primary,
+                            unreadCount: (c) => c.forOrder(o.id, 'merchant'),
                           ),
                           title: o.merchantName ?? '-',
                           subtitle: '#${o.orderNumber} · Chat Merchant',
@@ -1320,20 +1380,10 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _SoftListTile(
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: KuwrirColors.warning.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedDeliveryBox01,
-                              color: KuwrirColors.warning,
-                              size: 20,
-                            ),
+                          leading: _ChatEntryIcon(
+                            icon: HugeIcons.strokeRoundedDeliveryBox01,
+                            color: KuwrirColors.warning,
+                            unreadCount: (c) => c.forOrder(o.id, 'driver'),
                           ),
                           title: 'Driver',
                           subtitle: '#${o.orderNumber} · Chat Driver',

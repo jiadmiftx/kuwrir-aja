@@ -12,6 +12,7 @@ import '../models/product_search_result.dart';
 import '../models/order.dart';
 import '../models/order_quote.dart';
 import '../models/support_message.dart';
+import '../models/chat_unread_count.dart';
 import '../models/food_category.dart';
 import '../models/promotion.dart';
 import '../models/promo_banner.dart';
@@ -1073,6 +1074,26 @@ class ApiClient {
 
   Future<void> sendMerchantOrderChat(String orderId, String text) async {
     await post('/merchant-orders/$orderId/chat', {'text': text});
+  }
+
+  /// Aggregate unread order-chat (driver + merchant channel) + support
+  /// counts for a customer — see backend Handler.GetChatUnreadCount.
+  Future<ChatUnreadCount> getChatUnreadCount() async {
+    final data = await get('/orders/chat-unread');
+    return ChatUnreadCount.fromJson(data);
+  }
+
+  /// Driver's equivalent of [getChatUnreadCount] — driver channel only.
+  Future<ChatUnreadCount> getDriverChatUnreadCount() async {
+    final data = await get('/driver-orders/chat-unread');
+    return ChatUnreadCount.fromJson(data);
+  }
+
+  /// Merchant's equivalent of [getChatUnreadCount] — merchant channel only,
+  /// no support chat exists for merchant_app so `support` is always 0.
+  Future<ChatUnreadCount> getMerchantChatUnreadCount() async {
+    final data = await get('/merchant-orders/chat-unread');
+    return ChatUnreadCount.fromJson(data);
   }
 
   // --- Notifications ---

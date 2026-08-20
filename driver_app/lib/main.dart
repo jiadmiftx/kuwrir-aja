@@ -30,11 +30,18 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   final apiClient = ApiClient();
+  final chatUnread = ChatUnreadService(
+    fetch: apiClient.getDriverChatUnreadCount,
+    pushSignal: NotificationService.onPushData,
+  )..start();
   runApp(
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
       child: MultiRepositoryProvider(
-        providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
+        providers: [
+          RepositoryProvider<ApiClient>.value(value: apiClient),
+          RepositoryProvider<ChatUnreadService>.value(value: chatUnread),
+        ],
         child: MultiBlocProvider(
           providers: [
             BlocProvider(create: (_) => JobBoardCubit(apiClient)),

@@ -381,10 +381,8 @@ class _OrderCard extends StatelessWidget {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(4),
-                        child: HugeIcon(
-                          icon: HugeIcons.strokeRoundedChat,
-                          size: 18,
-                          color: KuwrirColors.textSecondary,
+                        child: _ChatIconWithBadge(
+                          orderId: order['id'] as String,
                         ),
                       ),
                     ),
@@ -831,6 +829,36 @@ class _StatusBadge extends StatelessWidget {
           color: color,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+/// Chat icon with an unread-count badge for one order's merchant-channel
+/// thread — used on the order list's chat action.
+class _ChatIconWithBadge extends StatelessWidget {
+  final String orderId;
+  const _ChatIconWithBadge({required this.orderId});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedChat,
+            size: 18,
+            color: KuwrirColors.textSecondary,
+          ),
+          Positioned(
+            right: -4,
+            top: -4,
+            child: UnreadBadge(count: count.forOrder(orderId, 'merchant')),
+          ),
+        ],
       ),
     );
   }

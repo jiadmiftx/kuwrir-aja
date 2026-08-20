@@ -84,8 +84,15 @@ class KuwrirMerchantApp extends StatelessWidget {
       }
     });
 
+    final chatUnread = ChatUnreadService(
+      fetch: apiClient.getMerchantChatUnreadCount,
+      pushSignal: NotificationService.onPushData,
+    )..start();
     return MultiRepositoryProvider(
-      providers: [RepositoryProvider<ApiClient>.value(value: apiClient)],
+      providers: [
+        RepositoryProvider<ApiClient>.value(value: apiClient),
+        RepositoryProvider<ChatUnreadService>.value(value: chatUnread),
+      ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider.value(value: storeOrdersCubit),

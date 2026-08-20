@@ -265,7 +265,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             actions: [
               if (canChat)
                 IconButton(
-                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedStore01),
+                  icon: _AppBarChatIcon(
+                    icon: HugeIcons.strokeRoundedStore01,
+                    unreadCount: (c) => c.forOrder(order.id, 'merchant'),
+                  ),
                   tooltip: 'Chat dengan Merchant',
                   onPressed: () => Navigator.push(
                     context,
@@ -284,7 +287,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
               if (canChat)
                 IconButton(
-                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedChat),
+                  icon: _AppBarChatIcon(
+                    icon: HugeIcons.strokeRoundedChat,
+                    unreadCount: (c) => c.forOrder(order.id, 'driver'),
+                  ),
                   tooltip: 'Chat dengan Driver',
                   onPressed: () => Navigator.push(
                     context,
@@ -1020,6 +1026,33 @@ class _PriceRow extends StatelessWidget {
           Text(
             'IDR ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
             style: style.copyWith(color: isBold ? KuwrirColors.primary : null),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// AppBar chat icon with an unread-count badge — [unreadCount] picks the
+/// relevant channel count for this order out of [ChatUnreadCount].
+class _AppBarChatIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final int Function(ChatUnreadCount) unreadCount;
+  const _AppBarChatIcon({required this.icon, required this.unreadCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HugeIcon(icon: icon),
+          Positioned(
+            right: -4,
+            top: -4,
+            child: UnreadBadge(count: unreadCount(count)),
           ),
         ],
       ),

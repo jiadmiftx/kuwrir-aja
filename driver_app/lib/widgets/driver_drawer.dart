@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 
@@ -138,6 +139,11 @@ class _DriverDrawerState extends State<DriverDrawer> {
                     icon: HugeIcons.strokeRoundedCustomerService01,
                     label: 'Pusat Bantuan',
                     onTap: () => _openScreen(const SupportChatScreen()),
+                    trailing: ValueListenableBuilder<ChatUnreadCount>(
+                      valueListenable: context.read<ChatUnreadService>().count,
+                      builder: (context, count, _) =>
+                          UnreadBadge(count: count.support),
+                    ),
                   ),
                   _DrawerRow(
                     icon: HugeIcons.strokeRoundedNotification03,
@@ -167,10 +173,12 @@ class _DrawerRow extends StatelessWidget {
   final List<List<dynamic>> icon;
   final String label;
   final VoidCallback onTap;
+  final Widget? trailing;
   const _DrawerRow({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.trailing,
   });
 
   @override
@@ -190,6 +198,7 @@ class _DrawerRow extends StatelessWidget {
         label,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
       ),
+      trailing: trailing,
       onTap: onTap,
     );
   }

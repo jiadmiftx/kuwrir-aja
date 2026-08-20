@@ -105,7 +105,7 @@ class ActiveDeliveryScreen extends StatelessWidget {
         title: Text(isPickedUp ? 'Antar ke Customer' : 'Ambil di Merchant'),
         actions: [
           IconButton(
-            icon: const HugeIcon(icon: HugeIcons.strokeRoundedMessage01),
+            icon: _ChatIconWithBadge(orderId: orderId),
             tooltip: 'Chat dengan Customer',
             onPressed: () => Navigator.push(
               context,
@@ -550,6 +550,32 @@ class _InfoRow extends StatelessWidget {
         ),
         if (trailing != null) trailing!,
       ],
+    );
+  }
+}
+
+/// Chat icon with an unread-count badge for this order's driver-channel
+/// thread — used in the AppBar.
+class _ChatIconWithBadge extends StatelessWidget {
+  final String orderId;
+  const _ChatIconWithBadge({required this.orderId});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const HugeIcon(icon: HugeIcons.strokeRoundedMessage01),
+          Positioned(
+            right: -4,
+            top: -4,
+            child: UnreadBadge(count: count.forOrder(orderId, 'driver')),
+          ),
+        ],
+      ),
     );
   }
 }

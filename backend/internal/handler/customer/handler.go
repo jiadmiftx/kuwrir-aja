@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id/stream", h.StreamOrderStatus)
 		orders.POST("/:id/cancel", h.CancelOrder)
 		orders.POST("/:id/review", h.SubmitReview)
+		orders.GET("/chat-unread", h.GetChatUnreadCount)
 		orders.POST("/:id/refund-request", h.RequestRefund)
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
@@ -1011,6 +1012,7 @@ func (h *RestaurantOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
 		orders.GET("/:id/chat/stream", h.StreamChat)
+		orders.GET("/chat-unread", h.GetChatUnreadCount)
 	}
 }
 
@@ -1104,6 +1106,40 @@ func (h *RestaurantOrderHandler) SendChat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
+// GetChatUnreadCount is the merchant-side equivalent of Handler's/
+// DriverOrderHandler's — merchant_app has no general support chat, so
+// "support" is always 0 here, kept only for response-shape parity.
+func (h *RestaurantOrderHandler) GetChatUnreadCount(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var merchant model.Merchant
+	if err := h.db.Where("user_id = ?", userID).First(&merchant).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Merchant not found"})
+		return
+	}
+
+	var rows []chatUnreadRow
+	h.db.Table("chat_messages").
+		Select("chat_messages.order_id, chat_messages.channel, COUNT(*) as count").
+		Joins("JOIN orders ON orders.id = chat_messages.order_id").
+		Where("orders.merchant_id = ? AND chat_messages.channel = 'merchant' AND chat_messages.sender_role != 'merchant' AND chat_messages.is_read = false", merchant.ID).
+		Group("chat_messages.order_id, chat_messages.channel").
+		Scan(&rows)
+
+	orders := map[string]map[string]int{}
+	total := 0
+	for _, r := range rows {
+		oid := r.OrderID.String()
+		if orders[oid] == nil {
+			orders[oid] = map[string]int{}
+		}
+		orders[oid][r.Channel] = r.Count
+		total += r.Count
+	}
+
+	c.JSON(http.StatusOK, gin.H{"total": total, "support": 0, "orders": orders})
 }
 
 // ActiveOrders returns orders for the merchant owner
@@ -1466,6 +1502,7 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.POST("/:id/chat", h.SendChat)
 		orders.GET("/:id/chat/stream", h.StreamChat)
 		orders.GET("/:id/road-route", h.GetRoadRoute)
+		orders.GET("/chat-unread", h.GetChatUnreadCount)
 	}
 }
 
@@ -1958,6 +1995,46 @@ func (h *DriverOrderHandler) SendChat(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
+// GetChatUnreadCount is the driver-side equivalent of Handler's — driver
+// only ever has the "driver" channel (never "merchant"), but the response
+// shape stays the same so the client can share one parsing path.
+func (h *DriverOrderHandler) GetChatUnreadCount(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var rows []chatUnreadRow
+	h.db.Table("chat_messages").
+		Select("chat_messages.order_id, chat_messages.channel, COUNT(*) as count").
+		Joins("JOIN orders ON orders.id = chat_messages.order_id").
+		Where("orders.driver_id = ? AND chat_messages.channel = 'driver' AND chat_messages.sender_role != 'driver' AND chat_messages.is_read = false", driver.ID).
+		Group("chat_messages.order_id, chat_messages.channel").
+		Scan(&rows)
+
+	orders := map[string]map[string]int{}
+	total := 0
+	for _, r := range rows {
+		oid := r.OrderID.String()
+		if orders[oid] == nil {
+			orders[oid] = map[string]int{}
+		}
+		orders[oid][r.Channel] = r.Count
+		total += r.Count
+	}
+
+	var support int64
+	h.db.Model(&model.SupportMessage{}).
+		Where("user_id = ? AND sender_role = 'admin' AND is_read = false", userID).
+		Count(&support)
+	total += int(support)
+
+	c.JSON(http.StatusOK, gin.H{"total": total, "support": support, "orders": orders})
+}
+
 // RequestRefund allows a customer to submit a refund request for a delivered order.
 func (h *Handler) RequestRefund(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -2356,6 +2433,50 @@ func (h *Handler) SendMerchantChat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
+// chatUnreadRow is the shape COUNT(*) ... GROUP BY order_id, channel scans
+// into — shared by all three GetChatUnreadCount variants below.
+type chatUnreadRow struct {
+	OrderID uuid.UUID
+	Channel string
+	Count   int
+}
+
+// GetChatUnreadCount aggregates unread order-chat messages (both driver and
+// merchant channels — a customer can have both open) plus unread support
+// replies, so the client can badge the chat tab without polling every
+// individual thread. Uses the same "sender_role != me" filter markChatRead
+// clears with, so a count here and a screen open clearing it always agree.
+func (h *Handler) GetChatUnreadCount(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var rows []chatUnreadRow
+	h.db.Table("chat_messages").
+		Select("chat_messages.order_id, chat_messages.channel, COUNT(*) as count").
+		Joins("JOIN orders ON orders.id = chat_messages.order_id").
+		Where("orders.customer_id = ? AND chat_messages.sender_role != 'customer' AND chat_messages.is_read = false", userID).
+		Group("chat_messages.order_id, chat_messages.channel").
+		Scan(&rows)
+
+	orders := map[string]map[string]int{}
+	total := 0
+	for _, r := range rows {
+		oid := r.OrderID.String()
+		if orders[oid] == nil {
+			orders[oid] = map[string]int{}
+		}
+		orders[oid][r.Channel] = r.Count
+		total += r.Count
+	}
+
+	var support int64
+	h.db.Model(&model.SupportMessage{}).
+		Where("user_id = ? AND sender_role = 'admin' AND is_read = false", userID).
+		Count(&support)
+	total += int(support)
+
+	c.JSON(http.StatusOK, gin.H{"total": total, "support": support, "orders": orders})
 }
 
 // markChatRead flips IsRead on every message in this order/channel that

@@ -532,10 +532,8 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                               ),
                             ),
                           ),
-                          icon: HugeIcon(
-                            icon: HugeIcons.strokeRoundedMessage01,
-                            color: KuwrirColors.info,
-                            size: 20,
+                          icon: _ChatIconWithBadge(
+                            orderId: order['id'] as String? ?? '',
                           ),
                         ),
                         if (receiverPhone.isNotEmpty)
@@ -1179,6 +1177,36 @@ class _AddressRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Chat icon with an unread-count badge for one order's driver-channel
+/// thread — used on the active-order card's chat button.
+class _ChatIconWithBadge extends StatelessWidget {
+  final String orderId;
+  const _ChatIconWithBadge({required this.orderId});
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedMessage01,
+            color: KuwrirColors.info,
+            size: 20,
+          ),
+          Positioned(
+            right: -4,
+            top: -4,
+            child: UnreadBadge(count: count.forOrder(orderId, 'driver')),
+          ),
+        ],
+      ),
     );
   }
 }
