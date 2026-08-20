@@ -2,20 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Home01Icon, Search01Icon, ShoppingBag02Icon, Invoice01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
+import {
+  Chatting01Icon,
+  Home01Icon,
+  Search01Icon,
+  ShoppingBag02Icon,
+  Invoice01Icon,
+  UserCircleIcon,
+} from "@hugeicons/core-free-icons";
 import { useCartStore, cartItemCount } from "@/lib/stores/cart";
+import { useAuthStore } from "@/lib/stores/auth";
+import { getChatUnreadCount } from "@/lib/api/endpoints";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const LINKS = [
   { href: "/", label: "Beranda", icon: Home01Icon },
   { href: "/search", label: "Cari", icon: Search01Icon },
   { href: "/orders", label: "Pesanan", icon: Invoice01Icon },
+  { href: "/chat", label: "Chat", icon: Chatting01Icon },
 ] as const;
 
 export function TopNav() {
   const pathname = usePathname();
   const count = useCartStore((s) => cartItemCount(s.lines));
+  const token = useAuthStore((s) => s.token);
+  const unread = useQuery({
+    queryKey: ["chat-unread"],
+    queryFn: getChatUnreadCount,
+    enabled: !!token,
+    refetchInterval: 30_000,
+  });
 
   if (pathname === "/login") return null;
 
@@ -40,6 +58,11 @@ export function TopNav() {
               >
                 <HugeiconsIcon icon={link.icon} size={18} strokeWidth={active ? 2 : 1.5} />
                 {link.label}
+                {link.href === "/chat" && (unread.data?.total ?? 0) > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-(--color-danger) px-1 text-[11px] font-semibold text-(--color-accent-contrast)">
+                    {(unread.data?.total ?? 0) > 9 ? "9+" : unread.data?.total}
+                  </span>
+                )}
               </Link>
             );
           })}

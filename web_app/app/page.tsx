@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Search01Icon, LocationOffline01Icon } from "@hugeicons/core-free-icons";
+import { Search01Icon, LocationOffline01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { MerchantCard } from "@/components/MerchantCard";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -46,7 +46,16 @@ function HomeContent() {
             Mau pesan apa hari ini?
           </h1>
         </div>
-        <NotificationBell className="mt-1 h-10 w-10 shrink-0 rounded-full border border-(--color-border) bg-(--color-surface-raised) text-(--color-ink-soft) md:hidden" />
+        <div className="mt-1 flex shrink-0 items-center gap-2 md:hidden">
+          <NotificationBell className="h-10 w-10 rounded-full border border-(--color-border) bg-(--color-surface-raised) text-(--color-ink-soft)" />
+          <Link
+            href="/profile"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface-raised) text-(--color-ink-soft)"
+            aria-label="Profil"
+          >
+            <HugeiconsIcon icon={UserIcon} size={18} strokeWidth={1.5} />
+          </Link>
+        </div>
       </header>
 
       <Link
