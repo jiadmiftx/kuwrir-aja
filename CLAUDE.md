@@ -7,7 +7,9 @@ this file is about how to work here, not what the product does.
 
 ## What this is
 
-Cocourir (formerly "Kuwrir Aja") — a food/goods delivery platform for Kuta, Lombok. Monorepo:
+Cocourir (formerly "Kuwrir Aja") — a local food/goods courier and delivery platform serving Lombok
+(not limited to Kuta), integrating local Lombok merchants, customers across the Lombok community,
+and local drivers. Supports both COD and online payment (Duitku gateway), not COD-only. Monorepo:
 Go/Gin backend, 3 Flutter apps, a React admin panel, a Next.js customer PWA, a shared Dart
 package, and a couple of standalone side-projects that happen to live in the same repo.
 

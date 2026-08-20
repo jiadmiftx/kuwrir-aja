@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Admin and operations staff of KUWRIR food delivery platform. Working on desktop browsers to manage day-to-day operations: verifying new merchants/drivers, monitoring orders, processing COD settlements, handling promotions. Indonesian-speaking, local to Kuta, Lombok. Frequently checks dashboards mid-shift; speed and clarity matter more than visual novelty.
+Admin and operations staff of Cocourir (KUWRIR), a local food/goods courier and delivery platform serving the Lombok community (not limited to Kuta). Working on desktop browsers to manage day-to-day operations: verifying new merchants/drivers, monitoring orders, processing settlements (COD and online payment), handling promotions. Indonesian-speaking, local to Lombok. Frequently checks dashboards mid-shift; speed and clarity matter more than visual novelty.
 
 ## Product Purpose
 
-KUWRIR Admin is the backoffice for a COD-only food delivery platform serving Kuta, Lombok. It manages the full operator workflow: merchant onboarding and verification, driver applications, live order monitoring, cash settlement tracking, and promotion management. Success means an operator can complete their daily reconciliation and verification tasks without friction.
+Cocourir Admin is the backoffice for a local food/goods delivery platform serving Lombok, supporting both COD and online payment (Duitku gateway) — not COD-only. It integrates local Lombok merchants, customers across the Lombok community, and local drivers. It manages the full operator workflow: merchant onboarding and verification, driver applications, live order monitoring, settlement tracking (cash and online), and promotion management. Success means an operator can complete their daily reconciliation and verification tasks without friction.
 
 ## Brand Personality
 

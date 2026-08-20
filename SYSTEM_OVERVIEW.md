@@ -1,20 +1,25 @@
 # KUWRIR — System Overview & Design Proposal
 
 > **Version 1.0** · 2026-06-01
-> **Platform:** Food Delivery + Jasa Panggilan · Kuta, Lombok, NTB, Indonesia
-> **Model:** Cash on Delivery (COD) · MVP
+> **Platform:** Food Delivery + Jasa Panggilan · Lombok, NTB, Indonesia (local courier platform, not limited to Kuta)
+> **Model:** Cash on Delivery (COD) and Online Payment (Duitku gateway)
+> **Note (2026-08-20):** scope corrected from the original MVP framing below — this platform now
+> serves the wider Lombok community (not just Kuta), integrating local Lombok merchants, customers,
+> and drivers, with online payment (Duitku) live alongside COD, not COD-only. The rest of this
+> section is kept as the original MVP-era planning narrative; treat "Kuta" and "COD-only" mentions
+> below as historical starting-point context, not current scope. See CLAUDE.md for current scope.
 
 ---
 
 ## 1. Executive Summary
 
-KUWRIR adalah platform super-app berbasis mobile yang menghubungkan pelanggan, mitra merchant (restoran & jasa), dan mitra pengemudi di area wisata Kuta, Lombok. Platform ini beroperasi dengan model **Cash on Delivery (COD)** tanpa memerlukan integrasi payment gateway pada fase MVP, sehingga dapat diluncurkan dengan cepat dan biaya rendah.
+KUWRIR adalah platform super-app berbasis mobile yang menghubungkan pelanggan, mitra merchant (restoran & jasa), dan mitra pengemudi di Lombok. Platform ini beroperasi dengan model **Cash on Delivery (COD) dan Online Payment** (Duitku gateway).
 
 **Dua layanan utama:**
 
 | Layanan | Deskripsi |
 |---|---|
-| **Pesan Makanan** | Customer memesan makanan dari restoran, driver mengantarkan, customer bayar tunai |
+| **Pesan Makanan** | Customer memesan makanan dari restoran, driver mengantarkan, customer bayar tunai atau online |
 | **Jasa Panggilan** | Customer booking laundry, bengkel, cleaning, salon — driver jemput barang/item ke tempat jasa, lalu antar kembali ke customer |
 
 **Keunggulan kompetitif:**

@@ -1,6 +1,7 @@
 # KUWRIR — System Flow & Database Schema
 > Dokumen analisis lengkap untuk keperluan revamp. Dibuat 2026-06-19.
-> Target: Kuta, Lombok, NTB · MVP: COD Only · Go + Flutter + React
+> Target: Lombok, NTB (local food/goods courier platform) · Payment: COD & Online Payment (Duitku) · Go + Flutter + React
+> Note (2026-08-20): scope corrected — not Kuta-only, not COD-only. See CLAUDE.md.
 
 ---
 

@@ -1,8 +1,9 @@
 # KUWRIR Platform — Technical Specification
 
 > **Version:** 1.0.0 · **Last Updated:** 2026-06-01
-> **Target Region:** Kuta, Lombok, NTB, Indonesia
-> **Payment Model:** Cash on Delivery (COD) — MVP
+> **Target Region:** Lombok, NTB, Indonesia (local food/goods courier platform, not limited to Kuta)
+> **Payment Model:** Cash on Delivery (COD) and Online Payment (Duitku gateway)
+> Note (2026-08-20): scope corrected from earlier Kuta-only/COD-only framing. See CLAUDE.md.
 
 ---
 
