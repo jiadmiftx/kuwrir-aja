@@ -38,9 +38,16 @@ class _DriverDrawerState extends State<DriverDrawer> {
     if (mounted) setState(() {});
   }
 
+  /// Closing the drawer and pushing the next screen both resolve the
+  /// Navigator ancestor from `context` — doing that lookup twice, once
+  /// after `pop()` has already started deactivating this widget, throws
+  /// "Looking up a deactivated widget's ancestor is unsafe". Resolving the
+  /// NavigatorState once up front and calling both operations on it avoids
+  /// the second lookup entirely.
   void _openScreen(Widget screen) {
-    Navigator.pop(context);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    navigator.push(MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
@@ -112,8 +119,9 @@ class _DriverDrawerState extends State<DriverDrawer> {
                     icon: HugeIcons.strokeRoundedWallet01,
                     label: 'Wallet Driver',
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/wallet');
+                      final navigator = Navigator.of(context);
+                      navigator.pop();
+                      navigator.pushNamed('/wallet');
                     },
                   ),
                   _DrawerRow(
