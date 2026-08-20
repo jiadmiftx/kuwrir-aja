@@ -179,6 +179,7 @@ export interface Order {
   total: number;
   pickup_address?: string;
   dropoff_address?: string;
+  receiver_name?: string;
   distance_km: number;
   notes?: string;
   promo_code?: string;

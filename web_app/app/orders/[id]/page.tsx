@@ -8,26 +8,35 @@ import {
   Alert02Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
+  Location01Icon,
   Message01Icon,
+  Motorbike01Icon,
   Refresh01Icon,
   StarIcon,
+  Store01Icon,
+  UserIcon,
 } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { OrderProgressTracker } from "@/components/OrderProgressTracker";
 import { ReplacementPickerSheet } from "@/components/ReplacementPickerSheet";
 import { ReviewSheet } from "@/components/ReviewSheet";
 import {
   cancelOrder,
   cancelViaModificationRequest,
+  getChatUnreadCount,
   getMerchantProducts,
   getModificationRequest,
   getOrder,
-  getOrderChat,
+  getOrderDriverChat,
+  getOrderMerchantChat,
   replaceOrderItem,
   requestRefund,
-  sendOrderChat,
+  sendOrderDriverChat,
+  sendOrderMerchantChat,
 } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
-import { orderStatusLabel, isActiveOrder } from "@/lib/order-status";
+import { canOrderChat, orderStatusLabel, orderStatusToneClasses, isActiveOrder } from "@/lib/order-status";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useCartStore } from "@/lib/stores/cart";
 import { ApiError } from "@/lib/api/client";
@@ -53,12 +62,22 @@ function modificationReasonLabel(category: string, reason?: string) {
   return reason ? `${label} — ${reason}` : label;
 }
 
+type ChatChannel = "merchant" | "driver";
+
+type DialogState = {
+  title: string;
+  message: string;
+  danger?: boolean;
+  confirmLabel?: string;
+  onConfirm?: () => void;
+} | null;
+
 function OrderDetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
-  const [showChat, setShowChat] = useState(false);
+  const [activeChat, setActiveChat] = useState<ChatChannel | null>(null);
   const [chatText, setChatText] = useState("");
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState("");
@@ -66,6 +85,7 @@ function OrderDetailContent() {
   const [showPicker, setShowPicker] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [dialog, setDialog] = useState<DialogState>(null);
   const cartAddItem = useCartStore((s) => s.addItem);
   const cartMerchantId = useCartStore((s) => s.merchantId);
   const cartLines = useCartStore((s) => s.lines);
@@ -141,26 +161,61 @@ function OrderDetailContent() {
   );
   usePaymentStream(params.id, awaitingPayment, onPaymentStatus);
 
-  const chat = useQuery({
-    queryKey: ["order-chat", params.id],
-    queryFn: () => getOrderChat(params.id),
-    enabled: showChat,
-    // SSE (below) is the primary refresh trigger now — this is just a slow
-    // safety net for the rare case where the stream can't connect at all.
-    refetchInterval: showChat ? 60_000 : false,
+  // Two separate threads (never mixed, matches the backend's channel split
+  // and customer_app's two distinct chat buttons) — each only fetched while
+  // its own panel is open.
+  const driverChat = useQuery({
+    queryKey: ["order-chat-driver", params.id],
+    queryFn: () => getOrderDriverChat(params.id),
+    enabled: activeChat === "driver",
+    refetchInterval: activeChat === "driver" ? 60_000 : false,
   });
-  const onChatSignal = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["order-chat", params.id] });
+  const merchantChat = useQuery({
+    queryKey: ["order-chat-merchant", params.id],
+    queryFn: () => getOrderMerchantChat(params.id),
+    enabled: activeChat === "merchant",
+    refetchInterval: activeChat === "merchant" ? 60_000 : false,
+  });
+  const onDriverChatSignal = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["order-chat-driver", params.id] });
+    queryClient.invalidateQueries({ queryKey: ["chat-unread"] });
   }, [queryClient, params.id]);
-  useSseSignal(`/orders/${params.id}/chat/stream`, "chat_message", showChat, onChatSignal);
+  const onMerchantChatSignal = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["order-chat-merchant", params.id] });
+    queryClient.invalidateQueries({ queryKey: ["chat-unread"] });
+  }, [queryClient, params.id]);
+  useSseSignal(`/orders/${params.id}/chat/stream`, "chat_message", activeChat === "driver", onDriverChatSignal);
+  useSseSignal(
+    `/orders/${params.id}/merchant-chat/stream`,
+    "chat_message",
+    activeChat === "merchant",
+    onMerchantChatSignal
+  );
 
-  const sendChat = useMutation({
-    mutationFn: () => sendOrderChat(params.id, chatText),
+  const sendDriverChat = useMutation({
+    mutationFn: () => sendOrderDriverChat(params.id, chatText),
     onSuccess: () => {
       setChatText("");
-      queryClient.invalidateQueries({ queryKey: ["order-chat", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["order-chat-driver", params.id] });
     },
   });
+  const sendMerchantChat = useMutation({
+    mutationFn: () => sendOrderMerchantChat(params.id, chatText),
+    onSuccess: () => {
+      setChatText("");
+      queryClient.invalidateQueries({ queryKey: ["order-chat-merchant", params.id] });
+    },
+  });
+
+  const chatChattable = !!o0 && canOrderChat(o0.status);
+  const unread = useQuery({
+    queryKey: ["chat-unread"],
+    queryFn: getChatUnreadCount,
+    enabled: chatChattable,
+    refetchInterval: chatChattable ? 30_000 : false,
+  });
+  const merchantUnread = unread.data?.orders?.[params.id]?.merchant ?? 0;
+  const driverUnread = unread.data?.orders?.[params.id]?.driver ?? 0;
 
   const cancel = useMutation({
     mutationFn: () => cancelOrder(params.id),
@@ -188,25 +243,36 @@ function OrderDetailContent() {
     REFUND_ACTION_ENABLED && (o.status === "delivered" || o.status === "cancelled");
   const isDelivered = o.status === "delivered";
   const hasReview = order.data?.has_review ?? false;
+  const canChat = canOrderChat(o.status);
+
+  function toggleChat(channel: ChatChannel) {
+    setActiveChat((cur) => (cur === channel ? null : channel));
+  }
 
   // Re-adds this order's items to the cart from the merchant's *current*
   // live menu (not a blind replay of the old snapshot) — an item may have
   // since gone unavailable or been removed entirely, so each is matched by
   // product id against a fresh menu fetch and silently skipped (with a
-  // summary alert) rather than added stale. Mirrors customer_app's reorder.
+  // summary dialog) rather than added stale. Mirrors customer_app's reorder.
   async function handleReorder() {
     const merchantId = o!.merchant_id;
     if (!merchantId) return;
 
     if (cartMerchantId && cartMerchantId !== merchantId && cartLines.length > 0) {
-      const ok = confirm(
-        `Keranjang kamu saat ini berisi pesanan dari toko lain. Memesan lagi dari ${
+      setDialog({
+        title: "Ganti keranjang?",
+        message: `Keranjang kamu saat ini berisi pesanan dari toko lain. Memesan lagi dari ${
           o!.merchant?.name ?? "toko ini"
-        } akan mengganti isi keranjang.`
-      );
-      if (!ok) return;
+        } akan mengganti isi keranjang.`,
+        confirmLabel: "Ganti",
+        onConfirm: () => doReorder(merchantId),
+      });
+      return;
     }
+    doReorder(merchantId);
+  }
 
+  async function doReorder(merchantId: string) {
     setReordering(true);
     try {
       const { categories } = await getMerchantProducts(merchantId);
@@ -223,10 +289,12 @@ function OrderDetailContent() {
         cartAddItem(merchantId, o!.merchant?.name ?? "", product, [], item.quantity, "");
       }
 
-      if (skipped > 0) alert(`${skipped} item tidak lagi tersedia dan dilewati`);
+      if (skipped > 0) {
+        setDialog({ title: "Sebagian item dilewati", message: `${skipped} item tidak lagi tersedia dan dilewati.` });
+      }
       router.push("/cart");
     } catch {
-      alert("Gagal memuat menu toko");
+      setDialog({ title: "Gagal memuat menu toko", message: "Coba lagi dalam beberapa saat.", danger: true });
     } finally {
       setReordering(false);
     }
@@ -243,28 +311,44 @@ function OrderDetailContent() {
 
       <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-4 md:px-0">
         <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="rounded-full bg-(--color-accent-soft) px-3 py-1 text-sm font-medium text-(--color-accent)">
-              {orderStatusLabel(o.status)}
-            </span>
-            {o.payment_type !== "cash" && (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  o.payment_status === "paid"
-                    ? "bg-(--color-accent-soft) text-(--color-accent)"
-                    : "bg-(--color-warning-soft) text-(--color-warning)"
-                }`}
-              >
-                {o.payment_status === "paid" ? "Sudah Dibayar" : "Menunggu Pembayaran"}
-              </span>
-            )}
+          <div className="flex items-start gap-3">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${orderStatusToneClasses(o.status)}`}>
+              <HugeiconsIcon
+                icon={o.status === "picked_up" ? Motorbike01Icon : Store01Icon}
+                size={20}
+                strokeWidth={1.5}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`rounded-full px-3 py-1 text-sm font-medium ${orderStatusToneClasses(o.status)}`}>
+                  {orderStatusLabel(o.status)}
+                </span>
+                {o.payment_type !== "cash" && (
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      o.payment_status === "paid"
+                        ? "bg-(--color-accent-soft) text-(--color-accent)"
+                        : "bg-(--color-warning-soft) text-(--color-warning)"
+                    }`}
+                  >
+                    {o.payment_status === "paid" ? "Sudah Dibayar" : "Menunggu Pembayaran"}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 truncate text-sm text-(--color-ink-soft)">{o.merchant?.name}</p>
+              {o.status === "cancelled" && o.cancellation_reason && (
+                <p className="mt-1 text-xs text-(--color-ink-faint)">{o.cancellation_reason}</p>
+              )}
+            </div>
           </div>
-          <p className="text-sm text-(--color-ink-soft)">{o.merchant?.name}</p>
-          <p className="text-xs text-(--color-ink-faint)">{o.dropoff_address}</p>
-          {o.status === "cancelled" && o.cancellation_reason && (
-            <p className="mt-2 text-xs text-(--color-ink-faint)">{o.cancellation_reason}</p>
-          )}
         </section>
+
+        {o.status !== "cancelled" && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <OrderProgressTracker status={o.status} />
+          </section>
+        )}
 
         {modReq && removedItem && (
           <section className="rounded-2xl border border-(--color-warning-soft) bg-(--color-warning-soft) p-4">
@@ -279,11 +363,15 @@ function OrderDetailContent() {
               <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.5} className="shrink-0 text-(--color-ink-faint)" />
             </button>
             <button
-              onClick={() => {
-                if (confirm("Batalkan pesanan ini? Pembayaran (jika ada) akan direfund ke wallet.")) {
-                  cancelModification.mutate();
-                }
-              }}
+              onClick={() =>
+                setDialog({
+                  title: "Batalkan pesanan ini?",
+                  message: "Pembayaran (jika ada) akan direfund ke wallet.",
+                  danger: true,
+                  confirmLabel: "Ya, Batalkan",
+                  onConfirm: () => cancelModification.mutate(),
+                })
+              }
               disabled={cancelModification.isPending}
               className="mt-3 text-xs font-semibold text-(--color-danger)"
             >
@@ -306,6 +394,32 @@ function OrderDetailContent() {
           </section>
         )}
 
+        {(o.dropoff_address || o.receiver_name) && (
+          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+            <p className="mb-2.5 text-sm font-medium text-(--color-ink)">Informasi Pengiriman</p>
+            <div className="flex flex-col gap-2.5">
+              {o.dropoff_address && (
+                <div className="flex items-start gap-2.5">
+                  <HugeiconsIcon icon={Location01Icon} size={16} strokeWidth={1.5} className="mt-0.5 shrink-0 text-(--color-ink-faint)" />
+                  <div>
+                    <p className="text-xs text-(--color-ink-faint)">Alamat</p>
+                    <p className="text-sm text-(--color-ink)">{o.dropoff_address}</p>
+                  </div>
+                </div>
+              )}
+              {o.receiver_name && (
+                <div className="flex items-start gap-2.5">
+                  <HugeiconsIcon icon={UserIcon} size={16} strokeWidth={1.5} className="mt-0.5 shrink-0 text-(--color-ink-faint)" />
+                  <div>
+                    <p className="text-xs text-(--color-ink-faint)">Penerima</p>
+                    <p className="text-sm text-(--color-ink)">{o.receiver_name}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {o.items && o.items.length > 0 && (
           <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
             <p className="mb-2.5 text-sm font-medium text-(--color-ink)">Item Pesanan</p>
@@ -323,15 +437,28 @@ function OrderDetailContent() {
         )}
 
         <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+          <p className="mb-2.5 text-sm font-medium text-(--color-ink)">Rincian Pembayaran</p>
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex justify-between text-(--color-ink-soft)">
               <span>Subtotal</span>
               <span>{formatIDR(o.subtotal)}</span>
             </div>
+            {o.tax_amount > 0 && (
+              <div className="flex justify-between text-(--color-ink-soft)">
+                <span>Pajak (PPN)</span>
+                <span>{formatIDR(o.tax_amount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-(--color-ink-soft)">
               <span>Ongkos Kirim</span>
               <span>{formatIDR(o.delivery_fee)}</span>
             </div>
+            {o.app_service_fee > 0 && (
+              <div className="flex justify-between text-(--color-ink-soft)">
+                <span>Biaya Layanan</span>
+                <span>{formatIDR(o.app_service_fee)}</span>
+              </div>
+            )}
             {o.discount_amount > 0 && (
               <div className="flex justify-between text-(--color-accent)">
                 <span>Diskon {o.promo_code && `(${o.promo_code})`}</span>
@@ -345,19 +472,38 @@ function OrderDetailContent() {
           </div>
         </section>
 
+        {canChat && (
+          <div className="flex gap-2">
+            <ChatToggleButton
+              label="Chat Toko"
+              active={activeChat === "merchant"}
+              unread={merchantUnread}
+              onClick={() => toggleChat("merchant")}
+            />
+            <ChatToggleButton
+              label="Chat Driver"
+              active={activeChat === "driver"}
+              unread={driverUnread}
+              onClick={() => toggleChat("driver")}
+            />
+          </div>
+        )}
+
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowChat((v) => !v)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-(--color-accent) py-2.5 text-sm font-semibold text-(--color-accent)"
-          >
-            <HugeiconsIcon icon={Message01Icon} size={16} strokeWidth={1.5} />
-            Chat
-          </button>
           {canCancel && (
             <button
-              onClick={() => {
-                if (confirm("Batalkan pesanan ini?")) cancel.mutate();
-              }}
+              onClick={() =>
+                setDialog({
+                  title: "Batalkan pesanan ini?",
+                  message:
+                    o.payment_type !== "cash" && o.payment_status === "paid"
+                      ? `Pesanan #${o.order_number} akan dibatalkan dan dana akan dikembalikan ke wallet kamu.`
+                      : `Pesanan #${o.order_number} akan dibatalkan. Tindakan ini tidak bisa dibatalkan.`,
+                  danger: true,
+                  confirmLabel: "Ya, Batalkan",
+                  onConfirm: () => cancel.mutate(),
+                })
+              }
               disabled={cancel.isPending}
               className="flex-1 rounded-full border border-(--color-danger) py-2.5 text-sm font-semibold text-(--color-danger)"
             >
@@ -427,47 +573,20 @@ function OrderDetailContent() {
           </section>
         )}
 
-        {showChat && (
-          <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
-            <div className="mb-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
-              {chat.data?.messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                    m.sender_id === userId
-                      ? "self-end bg-(--color-accent) text-(--color-accent-contrast)"
-                      : "self-start bg-(--color-border-soft) text-(--color-ink)"
-                  }`}
-                >
-                  {m.text}
-                </div>
-              ))}
-              {chat.data && chat.data.messages.length === 0 && (
-                <p className="text-center text-xs text-(--color-ink-faint)">Belum ada percakapan.</p>
-              )}
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (chatText.trim()) sendChat.mutate();
-              }}
-              className="flex gap-2"
-            >
-              <input
-                value={chatText}
-                onChange={(e) => setChatText(e.target.value)}
-                placeholder="Tulis pesan..."
-                className="flex-1 rounded-full border border-(--color-border) px-4 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
-              />
-              <button
-                type="submit"
-                disabled={sendChat.isPending}
-                className="rounded-full bg-(--color-accent) px-4 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
-              >
-                Kirim
-              </button>
-            </form>
-          </section>
+        {activeChat && (
+          <ChatPanel
+            title={activeChat === "merchant" ? "Chat dengan Toko" : "Chat dengan Driver"}
+            userId={userId}
+            messages={(activeChat === "merchant" ? merchantChat.data : driverChat.data)?.messages ?? []}
+            loaded={!!(activeChat === "merchant" ? merchantChat.data : driverChat.data)}
+            chatText={chatText}
+            onChangeText={setChatText}
+            onSend={() => {
+              if (!chatText.trim()) return;
+              (activeChat === "merchant" ? sendMerchantChat : sendDriverChat).mutate();
+            }}
+            sending={(activeChat === "merchant" ? sendMerchantChat : sendDriverChat).isPending}
+          />
         )}
       </div>
 
@@ -496,13 +615,113 @@ function OrderDetailContent() {
                 : delta > 0
                   ? `Perkiraan tambahan bayar: ${formatIDR(delta)}`
                   : `Perkiraan refund: ${formatIDR(-delta)}`;
-            if (confirm(`Ganti ke ${picked.quantity}x ${picked.product.name}?\n\n${deltaMsg}`)) {
-              replace.mutate(picked);
-            }
+            setDialog({
+              title: `Ganti ke ${picked.quantity}x ${picked.product.name}?`,
+              message: deltaMsg,
+              confirmLabel: "Ganti",
+              onConfirm: () => replace.mutate(picked),
+            });
           }}
         />
       )}
+
+      {dialog && <ConfirmDialog {...dialog} onClose={() => setDialog(null)} />}
     </div>
+  );
+}
+
+function ChatToggleButton({
+  label,
+  active,
+  unread,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  unread: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-1 items-center justify-center gap-2 rounded-full border py-2.5 text-sm font-semibold transition-colors ${
+        active
+          ? "border-(--color-accent) bg-(--color-accent) text-(--color-accent-contrast)"
+          : "border-(--color-accent) text-(--color-accent)"
+      }`}
+    >
+      <HugeiconsIcon icon={Message01Icon} size={16} strokeWidth={1.5} />
+      {label}
+      {unread > 0 && (
+        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-(--color-danger) px-1 text-[10px] font-bold text-(--color-accent-contrast)">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function ChatPanel({
+  title,
+  userId,
+  messages,
+  loaded,
+  chatText,
+  onChangeText,
+  onSend,
+  sending,
+}: {
+  title: string;
+  userId: string | undefined;
+  messages: { id: string; sender_id: string; text: string }[];
+  loaded: boolean;
+  chatText: string;
+  onChangeText: (v: string) => void;
+  onSend: () => void;
+  sending: boolean;
+}) {
+  return (
+    <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
+      <p className="mb-3 text-sm font-medium text-(--color-ink)">{title}</p>
+      <div className="mb-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+              m.sender_id === userId
+                ? "self-end bg-(--color-accent) text-(--color-accent-contrast)"
+                : "self-start bg-(--color-border-soft) text-(--color-ink)"
+            }`}
+          >
+            {m.text}
+          </div>
+        ))}
+        {loaded && messages.length === 0 && (
+          <p className="text-center text-xs text-(--color-ink-faint)">Belum ada percakapan.</p>
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSend();
+        }}
+        className="flex gap-2"
+      >
+        <input
+          value={chatText}
+          onChange={(e) => onChangeText(e.target.value)}
+          placeholder="Tulis pesan..."
+          className="flex-1 rounded-full border border-(--color-border) px-4 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+        />
+        <button
+          type="submit"
+          disabled={sending}
+          className="rounded-full bg-(--color-accent) px-4 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
+        >
+          Kirim
+        </button>
+      </form>
+    </section>
   );
 }
 

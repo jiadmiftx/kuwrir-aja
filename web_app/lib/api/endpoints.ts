@@ -99,9 +99,20 @@ export const submitOrderReview = (
   body: { merchant_rating?: number; driver_rating?: number; comment?: string }
 ) => apiFetch<{ message: string }>(`/orders/${orderId}/review`, { method: "POST", body });
 export const cancelOrder = (id: string) => apiFetch<{ order: Order }>(`/orders/${id}/cancel`, { method: "POST" });
-export const getOrderChat = (id: string) => apiFetch<{ messages: ChatMessage[] }>(`/orders/${id}/chat`);
-export const sendOrderChat = (id: string, text: string) =>
+// Two separate threads per order, never mixed: "/chat" is the customer↔driver
+// channel, "/merchant-chat" is customer↔merchant — matches the backend's
+// ChatMessage.Channel split and customer_app's two distinct chat buttons.
+export const getOrderDriverChat = (id: string) => apiFetch<{ messages: ChatMessage[] }>(`/orders/${id}/chat`);
+export const sendOrderDriverChat = (id: string, text: string) =>
   apiFetch<{ message: ChatMessage }>(`/orders/${id}/chat`, { method: "POST", body: { text } });
+export const getOrderMerchantChat = (id: string) =>
+  apiFetch<{ messages: ChatMessage[] }>(`/orders/${id}/merchant-chat`);
+export const sendOrderMerchantChat = (id: string, text: string) =>
+  apiFetch<{ message: ChatMessage }>(`/orders/${id}/merchant-chat`, { method: "POST", body: { text } });
+export const getChatUnreadCount = () =>
+  apiFetch<{ total: number; support: number; orders: Record<string, Record<string, number>> }>(
+    "/orders/chat-unread"
+  );
 export const requestRefund = (orderId: string, reason: string) =>
   apiFetch<{ refund: RefundRequest; message: string }>(`/orders/${orderId}/refund-request`, {
     method: "POST",
