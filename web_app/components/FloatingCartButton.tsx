@@ -7,20 +7,23 @@ import { ArrowRight01Icon, ShoppingBag02Icon } from "@hugeicons/core-free-icons"
 import { useCartStore, cartItemCount, cartSubtotal } from "@/lib/stores/cart";
 import { formatIDR } from "@/lib/format";
 
-/// Mirrors customer_app's FloatingCartButton: a pill that appears once the
-/// cart has items, showing item count + subtotal, one tap to /cart. Only
-/// shown while actively browsing (home, search) — BottomNav's own small
-/// cart-count badge on the "Keranjang" tab already covers every other
-/// screen, and floating this over order detail/checkout/etc. would just be
-/// visual noise on top of screens that aren't about adding more items.
-const SHOW_ON_PATHS = ["/", "/search"];
+/// Mirrors customer_app's FloatingCartButton (shown on the same three
+/// screens: home, search, and store detail): a pill that appears once the
+/// cart has items, showing item count + subtotal, one tap to /cart.
+/// BottomNav's own small cart-count badge on the "Keranjang" tab already
+/// covers every other screen, and floating this over order detail/
+/// checkout/etc. would just be visual noise on top of screens that aren't
+/// about adding more items.
+function shouldShowOn(pathname: string) {
+  return pathname === "/" || pathname === "/search" || pathname.startsWith("/store/");
+}
 
 export function FloatingCartButton() {
   const pathname = usePathname();
   const lines = useCartStore((s) => s.lines);
   const merchantName = useCartStore((s) => s.merchantName);
 
-  if (lines.length === 0 || !SHOW_ON_PATHS.includes(pathname)) return null;
+  if (lines.length === 0 || !shouldShowOn(pathname)) return null;
 
   const count = cartItemCount(lines);
   const subtotal = cartSubtotal(lines);
