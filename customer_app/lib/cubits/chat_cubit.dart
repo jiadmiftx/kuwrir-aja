@@ -83,15 +83,18 @@ class ChatCubit extends Cubit<ChatState> {
     } catch (_) {}
   }
 
+  /// Rethrows on failure (unlike the rest of this cubit's silent-catch
+  /// style) so the screen can surface it — the merchant channel has a real
+  /// server-side rule that can reject a send (customer messaging before the
+  /// merchant has), and the client-side gate that normally prevents this is
+  /// a UX nicety, not a guarantee (e.g. stale message list).
   Future<void> sendMessage(String text) async {
-    try {
-      if (channel == ChatChannel.merchant) {
-        await _api.sendOrderMerchantChat(orderId, text);
-      } else {
-        await _api.sendChatMessage(orderId, text);
-      }
-      await _silentRefresh();
-    } catch (_) {}
+    if (channel == ChatChannel.merchant) {
+      await _api.sendOrderMerchantChat(orderId, text);
+    } else {
+      await _api.sendChatMessage(orderId, text);
+    }
+    await _silentRefresh();
   }
 
   @override

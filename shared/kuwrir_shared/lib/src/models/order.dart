@@ -65,6 +65,7 @@ class Order {
   final String? merchantName;
   final String? merchantLogoUrl;
   final String? driverId;
+  final DateTime? acceptedAt;
   final String? cancellationReason;
   final bool hasReview;
   final List<OrderItem> items;
@@ -101,6 +102,7 @@ class Order {
     this.merchantName,
     this.merchantLogoUrl,
     this.driverId,
+    this.acceptedAt,
     this.cancellationReason,
     this.hasReview = false,
     this.items = const [],
@@ -142,6 +144,10 @@ class Order {
       merchantName: merchant?['name'] as String?,
       merchantLogoUrl: merchant?['logo_url'] as String?,
       driverId: json['driver_id'] as String?,
+      acceptedAt:
+          json['accepted_at'] != null
+              ? DateTime.tryParse(json['accepted_at'] as String)
+              : null,
       cancellationReason: json['cancellation_reason'] as String?,
       hasReview: json['has_review'] as bool? ?? false,
       items:
@@ -165,4 +171,19 @@ class Order {
     'ready',
     'picked_up',
   ].contains(status);
+
+  // Merchant chat opens once the merchant has accepted the order (there's
+  // someone on the other end to reply) and stays open through delivery —
+  // matches order_tracking_screen.dart's canChat and the backend's
+  // SendMerchantChat gate (merchant must send the first message, checked
+  // there, not just gated here — this is a UX nicety, not the real rule).
+  bool get canChatMerchant =>
+      ['confirmed', 'preparing', 'ready', 'picked_up'].contains(status);
+
+  // Driver chat only makes sense once a driver has actually accepted the
+  // job (driverId alone isn't enough — admin can pre-assign a driver who
+  // hasn't confirmed yet, see backend AssignDriverToOrder/AcceptDelivery)
+  // — mirrors Gojek/Grab only surfacing driver contact once a real driver
+  // is en route, not the moment one's merely earmarked.
+  bool get canChatDriver => driverId != null && acceptedAt != null && isActive;
 }

@@ -2409,6 +2409,21 @@ func (h *Handler) SendMerchantChat(c *gin.Context) {
 		return
 	}
 
+	// Merchant must open the conversation, not the customer — a small
+	// merchant checking their phone occasionally shouldn't get cold-messaged
+	// by every customer with a question; the merchant reaching out first
+	// (order update, item swap, etc.) is what opens the thread up. Checked
+	// here, not just hidden client-side, since the client-side gate is only
+	// a UX nicety — this is the actual rule.
+	var merchantHasReplied bool
+	h.db.Model(&model.ChatMessage{}).
+		Where("order_id = ? AND channel = ? AND sender_role = ?", orderID, "merchant", "merchant").
+		Select("count(*) > 0").Scan(&merchantHasReplied)
+	if !merchantHasReplied {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Menunggu pesan dari toko. Toko akan segera menghubungi kamu terkait pesanan ini."})
+		return
+	}
+
 	senderUID, _ := uuid.Parse(userID)
 	orderUID, _ := uuid.Parse(orderID)
 	msg := model.ChatMessage{

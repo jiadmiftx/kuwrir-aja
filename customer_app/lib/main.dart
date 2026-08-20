@@ -759,11 +759,133 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                // Chat straight from the list — the old design made a
+                // customer open the full tracking screen just to reach a
+                // button that's really about this row, and merchant vs
+                // driver looked identical (same icon, no label) once you
+                // finally got there. Two distinct, labeled chips instead,
+                // each gated by Order.canChatMerchant/canChatDriver so
+                // they only appear once there's actually someone to chat
+                // with (mirrors the AppBar icons on the tracking screen).
+                if (order.canChatMerchant || order.canChatDriver) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      if (order.canChatMerchant)
+                        _ChatActionChip(
+                          icon: HugeIcons.strokeRoundedStore01,
+                          label: 'Chat Toko',
+                          color: KuwrirColors.primary,
+                          unreadCount: (c) => c.forOrder(order.id, 'merchant'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                orderId: order.id,
+                                orderNumber: order.orderNumber,
+                                channel: ChatChannel.merchant,
+                                counterpartLabel: order.merchantName ?? 'Toko',
+                                itemSummary: _itemSummary,
+                                total: order.total,
+                                statusLabel: _StatusBadge(order.status)._label,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (order.canChatMerchant && order.canChatDriver)
+                        const SizedBox(width: 8),
+                      if (order.canChatDriver)
+                        _ChatActionChip(
+                          icon: HugeIcons.strokeRoundedMotorbike01,
+                          label: 'Chat Driver',
+                          color: KuwrirColors.info,
+                          unreadCount: (c) => c.forOrder(order.id, 'driver'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                orderId: order.id,
+                                orderNumber: order.orderNumber,
+                                itemSummary: _itemSummary,
+                                total: order.total,
+                                statusLabel: _StatusBadge(order.status)._label,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Small labeled, colored, badge-able action button — used for the two
+/// chat entry points on each order card so "which chat is this" reads at
+/// a glance (icon + label + color, not just an icon).
+class _ChatActionChip extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final String label;
+  final Color color;
+  final int Function(ChatUnreadCount) unreadCount;
+  final VoidCallback onTap;
+  const _ChatActionChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final service = context.read<ChatUnreadService>();
+    return ValueListenableBuilder<ChatUnreadCount>(
+      valueListenable: service.count,
+      builder: (context, count, _) {
+        final unread = unreadCount(count);
+        return Expanded(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  HugeIcon(icon: icon, size: 15, color: color),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  if (unread > 0) ...[
+                    const SizedBox(width: 6),
+                    UnreadBadge(count: unread),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

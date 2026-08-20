@@ -47,6 +47,11 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollCtrl = ScrollController();
   late final ChatCubit _cubit;
 
+  // Merchant channel starts locked (can't know yet whether the merchant has
+  // ever replied until the first load completes); driver channel never
+  // locks — see the `canChatMerchant`/`canChatDriver` split on Order.
+  late bool _merchantHasReplied = widget.channel != ChatChannel.merchant;
+
   @override
   void initState() {
     super.initState();
@@ -77,11 +82,24 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
     _textCtrl.clear();
-    _cubit.sendMessage(text);
+    try {
+      await _cubit.sendMessage(text);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is ApiException ? e.message : 'Gagal mengirim pesan',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     // Scroll to bottom after send
     Future.delayed(const Duration(milliseconds: 200), () {
       if (_scrollCtrl.hasClients) {
@@ -124,10 +142,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     return Center(child: Text('Error: ${state.message}'));
                   }
                   if (state is ChatLoaded) {
+                    _merchantHasReplied =
+                        widget.channel != ChatChannel.merchant ||
+                        state.messages.any((m) => m.senderRole == 'merchant');
                     if (state.messages.isEmpty) {
                       return Center(
                         child: Text(
-                          'Belum ada pesan. Mulai chat dengan ${widget.counterpartLabel}!',
+                          widget.channel == ChatChannel.merchant
+                              ? 'Toko akan menghubungi kamu di sini jika ada info soal pesananmu.'
+                              : 'Belum ada pesan. Mulai chat dengan ${widget.counterpartLabel}!',
+                          textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.grey),
                         ),
                       );
@@ -146,7 +170,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ),
-            _InputBar(controller: _textCtrl, onSend: _send),
+            _InputBar(
+              controller: _textCtrl,
+              onSend: _send,
+              enabled: _merchantHasReplied,
+              lockedHint: widget.channel == ChatChannel.merchant
+                  ? 'Menunggu toko membalas dulu...'
+                  : null,
+            ),
           ],
         ),
       ),
@@ -302,8 +333,15 @@ class _MessageBubble extends StatelessWidget {
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
+  final bool enabled;
+  final String? lockedHint;
 
-  const _InputBar({required this.controller, required this.onSend});
+  const _InputBar({
+    required this.controller,
+    required this.onSend,
+    this.enabled = true,
+    this.lockedHint,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -320,9 +358,10 @@ class _InputBar extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
+              enabled: enabled,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: 'Ketik pesan...',
+                hintText: enabled ? 'Ketik pesan...' : (lockedHint ?? ''),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
@@ -339,14 +378,16 @@ class _InputBar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           CircleAvatar(
-            backgroundColor: KuwrirColors.primary,
+            backgroundColor: enabled
+                ? KuwrirColors.primary
+                : KuwrirColors.textHint,
             child: IconButton(
               icon: const HugeIcon(
                 icon: HugeIcons.strokeRoundedSent,
                 color: Colors.white,
                 size: 20,
               ),
-              onPressed: onSend,
+              onPressed: enabled ? onSend : null,
             ),
           ),
         ],

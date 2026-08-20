@@ -251,19 +251,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         final isDelivered =
             state is OrderTrackingDelivered || order.status == 'delivered';
 
-        // Show chat button only when driver is assigned (order in transit)
-        final canChat = [
-          'picked_up',
-          'confirmed',
-          'preparing',
-          'ready',
-        ].contains(order.status);
-
         return Scaffold(
           appBar: AppBar(
             title: Text('Pesanan ${order.orderNumber}'),
             actions: [
-              if (canChat)
+              if (order.canChatMerchant)
                 IconButton(
                   icon: _AppBarChatIcon(
                     icon: HugeIcons.strokeRoundedStore01,
@@ -285,7 +277,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     ),
                   ),
                 ),
-              if (canChat)
+              if (order.canChatDriver)
                 IconButton(
                   icon: _AppBarChatIcon(
                     icon: HugeIcons.strokeRoundedChat,
