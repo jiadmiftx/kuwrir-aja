@@ -85,10 +85,10 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-(--color-surface) md:p-6">
-      <div className="w-full max-w-md overflow-hidden md:rounded-[32px] md:shadow-xl">
+    <div className="flex min-h-screen flex-col bg-(--color-surface) md:items-center md:justify-center md:p-6">
+      <div className="flex w-full flex-1 flex-col overflow-hidden md:max-w-md md:flex-none md:rounded-[32px] md:shadow-xl">
         {/* Hero */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-(--color-accent-hover) to-(--color-accent) px-6 pt-14 pb-16 text-center">
+        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-(--color-accent-hover) to-(--color-accent) px-6 pt-14 pb-16 text-center">
           <HugeiconsIcon
             icon={PizzaIcon}
             size={56}
@@ -127,7 +127,7 @@ export default function LoginPage() {
         </div>
 
         {/* Sheet */}
-        <div className="relative z-10 -mt-6 rounded-t-[28px] bg-(--color-surface-raised) px-6 pt-6 pb-8">
+        <div className="relative z-10 -mt-6 flex flex-1 flex-col rounded-t-[28px] bg-(--color-surface-raised) px-6 pt-6 pb-8">
           <div className="mx-auto mb-6 h-1 w-9 rounded-full bg-(--color-border)" />
 
           {step === "phone" && (
