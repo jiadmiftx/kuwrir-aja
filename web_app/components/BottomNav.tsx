@@ -21,7 +21,10 @@ export function BottomNav() {
   if (pathname === "/login") return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-(--color-border) bg-(--color-surface-raised) md:hidden">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-30 border-t border-(--color-border) bg-(--color-surface-raised) md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="mx-auto flex max-w-(--content-width) items-stretch justify-between">
         {TABS.map((tab) => {
           const active = pathname === tab.href;

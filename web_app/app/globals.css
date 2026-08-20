@@ -33,4 +33,35 @@
 body {
   background: var(--color-surface);
   color: var(--color-ink);
+  /* Paired with viewport-fit=cover: without this, iOS standalone
+     (added-to-homescreen) mode fills the notch/status-bar strip with solid
+     black instead of the page background. env() resolves to 0 anywhere
+     else, so this is a no-op outside iOS PWA safe areas. */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Reserves room below page content for BottomNav (mobile only) plus the
+   iOS home-indicator safe area — a plain Tailwind pb-20 can't express the
+   env() calc() and stay responsive at once, hence this small class. */
+.app-content {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .app-content {
+    padding-bottom: 2rem;
+  }
+}
+
+/* Positioned above BottomNav + its safe-area padding on mobile (no bottom
+   nav / notch to clear on desktop, so a plain fixed offset there). Kept as
+   a real media query rather than a Tailwind md: class since Tailwind's
+   utility layer would otherwise lose the cascade fight against this
+   unlayered rule regardless of source order. */
+.floating-cart {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .floating-cart {
+    bottom: 1.5rem;
+  }
 }

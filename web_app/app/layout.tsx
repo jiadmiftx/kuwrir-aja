@@ -24,7 +24,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    // "default"/"black" reserve a status-bar strip iOS paints itself in a
+    // fixed color that ignores the page — in practice that's what shows up
+    // as a flat black bar on standalone launch. "black-translucent" lets
+    // our own background (plus the safe-area-inset-top padding in
+    // globals.css) show through instead.
+    statusBarStyle: "black-translucent",
     title: "Cocourir",
   },
   icons: {
@@ -37,6 +42,13 @@ export const viewport: Viewport = {
   themeColor: "#005734",
   width: "device-width",
   initialScale: 1,
+  // Without viewport-fit=cover, iOS standalone (added-to-homescreen) mode
+  // doesn't extend page content into the notch/home-indicator safe areas
+  // at all — it just paints those strips solid black by default, regardless
+  // of body background. "cover" lets our own background show through
+  // instead; the env(safe-area-inset-*) padding below then keeps real
+  // content (nav bars, etc.) out of the notch/indicator itself.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -52,7 +64,7 @@ export default function RootLayout({
       <body className="min-h-full">
         <Providers>
           <TopNav />
-          <div className="min-h-screen pb-20 md:pb-8">{children}</div>
+          <div className="app-content min-h-screen">{children}</div>
           <BottomNav />
           <FloatingCartButton />
           <InstallPrompt />
