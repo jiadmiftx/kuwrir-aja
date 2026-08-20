@@ -47,7 +47,7 @@ function HomeContent() {
 
       <Link
         href="/search"
-        className="mt-4 flex items-center gap-2.5 rounded-full border border-(--color-border) bg-(--color-surface-raised) px-4 py-3 text-sm text-(--color-ink-faint) transition-colors hover:border-(--color-ink-faint) md:max-w-md"
+        className="mt-4 flex items-center gap-2.5 rounded-full border border-(--color-border) bg-(--color-surface-raised) px-4 py-3 text-sm text-(--color-ink-faint) shadow-[0_2px_10px_-4px_rgba(0,0,0,0.08)] transition-colors hover:border-(--color-ink-faint) md:max-w-md"
       >
         <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.5} />
         Cari toko atau produk...
@@ -58,7 +58,7 @@ function HomeContent() {
           {banners.data.banners.map((b) => (
             <div
               key={b.id}
-              className="relative flex min-w-[85%] snap-center flex-col justify-end overflow-hidden rounded-2xl bg-(--color-ink) text-(--color-accent-contrast) md:min-w-0"
+              className="relative flex min-w-[85%] snap-center flex-col justify-end overflow-hidden rounded-[24px] bg-(--color-ink) text-(--color-accent-contrast) shadow-[0_6px_18px_-6px_rgba(0,0,0,0.2)] md:min-w-0"
               style={{ aspectRatio: "16/7" }}
             >
               {b.image_url && (
@@ -78,7 +78,7 @@ function HomeContent() {
         <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors ${
               activeCategory === null
                 ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
                 : "border-(--color-border) text-(--color-ink-soft)"
@@ -90,7 +90,7 @@ function HomeContent() {
             <button
               key={c.id}
               onClick={() => setActiveCategory(c.id)}
-              className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors ${
                 activeCategory === c.id
                   ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
                   : "border-(--color-border) text-(--color-ink-soft)"
@@ -104,7 +104,7 @@ function HomeContent() {
 
       {geo.status === "granted" && nearbyMerchants.data && nearbyMerchants.data.merchants.length > 0 && (
         <section className="mt-9">
-          <h2 className="text-base font-semibold text-(--color-ink)">Terdekat dari kamu</h2>
+          <h2 className="text-base font-bold text-(--color-ink)">Terdekat dari kamu</h2>
           <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {nearbyMerchants.data.merchants.map((m) => (
               <MerchantCard key={m.id} merchant={m} />
@@ -121,7 +121,7 @@ function HomeContent() {
 
       {popularProducts.data && popularProducts.data.products.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-base font-semibold text-(--color-ink)">Sedang Rame</h2>
+          <h2 className="text-base font-bold text-(--color-ink)">Sedang Rame</h2>
           <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
             {popularProducts.data.products.map((p) => (
               <ProductCard key={p.id} product={p} />
@@ -131,7 +131,7 @@ function HomeContent() {
       )}
 
       <section className="mt-9">
-        <h2 className="text-base font-semibold text-(--color-ink)">Rating Tertinggi</h2>
+        <h2 className="text-base font-bold text-(--color-ink)">Rating Tertinggi</h2>
         <div className="mt-3 flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible lg:grid-cols-4">
           {popularMerchants.isLoading && <p className="text-xs text-(--color-ink-faint)">Memuat...</p>}
           {popularMerchants.data?.merchants.map((m) => (

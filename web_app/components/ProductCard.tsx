@@ -9,7 +9,7 @@ export function ProductCard({ product }: { product: ProductSearchItem }) {
   return (
     <Link
       href={`/store/${product.merchant_id}`}
-      className="group flex min-w-[156px] max-w-[156px] flex-col gap-1.5 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-2.5 transition-shadow hover:shadow-md md:min-w-0 md:max-w-none md:w-full"
+      className="group flex min-w-[156px] max-w-[156px] flex-col gap-1.5 rounded-[20px] border border-(--color-border) bg-(--color-surface-raised) p-2.5 shadow-[0_4px_14px_-6px_rgba(0,0,0,0.1)] transition-shadow hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.16)] md:min-w-0 md:max-w-none md:w-full"
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-(--color-border-soft)">
         {product.image_url ? (

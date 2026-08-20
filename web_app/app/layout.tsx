@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { TopNav } from "@/components/TopNav";
 import { BottomNav } from "@/components/BottomNav";
+import { FloatingCartButton } from "@/components/FloatingCartButton";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { PushForegroundListener } from "@/components/PushForegroundListener";
 
@@ -53,6 +54,7 @@ export default function RootLayout({
           <TopNav />
           <div className="min-h-screen pb-20 md:pb-8">{children}</div>
           <BottomNav />
+          <FloatingCartButton />
           <InstallPrompt />
           <PushForegroundListener />
         </Providers>
