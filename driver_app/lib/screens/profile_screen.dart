@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,56 +36,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Best-effort — show whatever loaded, empty state otherwise.
     }
     if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Keluar'),
-        content: const Text('Yakin ingin keluar dari akun ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await ApiClient().clearTokens();
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-    }
-  }
-
-  Future<void> _deleteAccount() async {
-    final confirmed = await showDeleteAccountDialog(context);
-    if (confirmed != true || !mounted) return;
-
-    try {
-      await ApiClient().deleteAccount();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e is ApiException ? e.message : 'Gagal menghapus akun',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-    await ApiClient().clearTokens();
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-    }
   }
 
   Future<void> _editField({
@@ -155,13 +106,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       CircleAvatar(
-                        radius: 40,
+                        radius: 36,
                         backgroundColor: KuwrirColors.primary.withValues(
                           alpha: 0.08,
                         ),
                         child: HugeIcon(
                           icon: HugeIcons.strokeRoundedUser,
-                          size: 40,
+                          size: 32,
                           color: KuwrirColors.primary,
                         ),
                       ),
@@ -271,97 +222,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
                 const SizedBox(height: 28),
-                const _ProfileSectionLabel('Dompet'),
+                const _ProfileSectionLabel('Lainnya'),
                 const SizedBox(height: 10),
                 _ProfileSoftPanel(
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: HugeIcon(
+                  child: Column(
+                    children: [
+                      _ActionRow(
                         icon: HugeIcons.strokeRoundedWallet01,
-                        size: 18,
-                        color: KuwrirColors.primary,
+                        label: 'Wallet Driver',
+                        onTap: () => Navigator.pushNamed(context, '/wallet'),
                       ),
-                    ),
-                    title: const Text(
-                      'Wallet Driver',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.5,
+                      Divider(height: 1, color: KuwrirColors.border),
+                      _ActionRow(
+                        icon: HugeIcons.strokeRoundedSettings01,
+                        label: 'Pengaturan',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
+                        ),
                       ),
-                    ),
-                    trailing: HugeIcon(
-                      icon: HugeIcons.strokeRoundedArrowRight01,
-                      size: 18,
-                      color: KuwrirColors.textHint,
-                    ),
-                    onTap: () => Navigator.pushNamed(context, '/wallet'),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                _ProfileSoftPanel(
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.error.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedLogout01,
-                        size: 18,
-                        color: KuwrirColors.error,
-                      ),
-                    ),
-                    title: Text(
-                      'Keluar',
-                      style: TextStyle(
-                        color: KuwrirColors.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: _logout,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _ProfileSoftPanel(
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: KuwrirColors.error.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedDelete02,
-                        size: 18,
-                        color: KuwrirColors.error,
-                      ),
-                    ),
-                    title: Text(
-                      'Hapus Akun',
-                      style: TextStyle(
-                        color: KuwrirColors.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: _deleteAccount,
+                    ],
                   ),
                 ),
               ],
@@ -406,6 +288,29 @@ class _ProfileSoftPanel extends StatelessWidget {
   }
 }
 
+/// Small leading icon chip shared by every row on this screen — kept
+/// deliberately compact (28px box, 15px icon) so it reads as a label
+/// marker, not a decorative tile competing with the row's own text.
+class _RowIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final Color color;
+  const _RowIcon({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: HugeIcon(icon: icon, size: 15, color: color),
+    );
+  }
+}
+
 class _ProfileRow extends StatelessWidget {
   final List<List<dynamic>> icon;
   final String label;
@@ -421,15 +326,7 @@ class _ProfileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: KuwrirColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: HugeIcon(icon: icon, size: 18, color: KuwrirColors.primary),
-      ),
+      leading: _RowIcon(icon: icon, color: KuwrirColors.primary),
       title: Text(
         label,
         style: const TextStyle(fontSize: 13, color: KuwrirColors.textSecondary),
@@ -439,8 +336,34 @@ class _ProfileRow extends StatelessWidget {
         style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
       ),
       trailing: onTap != null
-          ? HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 18, color: KuwrirColors.textHint)
+          ? HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 15, color: KuwrirColors.textHint)
           : null,
+      onTap: onTap,
+    );
+  }
+}
+
+/// Simple navigational/action row (wallet, settings) — label only, no
+/// value subtitle, chevron trailing.
+class _ActionRow extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionRow({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: _RowIcon(icon: icon, color: KuwrirColors.primary),
+      title: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
+      ),
+      trailing: HugeIcon(
+        icon: HugeIcons.strokeRoundedArrowRight01,
+        size: 15,
+        color: KuwrirColors.textHint,
+      ),
       onTap: onTap,
     );
   }
