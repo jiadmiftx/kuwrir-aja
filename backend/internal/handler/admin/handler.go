@@ -584,8 +584,9 @@ func (h *Handler) GetOrder(c *gin.Context) {
 }
 
 // deleteOrdersHard permanently removes orders and everything scoped to
-// them (items, review, refund requests, chat) — a real hard delete via
-// Unscoped, not the soft-delete Base.DeletedAt gives every other model,
+// them (items, review, refund requests, chat, modification requests) — a
+// real hard delete via Unscoped, not the soft-delete Base.DeletedAt gives
+// every other model,
 // because this exists purely to purge test/seed data before a real
 // release, not to hide records that should stay for bookkeeping. Wallet
 // ledger entries (WalletTransaction) are deliberately left alone: they're
@@ -607,6 +608,9 @@ func deleteOrdersHard(db *gorm.DB, ids []string) error {
 			return err
 		}
 		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.ChatMessage{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("order_id IN ?", ids).Delete(&model.OrderModificationRequest{}).Error; err != nil {
 			return err
 		}
 		return tx.Unscoped().Where("id IN ?", ids).Delete(&model.Order{}).Error
