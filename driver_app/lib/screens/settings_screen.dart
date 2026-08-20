@@ -138,14 +138,14 @@ class _SettingsRowIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 28,
-      height: 28,
+      width: 36,
+      height: 36,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
       ),
-      child: HugeIcon(icon: icon, size: 15, color: color),
+      child: HugeIcon(icon: icon, color: color),
     );
   }
 }

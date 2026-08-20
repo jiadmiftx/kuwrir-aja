@@ -106,13 +106,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       CircleAvatar(
-                        radius: 36,
+                        radius: 40,
                         backgroundColor: KuwrirColors.primary.withValues(
                           alpha: 0.08,
                         ),
                         child: HugeIcon(
                           icon: HugeIcons.strokeRoundedUser,
-                          size: 32,
+                          size: 40,
                           color: KuwrirColors.primary,
                         ),
                       ),
@@ -288,9 +288,8 @@ class _ProfileSoftPanel extends StatelessWidget {
   }
 }
 
-/// Small leading icon chip shared by every row on this screen — kept
-/// deliberately compact (28px box, 15px icon) so it reads as a label
-/// marker, not a decorative tile competing with the row's own text.
+/// Leading icon chip shared by every row on this screen — icon renders at
+/// HugeIcon's own default size (24px), box sized to fit it comfortably.
 class _RowIcon extends StatelessWidget {
   final List<List<dynamic>> icon;
   final Color color;
@@ -299,14 +298,14 @@ class _RowIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 28,
-      height: 28,
+      width: 36,
+      height: 36,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
       ),
-      child: HugeIcon(icon: icon, size: 15, color: color),
+      child: HugeIcon(icon: icon, color: color),
     );
   }
 }
@@ -336,7 +335,7 @@ class _ProfileRow extends StatelessWidget {
         style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
       ),
       trailing: onTap != null
-          ? HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 15, color: KuwrirColors.textHint)
+          ? HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: 18, color: KuwrirColors.textHint)
           : null,
       onTap: onTap,
     );
@@ -361,7 +360,7 @@ class _ActionRow extends StatelessWidget {
       ),
       trailing: HugeIcon(
         icon: HugeIcons.strokeRoundedArrowRight01,
-        size: 15,
+        size: 18,
         color: KuwrirColors.textHint,
       ),
       onTap: onTap,
