@@ -1204,28 +1204,34 @@ class _ChatListScreenState extends State<_ChatListScreen> {
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _SoftListTile(
-                          leading: _ChatEntryIcon(
-                            icon: HugeIcons.strokeRoundedDeliveryBox01,
-                            color: KuwrirColors.warning,
-                            unreadCount: (c) => c.forOrder(o.id, 'driver'),
-                          ),
-                          title: 'Driver',
-                          subtitle: '#${o.orderNumber} · Chat Driver',
-                          trailing: _StatusBadge(o.status),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                orderId: o.id,
-                                orderNumber: o.orderNumber,
+                      // Only once a driver has actually accepted the job —
+                      // matches Order.canChatDriver, used everywhere else
+                      // this thread is exposed (order card, tracking AppBar).
+                      // Previously unconditional here, which listed a Chat
+                      // Driver row for orders with nobody assigned yet.
+                      if (o.canChatDriver)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _SoftListTile(
+                            leading: _ChatEntryIcon(
+                              icon: HugeIcons.strokeRoundedDeliveryBox01,
+                              color: KuwrirColors.warning,
+                              unreadCount: (c) => c.forOrder(o.id, 'driver'),
+                            ),
+                            title: 'Driver',
+                            subtitle: '#${o.orderNumber} · Chat Driver',
+                            trailing: _StatusBadge(o.status),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  orderId: o.id,
+                                  orderNumber: o.orderNumber,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ],
                 ],
