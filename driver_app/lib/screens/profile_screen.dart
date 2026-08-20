@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
-import 'settings_screen.dart';
-import 'delivery_history_screen.dart';
-import 'stats_screen.dart';
-import 'support_chat_screen.dart';
-import 'notifications_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -225,75 +220,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 28),
-                const _ProfileSectionLabel('Lainnya'),
-                const SizedBox(height: 10),
-                _ProfileSoftPanel(
-                  child: Column(
-                    children: [
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedWallet01,
-                        label: 'Wallet Driver',
-                        onTap: () => Navigator.pushNamed(context, '/wallet'),
-                      ),
-                      Divider(height: 1, color: KuwrirColors.border),
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedClock01,
-                        label: 'Riwayat Pengantaran',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DeliveryHistoryScreen(),
-                          ),
-                        ),
-                      ),
-                      Divider(height: 1, color: KuwrirColors.border),
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedChartLineData02,
-                        label: 'Statistik & Performa',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const StatsScreen(),
-                          ),
-                        ),
-                      ),
-                      Divider(height: 1, color: KuwrirColors.border),
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedCustomerService01,
-                        label: 'Pusat Bantuan',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SupportChatScreen(),
-                          ),
-                        ),
-                      ),
-                      Divider(height: 1, color: KuwrirColors.border),
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedNotification03,
-                        label: 'Notifikasi',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const NotificationsScreen(),
-                          ),
-                        ),
-                      ),
-                      Divider(height: 1, color: KuwrirColors.border),
-                      _ActionRow(
-                        icon: HugeIcons.strokeRoundedSettings01,
-                        label: 'Pengaturan',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SettingsScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
     );
@@ -389,36 +315,6 @@ class _ProfileRow extends StatelessWidget {
               color: KuwrirColors.textHint,
             )
           : null,
-      onTap: onTap,
-    );
-  }
-}
-
-/// Simple navigational/action row (wallet, settings) — label only, no
-/// value subtitle, chevron trailing.
-class _ActionRow extends StatelessWidget {
-  final List<List<dynamic>> icon;
-  final String label;
-  final VoidCallback onTap;
-  const _ActionRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: _RowIcon(icon: icon, color: KuwrirColors.primary),
-      title: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
-      ),
-      trailing: HugeIcon(
-        icon: HugeIcons.strokeRoundedArrowRight01,
-        size: 18,
-        color: KuwrirColors.textHint,
-      ),
       onTap: onTap,
     );
   }

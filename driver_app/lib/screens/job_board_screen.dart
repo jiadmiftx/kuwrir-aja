@@ -8,6 +8,7 @@ import '../cubits/active_delivery_cubit.dart';
 import '../services/location_service.dart';
 import '../widgets/open_in_maps_button.dart';
 import '../widgets/whatsapp_launcher.dart';
+import '../widgets/driver_drawer.dart';
 import 'active_delivery_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
@@ -33,6 +34,7 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
 
         return Scaffold(
           backgroundColor: KuwrirColors.background,
+          drawer: const DriverDrawer(),
           appBar: AppBar(
             title: const Text('Job Board'),
             actions: [
@@ -76,15 +78,6 @@ class _JobBoardScreenState extends State<JobBoardScreen> {
                   ),
                   const SizedBox(width: 4),
                 ],
-              ),
-              IconButton(
-                icon: const HugeIcon(icon: HugeIcons.strokeRoundedWallet01),
-                onPressed: () => Navigator.pushNamed(context, '/wallet'),
-              ),
-              IconButton(
-                icon: const HugeIcon(icon: HugeIcons.strokeRoundedUser),
-                tooltip: 'Profil Saya',
-                onPressed: () => Navigator.pushNamed(context, '/profile'),
               ),
             ],
           ),
