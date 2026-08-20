@@ -508,7 +508,7 @@ class _InfoRow extends StatelessWidget {
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: HugeIcon(icon: icon, color: color, size: 17),
+          child: HugeIcon(icon: icon, color: color, size: 18),
         ),
         const SizedBox(width: 10),
         Expanded(

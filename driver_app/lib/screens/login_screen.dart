@@ -270,7 +270,7 @@ class _LoginHeroState extends State<_LoginHero>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const HugeIcon(icon: HugeIcons.strokeRoundedFlash, size: 15, color: Colors.white),
+                          const HugeIcon(icon: HugeIcons.strokeRoundedFlash, size: 16, color: Colors.white),
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(

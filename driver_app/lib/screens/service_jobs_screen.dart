@@ -226,7 +226,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                HugeIcon(icon: isReturn ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowUp01, size: 12, color: accent),
+                HugeIcon(icon: isReturn ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowUp01, size: 14, color: accent),
                 const SizedBox(width: 4),
                 Text(isReturn ? 'ANTAR BALIK + COD' : 'JEMPUT BARANG', style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.bold)),
               ]),

@@ -452,7 +452,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         color: KuwrirColors.error.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(11),
                       ),
-                      child: HugeIcon(icon: HugeIcons.strokeRoundedMoneyNotFound01, color: KuwrirColors.error, size: 19),
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedMoneyNotFound01, color: KuwrirColors.error, size: 18),
                     ),
                     const SizedBox(width: 12),
                     Text('Cash to Deposit',

@@ -520,7 +520,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   children: [
                     HugeIcon(
                       icon: HugeIcons.strokeRoundedPaymentSuccess01,
-                      size: 15,
+                      size: 16,
                       color: KuwrirColors.warning,
                     ),
                     const SizedBox(width: 6),
@@ -1006,7 +1006,7 @@ class _AddressRow extends StatelessWidget {
             color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: HugeIcon(icon: icon, color: iconColor, size: 17),
+          child: HugeIcon(icon: icon, color: iconColor, size: 18),
         ),
         const SizedBox(width: 10),
         Expanded(
