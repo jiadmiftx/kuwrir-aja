@@ -637,7 +637,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                   ),
                 ),
                 const Spacer(),
-                TextButton.icon(
+                TextButton(
                   onPressed: () async {
                     await Navigator.push(
                       context,
@@ -653,11 +653,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       context.read<JobBoardCubit>().loadJobs();
                     }
                   },
-                  icon: const HugeIcon(
-                    icon: HugeIcons.strokeRoundedMaps,
-                    size: 16,
-                  ),
-                  label: const Text(
+                  child: const Text(
                     'Lihat Detail',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
