@@ -300,6 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     trailing: HugeIcon(
                       icon: HugeIcons.strokeRoundedArrowRight01,
+                      size: 18,
                       color: KuwrirColors.textHint,
                     ),
                     onTap: () => Navigator.pushNamed(context, '/wallet'),
@@ -311,7 +312,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    leading: HugeIcon(icon: HugeIcons.strokeRoundedLogout01, color: KuwrirColors.error),
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedLogout01,
+                        size: 18,
+                        color: KuwrirColors.error,
+                      ),
+                    ),
                     title: Text(
                       'Keluar',
                       style: TextStyle(
@@ -328,9 +341,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    leading: HugeIcon(
-                      icon: HugeIcons.strokeRoundedDelete02,
-                      color: KuwrirColors.error,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: KuwrirColors.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedDelete02,
+                        size: 18,
+                        color: KuwrirColors.error,
+                      ),
                     ),
                     title: Text(
                       'Hapus Akun',
