@@ -56,9 +56,19 @@ func InitFCM() {
 	})
 }
 
-// SendToUser sends a push notification to a user via their stored FCM token.
-// Silently no-ops if the user has no token or FCM is not initialized.
+// SendToUser sends a push notification to a user via their stored FCM token,
+// and always persists a Notification row first — regardless of whether FCM
+// is initialized or the user has a live token — so a missed/dismissed push
+// (or a stale token) doesn't mean the notification is gone for good; it's
+// still readable later via GET /me/notifications.
 func SendToUser(db *gorm.DB, userID uuid.UUID, title, body string, data map[string]string) {
+	db.Create(&model.Notification{
+		UserID: userID,
+		Title:  title,
+		Body:   body,
+		Type:   data["type"],
+	})
+
 	if fcmClient == nil {
 		log.Printf("FCM send skipped for user %s: fcmClient not initialized", userID)
 		return

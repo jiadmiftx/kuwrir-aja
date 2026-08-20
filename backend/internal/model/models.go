@@ -917,6 +917,21 @@ type SupportMessage struct {
 	IsRead     bool      `gorm:"default:false" json:"is_read"`
 }
 
+// Notification is a persisted record of every push service.SendToUser sends
+// — written regardless of whether the FCM send itself succeeds, so a user
+// with a stale/empty token (or who just dismissed the push) can still see
+// it later in-app instead of losing it entirely. Not written by
+// SendAlarmToUser (the merchant full-screen order alarm) — that's a wake
+// signal, not a "thing to read later."
+type Notification struct {
+	Base
+	UserID uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	Title  string    `json:"title"`
+	Body   string    `json:"body"`
+	Type   string    `gorm:"type:varchar(30)" json:"type,omitempty"` // mirrors the "type" key already used in SendToUser's data map
+	IsRead bool      `gorm:"default:false" json:"is_read"`
+}
+
 // AuditLog records one mutating (non-GET) request from any authenticated
 // user, across every app/role — written by a global middleware, not by
 // individual handlers, so coverage doesn't depend on each feature

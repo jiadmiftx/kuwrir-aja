@@ -1357,6 +1357,7 @@ func (h *DriverOrderHandler) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		orders.GET("/available", h.AvailableOrders)
 		orders.GET("/current", h.CurrentDelivery)
+		orders.GET("/history", h.DeliveryHistory)
 		orders.POST("/:id/accept", h.AcceptDelivery)
 		orders.POST("/:id/pickup", h.MarkPickedUp)
 		orders.POST("/:id/deliver", h.MarkDelivered)
@@ -1547,6 +1548,26 @@ func (h *DriverOrderHandler) CurrentDelivery(c *gin.Context) {
 		Where("driver_id = ? AND accepted_at IS NOT NULL AND status IN ?",
 			driver.ID, []model.OrderStatus{model.OrderStatusReady, model.OrderStatusPickedUp}).
 		Order("accepted_at DESC").Find(&orders)
+
+	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// DeliveryHistory returns this driver's completed deliveries, most recent
+// first — capped at 100 rather than fully paginated since delivery volume
+// at this platform's scale doesn't need it yet.
+func (h *DriverOrderHandler) DeliveryHistory(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var driver model.Driver
+	if err := h.db.Where("user_id = ?", userID).First(&driver).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver profile not found"})
+		return
+	}
+
+	var orders []model.Order
+	h.db.Preload("Merchant").
+		Where("driver_id = ? AND status = ?", driver.ID, model.OrderStatusDelivered).
+		Order("delivered_at DESC").Limit(100).Find(&orders)
 
 	c.JSON(http.StatusOK, gin.H{"orders": orders})
 }

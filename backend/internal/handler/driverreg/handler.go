@@ -147,7 +147,10 @@ func (h *Handler) SubmitApplication(c *gin.Context) {
 	})
 }
 
-// GetApplicationStatus returns the current driver's application + is_active flag.
+// GetApplicationStatus returns the current driver's application, is_active
+// flag, and (once approved — see Driver row existing) their rating/delivery
+// stats, so driver_app's stats screen can reuse this one call instead of a
+// dedicated endpoint.
 func (h *Handler) GetApplicationStatus(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -163,10 +166,17 @@ func (h *Handler) GetApplicationStatus(c *gin.Context) {
 	var user model.User
 	h.db.First(&user, "id = ?", userID)
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"application": app,
 		"is_active":   user.IsActive,
-	})
+	}
+	var driver model.Driver
+	if h.db.Where("user_id = ?", userID).First(&driver).Error == nil {
+		resp["rating"] = driver.Rating
+		resp["total_delivered"] = driver.TotalDelivered
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // PreviewAgreement renders the partnership agreement with the driver's own

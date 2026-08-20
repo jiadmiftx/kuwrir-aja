@@ -832,6 +832,13 @@ class ApiClient {
     return await post('/driver-orders/$orderId/deliver', {});
   }
 
+  /// Completed deliveries, most recent first — capped server-side at 100.
+  Future<List<Map<String, dynamic>>> getDriverDeliveryHistory() async {
+    final data = await get('/driver-orders/history');
+    final list = data['orders'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
   Future<Map<String, dynamic>> getDriverWallet() async {
     return await get('/driver/wallet');
   }
@@ -1055,6 +1062,19 @@ class ApiClient {
     await put('/auth/device-token', {'token': token});
   }
 
+  /// Persisted history of every push service.SendToUser has sent this user
+  /// (backend/internal/handler/notification) — role-agnostic, works for
+  /// any authenticated app.
+  Future<List<Map<String, dynamic>>> getMyNotifications() async {
+    final data = await get('/me/notifications');
+    final list = data['notifications'] as List<dynamic>? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    await post('/me/notifications/$id/read', {});
+  }
+
   // --- Support Chat ---
 
   Future<List<SupportMessage>> getSupportMessages() async {
@@ -1067,6 +1087,20 @@ class ApiClient {
 
   Future<void> sendSupportMessage(String text) async {
     await post('/support/messages', {'text': text});
+  }
+
+  // Driver support chat — same shape as customer's, distinct path
+  // (backend/internal/handler/support/handler.go RegisterDriverRoutes).
+  Future<List<SupportMessage>> getDriverSupportMessages() async {
+    final data = await get('/driver/support/messages');
+    final list = data['messages'] as List? ?? [];
+    return list
+        .map((m) => SupportMessage.fromJson(m as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> sendDriverSupportMessage(String text) async {
+    await post('/driver/support/messages', {'text': text});
   }
 
   // Admin support

@@ -28,6 +28,7 @@ import (
 	serviceHandler "github.com/kuwrir-platform/backend/internal/handler/service"
 	supportHandler "github.com/kuwrir-platform/backend/internal/handler/support"
 	bankaccountHandler "github.com/kuwrir-platform/backend/internal/handler/bankaccount"
+	notificationHandler "github.com/kuwrir-platform/backend/internal/handler/notification"
 	customerwalletHandler "github.com/kuwrir-platform/backend/internal/handler/customerwallet"
 	walletHandler "github.com/kuwrir-platform/backend/internal/handler/wallet"
 	"github.com/kuwrir-platform/backend/internal/middleware"
@@ -105,6 +106,7 @@ func main() {
 		&model.ChatMessage{},
 		// Customer ↔ Admin support chat
 		&model.SupportMessage{},
+		&model.Notification{},
 		// Audit trail
 		&model.AuditLog{},
 	); err != nil {
@@ -297,6 +299,7 @@ func main() {
 			driverRoutes := protected.Group("")
 			driverRoutes.Use(middleware.RoleMiddleware("driver"))
 			driverOrderH.RegisterRoutes(driverRoutes)
+			supportH.RegisterDriverRoutes(driverRoutes)
 
 			// Payment (webhook public, create needs customer auth)
 			payH := paymentHandler.NewHandler(db, cfg)
@@ -317,6 +320,11 @@ func main() {
 			// register the same literal path multiple times and panic.
 			bankH := bankaccountHandler.NewHandler(db)
 			bankH.RegisterRoutes(protected)
+
+			// Persisted notification history (see service.SendToUser) — same
+			// role-agnostic, mount-once-on-protected shape as bankaccount above.
+			notifH := notificationHandler.NewHandler(db)
+			notifH.RegisterRoutes(protected)
 		}
 	}
 

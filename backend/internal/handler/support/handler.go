@@ -26,6 +26,18 @@ func (h *Handler) RegisterCustomerRoutes(r *gin.RouterGroup) {
 	r.GET("/support/messages/stream", h.StreamSupportMessages)
 }
 
+// RegisterDriverRoutes mirrors RegisterCustomerRoutes on a distinct
+// /driver/support/... path (not reusing /support/messages — avoids a route
+// collision with the customer registration and matches this codebase's
+// /driver/... prefix convention for driver-specific endpoints).
+// GetMyMessages/StreamSupportMessages are reused unchanged since they're
+// already scoped only by the JWT's user_id, not hardcoded to any role.
+func (h *Handler) RegisterDriverRoutes(r *gin.RouterGroup) {
+	r.GET("/driver/support/messages", h.GetMyMessages)
+	r.POST("/driver/support/messages", h.SendDriverMessage)
+	r.GET("/driver/support/messages/stream", h.StreamSupportMessages)
+}
+
 func (h *Handler) RegisterAdminRoutes(r *gin.RouterGroup) {
 	r.GET("/support/users", h.ListSupportUsers)
 	r.GET("/support/users/:userId/messages", h.GetUserMessages)
@@ -136,12 +148,53 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
+// POST /driver/support/messages — driver sends a message to admin. Same
+// shape as SendMessage, just a distinct sender_role and push title so admin
+// can tell driver threads apart from customer ones at a glance.
+func (h *Handler) SendDriverMessage(c *gin.Context) {
+	userIDStr := c.GetString("user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user"})
+		return
+	}
+
+	var req sendMsgRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	msg := model.SupportMessage{
+		UserID:     userID,
+		SenderRole: "driver",
+		Text:       req.Text,
+	}
+	if err := h.db.Create(&msg).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message"})
+		return
+	}
+	service.PublishSupportEvent(userID.String())
+
+	var admins []model.User
+	h.db.Where("role = ? AND fcm_token != ''", "admin").Find(&admins)
+	for _, admin := range admins {
+		service.SendToUser(h.db, admin.ID, "Pesan Support Baru (Driver)", req.Text, map[string]string{
+			"type":    "support",
+			"user_id": userID.String(),
+		})
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
 // GET /admin/support/users — list users who have support messages
 func (h *Handler) ListSupportUsers(c *gin.Context) {
 	type userRow struct {
 		UserID      string `json:"user_id"`
 		Name        string `json:"name"`
 		Phone       string `json:"phone"`
+		Role        string `json:"role"`
 		UnreadCount int64  `json:"unread_count"`
 		LastMessage string `json:"last_message"`
 	}
@@ -152,11 +205,12 @@ func (h *Handler) ListSupportUsers(c *gin.Context) {
 			sm.user_id::text,
 			u.name,
 			u.phone,
-			COUNT(CASE WHEN sm.sender_role = 'customer' AND sm.is_read = false THEN 1 END) AS unread_count,
+			u.role,
+			COUNT(CASE WHEN sm.sender_role != 'admin' AND sm.is_read = false THEN 1 END) AS unread_count,
 			(SELECT text FROM support_messages WHERE user_id = sm.user_id ORDER BY created_at DESC LIMIT 1) AS last_message
 		FROM support_messages sm
 		JOIN users u ON u.id = sm.user_id
-		GROUP BY sm.user_id, u.name, u.phone
+		GROUP BY sm.user_id, u.name, u.phone, u.role
 		ORDER BY MAX(sm.created_at) DESC
 	`).Scan(&rows)
 
@@ -178,9 +232,11 @@ func (h *Handler) GetUserMessages(c *gin.Context) {
 		return
 	}
 
-	// Mark customer messages as read (admin has seen them)
+	// Mark the other party's messages as read (admin has seen them) — any
+	// non-admin sender_role, not just "customer", so driver threads flip
+	// read state correctly too.
 	h.db.Model(&model.SupportMessage{}).
-		Where("user_id = ? AND sender_role = ? AND is_read = false", userID, "customer").
+		Where("user_id = ? AND sender_role != ? AND is_read = false", userID, "admin").
 		Update("is_read", true)
 
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})

@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../cubits/active_delivery_cubit.dart';
 import '../widgets/open_in_maps_button.dart';
+import '../widgets/whatsapp_launcher.dart';
 import 'chat_screen.dart';
 
 /// Detail view for one order — reached via "Lihat Detail" from the job
@@ -264,6 +265,18 @@ class ActiveDeliveryScreen extends StatelessWidget {
                     color: KuwrirColors.info,
                     label: receiverName,
                     sub: receiverPhone,
+                    trailing: receiverPhone.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Chat WhatsApp',
+                            onPressed: () =>
+                                openWhatsApp(context, receiverPhone),
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedWhatsapp,
+                              color: KuwrirColors.success,
+                              size: 22,
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 10),
                   _InfoRow(
@@ -487,12 +500,14 @@ class _InfoRow extends StatelessWidget {
   final Color color;
   final String label;
   final String sub;
+  final Widget? trailing;
 
   const _InfoRow({
     required this.icon,
     required this.color,
     required this.label,
     required this.sub,
+    this.trailing,
   });
 
   @override
@@ -533,6 +548,7 @@ class _InfoRow extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) trailing!,
       ],
     );
   }

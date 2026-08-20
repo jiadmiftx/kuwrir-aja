@@ -7,6 +7,7 @@ import '../cubits/job_board_cubit.dart';
 import '../cubits/active_delivery_cubit.dart';
 import '../services/location_service.dart';
 import '../widgets/open_in_maps_button.dart';
+import '../widgets/whatsapp_launcher.dart';
 import 'active_delivery_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
@@ -424,6 +425,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
     final pickupAddress = order['pickup_address'] as String? ?? '';
     final dropoffAddress = order['dropoff_address'] as String? ?? '';
     final receiverName = order['receiver_name'] as String? ?? '';
+    final receiverPhone = order['receiver_phone'] as String? ?? '';
     final driverEarning = (order['driver_earning'] as num?)?.toDouble() ?? 0;
     final total = (order['total'] as num?)?.toDouble() ?? 0;
     final paymentType = order['payment_type'] as String? ?? 'cash';
@@ -470,7 +472,9 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 HugeIcon(
-                  icon: isPickedUp ? HugeIcons.strokeRoundedUser : HugeIcons.strokeRoundedStore01,
+                  icon: isPickedUp
+                      ? HugeIcons.strokeRoundedUser
+                      : HugeIcons.strokeRoundedStore01,
                   size: 16,
                   color: isPickedUp ? KuwrirColors.error : KuwrirColors.warning,
                 ),
@@ -502,6 +506,16 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                     ],
                   ),
                 ),
+                if (isPickedUp && receiverPhone.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Chat WhatsApp',
+                    onPressed: () => openWhatsApp(context, receiverPhone),
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedWhatsapp,
+                      color: KuwrirColors.success,
+                      size: 20,
+                    ),
+                  ),
               ],
             ),
 
@@ -604,7 +618,10 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
                       context.read<JobBoardCubit>().loadJobs();
                     }
                   },
-                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedMaps, size: 16),
+                  icon: const HugeIcon(
+                    icon: HugeIcons.strokeRoundedMaps,
+                    size: 16,
+                  ),
                   label: const Text(
                     'Lihat Detail',
                     style: TextStyle(fontWeight: FontWeight.w700),
