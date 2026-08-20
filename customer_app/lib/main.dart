@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -263,7 +262,7 @@ class _CustomerHomeState extends State<CustomerHome> {
         index: _idx,
         children: const [
           HomeScreen(),
-          _PromoScreen(),
+          CartScreen(),
           _OrdersScreen(),
           _ChatListScreen(),
         ],
@@ -271,7 +270,7 @@ class _CustomerHomeState extends State<CustomerHome> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) async {
-          // Orders (2) and Chat (3) require a session; Home/Promo stay
+          // Orders (2) and Chat (3) require a session; Home/Cart stay
           // browsable for guests.
           if ((i == 2 || i == 3) && !await ensureLoggedIn(context)) return;
           if (mounted) setState(() => _idx = i);
@@ -282,10 +281,12 @@ class _CustomerHomeState extends State<CustomerHome> {
             selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedHome01),
             label: 'Beranda',
           ),
-          const NavigationDestination(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
-            selectedIcon: HugeIcon(icon: HugeIcons.strokeRoundedDiscountTag01),
-            label: 'Promo',
+          NavigationDestination(
+            icon: _CartTabIcon(icon: HugeIcons.strokeRoundedShoppingBag02),
+            selectedIcon: _CartTabIcon(
+              icon: HugeIcons.strokeRoundedShoppingBag02,
+            ),
+            label: 'Keranjang',
           ),
           const NavigationDestination(
             icon: HugeIcon(icon: HugeIcons.strokeRoundedInvoice01),
@@ -297,6 +298,33 @@ class _CustomerHomeState extends State<CustomerHome> {
             selectedIcon: _ChatTabIcon(icon: HugeIcons.strokeRoundedChat01),
             label: 'Chat',
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cart tab icon with an item-count badge, so the tab itself signals "you
+/// have stuff in here" the same way the Chat tab signals unread messages —
+/// without this the only other cart-contents hint was the floating cart
+/// button, which only appears on Home/Search/store pages.
+class _CartTabIcon extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  const _CartTabIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CartCubit, CartState>(
+      builder: (context, cart) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          HugeIcon(icon: icon),
+          if (cart.totalQuantity > 0)
+            Positioned(
+              right: -6,
+              top: -4,
+              child: UnreadBadge(count: cart.totalQuantity),
+            ),
         ],
       ),
     );
@@ -937,329 +965,6 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         _label,
         style: TextStyle(fontSize: 10.5, color: c, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
-class _PromoScreen extends StatefulWidget {
-  const _PromoScreen();
-
-  @override
-  State<_PromoScreen> createState() => _PromoScreenState();
-}
-
-class _PromoScreenState extends State<_PromoScreen> {
-  late Future<List<Promotion>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = ApiClient().getActivePromotions();
-  }
-
-  Future<void> _refresh() async {
-    final future = ApiClient().getActivePromotions();
-    setState(() {
-      _future = future;
-    });
-    await future;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: KuwrirColors.background,
-      appBar: AppBar(
-        title: const Text('Promo'),
-        backgroundColor: KuwrirColors.background,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: KuwrirColors.primary,
-        child: FutureBuilder<List<Promotion>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final promos = snapshot.data ?? const [];
-            if (promos.isEmpty) {
-              return LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: _EmptyState(
-                      icon: HugeIcons.strokeRoundedDiscountTag01,
-                      title: 'Belum ada promo aktif',
-                      subtitle: 'Pantau terus untuk penawaran terbaik',
-                    ),
-                  ),
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              itemCount: promos.length,
-              itemBuilder: (context, i) => _PromoCard(promo: promos[i]),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// Per-type accent + icon so a promo reads at a glance without parsing the
-/// title text — percentage/fixed/free-delivery each get their own personality
-/// instead of one flat green treatment for every card.
-class _PromoStyle {
-  final Color color;
-  final List<List<dynamic>> icon;
-  const _PromoStyle(this.color, this.icon);
-}
-
-_PromoStyle _promoStyle(String type) {
-  switch (type) {
-    case 'fixed':
-      return const _PromoStyle(
-        KuwrirColors.accent,
-        HugeIcons.strokeRoundedSavings,
-      );
-    case 'free_delivery':
-      return const _PromoStyle(
-        KuwrirColors.warning,
-        HugeIcons.strokeRoundedDeliveryBox01,
-      );
-    default:
-      return const _PromoStyle(
-        KuwrirColors.primary,
-        HugeIcons.strokeRoundedPercent,
-      );
-  }
-}
-
-class _PromoCard extends StatelessWidget {
-  final Promotion promo;
-  const _PromoCard({required this.promo});
-
-  String get _valueLabel {
-    switch (promo.type) {
-      case 'percentage':
-        return 'Diskon ${promo.value.toStringAsFixed(0)}%';
-      case 'fixed':
-        return 'Potongan Rp ${_fmt(promo.value)}';
-      case 'free_delivery':
-        return 'Gratis Ongkir';
-      default:
-        return promo.title;
-    }
-  }
-
-  String _fmt(double v) => v
-      .toStringAsFixed(0)
-      .replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
-
-  Future<void> _copyCode(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: promo.code));
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Kode ${promo.code} disalin'),
-          backgroundColor: KuwrirColors.primaryDark,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final style = _promoStyle(promo.type);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: KuwrirColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: KuwrirColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: KuwrirColors.textPrimary.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (promo.imageUrl != null)
-            Image.network(
-              promo.imageUrl!,
-              height: 132,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _PromoHeroFallback(style: style),
-            )
-          else
-            _PromoHeroFallback(style: style),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _valueLabel,
-                  style: TextStyle(
-                    fontSize: 17.5,
-                    fontWeight: FontWeight.w800,
-                    color: style.color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  promo.title,
-                  style: TextStyle(
-                    color: KuwrirColors.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-                if (promo.minOrder > 0 ||
-                    (promo.type == 'percentage' && promo.maxDiscount > 0)) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      if (promo.minOrder > 0)
-                        _PromoInfoChip(
-                          text: 'Min. belanja Rp ${_fmt(promo.minOrder)}',
-                        ),
-                      if (promo.type == 'percentage' && promo.maxDiscount > 0)
-                        _PromoInfoChip(
-                          text: 'Maks. Rp ${_fmt(promo.maxDiscount)}',
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 14),
-                InkWell(
-                  onTap: () => _copyCode(context),
-                  borderRadius: BorderRadius.circular(12),
-                  child: DottedCodeChip(code: promo.code, color: style.color),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PromoInfoChip extends StatelessWidget {
-  final String text;
-  const _PromoInfoChip({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: KuwrirColors.background,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: KuwrirColors.border),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          color: KuwrirColors.textSecondary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-/// A coupon-style code pill with a dashed border, doubling as the tap
-/// target to copy the code — makes "Salin Kode" a real affordance instead
-/// of a static label.
-class DottedCodeChip extends StatelessWidget {
-  final String code;
-  final Color color;
-  const DottedCodeChip({super.key, required this.code, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedTicket01,
-            size: 16,
-            color: color,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              code,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: color,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedCopy01,
-            size: 15,
-            color: color.withValues(alpha: 0.7),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PromoHeroFallback extends StatelessWidget {
-  final _PromoStyle style;
-  const _PromoHeroFallback({required this.style});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 92,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            style.color.withValues(alpha: 0.16),
-            style.color.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: HugeIcon(icon: style.icon, size: 34, color: style.color),
       ),
     );
   }
