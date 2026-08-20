@@ -243,6 +243,16 @@ export interface SupportMessage {
   created_at: string;
 }
 
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  type?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
 export interface Wallet {
   id: string;
   user_id: string;

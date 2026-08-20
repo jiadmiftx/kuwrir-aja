@@ -6,6 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon, LocationOffline01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { MerchantCard } from "@/components/MerchantCard";
+import { NotificationBell } from "@/components/NotificationBell";
 import { ProductCard } from "@/components/ProductCard";
 import { useGeolocation } from "@/lib/hooks/useGeolocation";
 import {
@@ -38,11 +39,14 @@ function HomeContent() {
 
   return (
     <div className="mx-auto max-w-(--content-width) px-4 pb-6 md:px-8">
-      <header className="pt-5 md:pt-8">
-        <p className="text-sm text-(--color-ink-faint)">Halo{user ? `, ${user.name || "kamu"}` : ""}</p>
-        <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-(--color-ink) md:text-2xl">
-          Mau pesan apa hari ini?
-        </h1>
+      <header className="flex items-start justify-between pt-5 md:pt-8">
+        <div>
+          <p className="text-sm text-(--color-ink-faint)">Halo{user ? `, ${user.name || "kamu"}` : ""}</p>
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-(--color-ink) md:text-2xl">
+            Mau pesan apa hari ini?
+          </h1>
+        </div>
+        <NotificationBell className="mt-1 h-10 w-10 shrink-0 rounded-full border border-(--color-border) bg-(--color-surface-raised) text-(--color-ink-soft) md:hidden" />
       </header>
 
       <Link

@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
   Address,
+  AppNotification,
   AuthResponse,
   Banner,
   ChatMessage,
@@ -142,6 +143,15 @@ export const createPayment = (orderId: string, paymentMethod: string, email?: st
 export const getSupportMessages = () => apiFetch<{ messages: SupportMessage[] }>("/support/messages");
 export const sendSupportMessage = (text: string) =>
   apiFetch<{ message: SupportMessage }>("/support/messages", { method: "POST", body: { text } });
+
+// --- Notifications ---
+// Server-persisted history of every push service.SendToUser has sent this
+// user (see backend/internal/handler/notification) — unlike customer_app's
+// on-device SharedPreferences cache, this survives across browsers/devices
+// and doesn't depend on the push having actually been delivered locally.
+export const getMyNotifications = () => apiFetch<{ notifications: AppNotification[] }>("/me/notifications");
+export const markNotificationRead = (id: string) =>
+  apiFetch<{ message: string }>(`/me/notifications/${id}/read`, { method: "POST" });
 
 // --- Wallet ---
 export const getWallet = () => apiFetch<{ wallet: Wallet }>("/customer/wallet");

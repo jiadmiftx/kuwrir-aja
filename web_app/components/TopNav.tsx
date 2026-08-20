@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Home01Icon, Search01Icon, ShoppingBag02Icon, Invoice01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { useCartStore, cartItemCount } from "@/lib/stores/cart";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const LINKS = [
   { href: "/", label: "Beranda", icon: Home01Icon },
@@ -45,6 +46,7 @@ export function TopNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <NotificationBell className="h-9 w-9 rounded-full text-(--color-ink-soft) transition-colors hover:bg-(--color-border-soft)" />
           <Link
             href="/cart"
             className="relative flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-(--color-ink-soft) transition-colors hover:bg-(--color-border-soft)"
