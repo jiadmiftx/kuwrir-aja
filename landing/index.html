@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <meta name="theme-color" content="#0a2e1e">
+  <link rel="canonical" href="https://cocourir.com/">
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://cocourir.com/">
@@ -353,6 +354,37 @@
       align-self: stretch;
     }
 
+    /* ── App CTA (buka di browser / install ke homescreen) ──── */
+    .app-cta {
+      padding: clamp(4rem, 8vw, 6rem) 1rem;
+      background: var(--g50);
+      text-align: center;
+    }
+    .app-cta .section-title, .app-cta .section-sub { margin-inline: auto; }
+    .install-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      max-width: 760px;
+      margin: 0 auto 2.5rem;
+      text-align: left;
+    }
+    .install-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-card);
+    }
+    .install-icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+    .install-card h3 { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.9rem; }
+    .install-card ol { padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .install-card li { font-size: 0.9rem; color: var(--ink-mid); line-height: 1.55; }
+    .install-card strong { color: var(--ink); }
+    .app-cta-btn { display: inline-flex; }
+    @media (max-width: 640px) {
+      .install-grid { grid-template-columns: 1fr; }
+    }
+
     /* ── How it works ─────────────────────────────────────── */
     .how {
       padding: clamp(5rem, 10vw, 8rem) 1rem;
@@ -382,16 +414,17 @@
     }
     .steps {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 2px;
       position: relative;
+      max-width: 760px;
     }
     .steps::before {
       content: '';
       position: absolute;
       top: 52px;
-      left: calc(16.67% + 24px);
-      right: calc(16.67% + 24px);
+      left: calc(25% + 26px);
+      right: calc(25% + 26px);
       height: 2px;
       background: linear-gradient(90deg, var(--g400), var(--g600), var(--g400));
       z-index: 0;
@@ -418,8 +451,7 @@
       margin-bottom: 1.5rem;
       position: relative;
     }
-    .step:nth-child(2) .step-num { background: var(--g500); }
-    .step:nth-child(3) .step-num { background: var(--amber); color: var(--g950); }
+    .step:nth-child(2) .step-num { background: var(--amber); color: var(--g950); }
     .step h3 {
       font-size: 1.2rem;
       font-weight: 800;
@@ -439,7 +471,7 @@
       padding: 0.25rem 0.75rem;
       border-radius: 100px;
     }
-    .step:nth-child(3) .step-role { color: var(--amber-d); background: oklch(0.96 0.06 74); }
+    .step:nth-child(2) .step-role { color: var(--amber-d); background: oklch(0.96 0.06 74); }
 
     /* ── Food showcase ────────────────────────────────────── */
     .food {
@@ -718,77 +750,6 @@
       box-shadow: 0 6px 28px var(--g700) / 0.40;
     }
 
-    /* ── CTA Driver ───────────────────────────────────────── */
-    .cta-driver {
-      background: var(--g950);
-      padding: clamp(5rem, 10vw, 8rem) 1rem;
-      color: #fff;
-    }
-    .cta-driver .section-label { color: var(--g400); }
-    .cta-driver .section-title { color: #fff; }
-    .cta-driver .section-sub { color: oklch(1 0 0 / 0.65); }
-    .driver-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-      align-items: center;
-    }
-    .driver-earning-card {
-      background: var(--g900);
-      border-radius: var(--radius-xl);
-      padding: 2.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .driver-earning-card::before {
-      content: '';
-      position: absolute;
-      top: -60px; right: -60px;
-      width: 200px; height: 200px;
-      border-radius: 50%;
-      background: var(--g700);
-      opacity: 0.3;
-    }
-    .earning-label { font-size: 0.83rem; color: oklch(1 0 0 / 0.55); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.5rem; }
-    .earning-big { font-size: 3.8rem; font-weight: 800; letter-spacing: -0.06em; color: var(--amber); line-height: 1; margin-bottom: 0.5rem; }
-    .earning-sub { font-size: 0.9rem; color: oklch(1 0 0 / 0.60); margin-bottom: 2rem; }
-    .earning-breakdown {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .breakdown-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      background: oklch(1 0 0 / 0.06);
-      border-radius: var(--radius-sm);
-      font-size: 0.9rem;
-    }
-    .breakdown-row span { color: oklch(1 0 0 / 0.70); }
-    .breakdown-row strong { color: var(--amber); font-weight: 800; }
-    .breakdown-row.total-row { background: var(--amber); }
-    .breakdown-row.total-row span, .breakdown-row.total-row strong { color: var(--g950); }
-    .driver-perks { margin-top: 2rem; }
-    .driver-perk {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-      padding: 1rem 0;
-      border-bottom: 1px solid oklch(1 0 0 / 0.08);
-    }
-    .driver-perk:last-child { border-bottom: none; }
-    .driver-perk-icon { font-size: 1.4rem; }
-    .driver-perk h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .driver-perk p { font-size: 0.87rem; color: oklch(1 0 0 / 0.60); }
-    .cta-driver .btn-green {
-      background: var(--amber);
-      color: var(--g950);
-      box-shadow: 0 4px 20px var(--amber) / 0.35;
-    }
-    .cta-driver .btn-green:hover { background: oklch(0.82 0.14 76); }
-
     /* ── Footer ───────────────────────────────────────────── */
     .footer {
       background: oklch(0.14 0.04 148);
@@ -857,7 +818,7 @@
       .tab-panel.active { grid-template-columns: 1fr; }
       .food-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
       .food-cell:first-child { grid-row: auto; grid-column: 1 / -1; aspect-ratio: 16/7; }
-      .cta-split, .driver-split { grid-template-columns: 1fr; }
+      .cta-split { grid-template-columns: 1fr; }
       .footer-grid { grid-template-columns: 1fr 1fr; }
       .comp-table th, .comp-table td { padding: 0.75rem 1rem; }
     }
@@ -885,10 +846,9 @@
     <ul class="nav-links" role="list">
       <li><a href="#how">Cara Kerja</a></li>
       <li><a href="#benefits">Keunggulan</a></li>
-      <li><a href="#merchant">Buka Toko</a></li>
-      <li><a href="#driver">Jadi Driver</a></li>
+      <li><a href="merchant.html">Untuk Merchant</a></li>
     </ul>
-    <a href="#merchant" class="btn-nav">Daftar Gratis</a>
+    <a href="#app" class="btn-nav">Buka Aplikasi</a>
   </div>
 </nav>
 
@@ -908,8 +868,8 @@
       Sekarang pesan dari resto atau warung makan kesukaanmu tinggal sekali tap. Ongkir flat Rp 10.000, tidak surge, tanpa biaya tersembunyi. Beneran adil, dari dan untuk warga Lombok.
     </p>
     <div class="hero-actions">
-      <a href="#food" class="btn-primary">Lihat Menu Sekitar</a>
-      <a href="#merchant" class="btn-outline">Buka Toko Gratis</a>
+      <a href="#app" class="btn-primary">Buka Cocourir Sekarang</a>
+      <a href="#how" class="btn-outline">Lihat Cara Kerja</a>
     </div>
   </div>
   <div class="hero-right">
@@ -922,13 +882,46 @@
       >
       <div class="hero-badge badge-1" aria-hidden="true">
         <div class="badge-dot"></div>
-        <span>Driver aktif di sekitarmu</span>
+        <span>Langsung dari browser, tanpa app store</span>
       </div>
       <div class="hero-badge badge-2" aria-hidden="true">
         <div class="badge-dot amber"></div>
         <span>Ongkir Rp 10rb, tidak surge</span>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ── Buka di Browser / Install ke Homescreen ──────────────── -->
+<section class="app-cta" id="app" aria-labelledby="app-heading">
+  <div class="container">
+    <p class="section-label reveal">Buka di Browser</p>
+    <h2 class="section-title reveal" id="app-heading">Coba Cocourir langsung dari browser,<br>tanpa install dari store</h2>
+    <p class="section-sub reveal">Buka <strong>app.cocourir.com</strong>, pesan seperti biasa, lalu simpan ke layar utama HP kamu — rasanya seperti aplikasi asli, tanpa harus antre download dari Play Store atau App Store.</p>
+    <div class="install-grid">
+      <article class="install-card reveal">
+        <div class="install-icon" aria-hidden="true">📱</div>
+        <h3>iPhone (Safari)</h3>
+        <ol>
+          <li>Buka <strong>app.cocourir.com</strong> di Safari</li>
+          <li>Ketuk ikon <strong>Bagikan</strong> (kotak dengan panah ke atas)</li>
+          <li>Pilih <strong>"Tambah ke Layar Utama"</strong></li>
+        </ol>
+      </article>
+      <article class="install-card reveal" style="transition-delay: 0.1s">
+        <div class="install-icon" aria-hidden="true">🤖</div>
+        <h3>Android (Chrome)</h3>
+        <ol>
+          <li>Buka <strong>app.cocourir.com</strong> di Chrome</li>
+          <li>Ketuk menu titik tiga di pojok kanan atas</li>
+          <li>Pilih <strong>"Install app"</strong> / <strong>"Tambahkan ke layar Utama"</strong></li>
+        </ol>
+      </article>
+    </div>
+    <a href="https://app.cocourir.com" class="btn-primary app-cta-btn reveal">
+      Buka Cocourir Sekarang
+      <span aria-hidden="true">→</span>
+    </a>
   </div>
 </section>
 
@@ -961,7 +954,7 @@
 <section class="how" id="how" aria-labelledby="how-heading">
   <div class="container">
     <p class="section-label reveal">Cara Kerja</p>
-    <h2 class="section-title reveal" id="how-heading">Semudah tiga langkah</h2>
+    <h2 class="section-title reveal" id="how-heading">Semudah dua langkah</h2>
     <p class="section-sub reveal">Dari pilih menu sampai makanan di tangan kamu, semua berjalan mulus tanpa ribet.</p>
     <div class="steps">
       <article class="step reveal">
@@ -972,15 +965,9 @@
       </article>
       <article class="step reveal" style="transition-delay: 0.1s">
         <div class="step-num" aria-hidden="true">2</div>
-        <h3>Merchant Siapkan</h3>
-        <p>Merchant menerima pesananmu langsung di Merchant App. Dimasak segar, dikemas dengan baik, siap dijemput driver.</p>
-        <span class="step-role">Merchant</span>
-      </article>
-      <article class="step reveal" style="transition-delay: 0.2s">
-        <div class="step-num" aria-hidden="true">3</div>
-        <h3>Driver Antar ke Pintu</h3>
-        <p>Driver lokal menjemput dan mengantarkan pesananmu. Track real-time di app. Bayar tunai atau digital, terserah kamu.</p>
-        <span class="step-role">Driver Lokal</span>
+        <h3>Disiapkan & Diantar ke Pintumu</h3>
+        <p>Merchant menyiapkan pesananmu segar, lalu kurir kami antar langsung ke depan pintu. Pantau prosesnya real-time di app. Bayar tunai atau digital, terserah kamu.</p>
+        <span class="step-role">Merchant & Kurir</span>
       </article>
     </div>
   </div>
@@ -1042,12 +1029,11 @@
   <div class="container">
     <p class="section-label reveal">Keunggulan</p>
     <h2 class="section-title reveal" id="benefits-heading">Cocourir lebih adil<br>untuk semua pihak</h2>
-    <p class="section-sub reveal">Tidak ada pihak yang diperas. Merchant untung, driver untung, customer senang. Begitu harusnya platform lokal bekerja.</p>
+    <p class="section-sub reveal">Tidak ada pihak yang diperas. Merchant untung, customer senang. Begitu harusnya platform lokal bekerja.</p>
 
     <div class="benefit-tabs reveal" role="tablist" aria-label="Pilih tipe pengguna">
       <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-customer" onclick="switchTab('customer', this)">Customer</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-merchant" onclick="switchTab('merchant', this)">Merchant</button>
-      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-driver" onclick="switchTab('driver', this)">Driver</button>
     </div>
 
     <!-- Customer -->
@@ -1076,8 +1062,8 @@
       <article class="benefit-card">
         <div class="benefit-icon" aria-hidden="true">⚡</div>
         <div>
-          <h4>Driver Lokal, Cepat Datang</h4>
-          <p>Jaringan driver berbasis area. Tidak perlu nunggu driver dari ujung kota lain. Familiar dengan jalanan Lombok, lebih cepat sampai.</p>
+          <h4>Kurir Lokal, Cepat Sampai</h4>
+          <p>Jaringan kurir berbasis area. Tidak perlu nunggu kurir dari ujung kota lain. Familiar dengan jalanan Lombok, lebih cepat sampai.</p>
         </div>
       </article>
       <div class="benefit-highlight">
@@ -1128,44 +1114,6 @@
       </div>
     </div>
 
-    <!-- Driver -->
-    <div class="tab-panel" id="tab-driver" role="tabpanel">
-      <article class="benefit-card">
-        <div class="benefit-icon" aria-hidden="true">💸</div>
-        <div>
-          <h4>Pendapatan Jelas per Order</h4>
-          <p>Nominal yang kamu terima terlihat sebelum order diambil. Tidak ada potongan yang muncul tiba-tiba. Yang tertera, itu yang masuk ke walletmu.</p>
-        </div>
-      </article>
-      <article class="benefit-card">
-        <div class="benefit-icon" aria-hidden="true">🕐</div>
-        <div>
-          <h4>Tidak Ada Target Wajib</h4>
-          <p>Kerja kapan mau, ambil berapa order mau. Tidak ada hukuman kalau tidak capai target. Kamu yang atur waktumu sendiri.</p>
-        </div>
-      </article>
-      <article class="benefit-card">
-        <div class="benefit-icon" aria-hidden="true">⭐</div>
-        <div>
-          <h4>Poin & Bonus Transparan</h4>
-          <p>Kumpulkan poin dari setiap order, tukarkan jadi bonus tunai. Syaratnya jelas, bisa dicek kapan saja di app. Tidak ada kejutan.</p>
-        </div>
-      </article>
-      <article class="benefit-card">
-        <div class="benefit-icon" aria-hidden="true">🛡️</div>
-        <div>
-          <h4>Aturan Suspend yang Adil</h4>
-          <p>Suspend hanya dengan alasan yang jelas dan tertulis. Ada mekanisme banding 7 hari. Tidak aktif? Bisa reaktivasi dalam 1 hari kerja.</p>
-        </div>
-      </article>
-      <div class="benefit-highlight">
-        <div>
-          <strong>Bergabung sekarang:</strong>
-          <p>Driver Cocourir adalah yang pertama di Lombok. Bergabung lebih awal artinya kamu dapat lebih banyak order sebelum persaingan sesama driver tinggi.</p>
-        </div>
-        <div class="highlight-num">Awal<span style="font-size:1.5rem; color: oklch(1 0 0 / 0.50)"> = untung</span></div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -1205,11 +1153,6 @@
             <td>Biaya layanan / app fee</td>
             <td class="col-us"><span class="icon-check">✓</span> <strong>Tidak ada</strong></td>
             <td><span class="icon-x">✗</span> Rp 1.000–5.000 per order</td>
-          </tr>
-          <tr>
-            <td>Kejelasan & keadilan untuk driver</td>
-            <td class="col-us"><span class="icon-check">✓</span> <strong>Pendapatan transparan, tanpa target wajib</strong></td>
-            <td><span class="icon-x">✗</span> Sering baru jelas setelah order selesai, ada target maksa</td>
           </tr>
           <tr>
             <td>Respons dukungan</td>
@@ -1261,7 +1204,7 @@
         loading="lazy"
       >
       <div class="cta-body">
-        <p class="section-label reveal">Untuk Merchant</p>
+        <p class="section-label reveal">Punya Toko atau Warung?</p>
         <h2 class="section-title reveal" id="merchant-heading">Buka toko di Cocourir, jangkau lebih banyak pembeli</h2>
         <p class="section-sub reveal" style="margin-bottom: 0;">Tidak perlu naikkan harga untuk nutup komisi. Kamu jual dengan hargamu, kami yang bantu distribusikan.</p>
         <ul class="cta-perks reveal">
@@ -1279,63 +1222,9 @@
               <span>Harga yang kamu set = harga yang kamu terima. Penuh.</span>
             </div>
           </li>
-          <li class="perk">
-            <div class="perk-dot" aria-hidden="true">✓</div>
-            <div>
-              <strong>Merchant App yang mudah</strong>
-              <span>Kelola menu, terima order, dan tarik saldo dari genggaman tanganmu</span>
-            </div>
-          </li>
-          <li class="perk">
-            <div class="perk-dot" aria-hidden="true">✓</div>
-            <div>
-              <strong>Didukung tim lokal Lombok</strong>
-              <span>Ada masalah? Hubungi admin lokal yang ngerti kondisi di sini</span>
-            </div>
-          </li>
         </ul>
-        <a href="https://instagram.com/cocourir" class="btn-green reveal" target="_blank" rel="noopener noreferrer">
-          Hubungi Kami di Instagram
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── CTA Driver ────────────────────────────────────────────── -->
-<section class="cta-driver" id="driver" aria-labelledby="driver-heading">
-  <div class="container">
-    <div class="driver-split" style="grid-template-columns: 1fr; max-width: 680px;">
-      <div class="cta-body">
-        <p class="section-label reveal">Untuk Driver</p>
-        <h2 class="section-title reveal" id="driver-heading">Pendapatan jelas, tidak dipotong sembarangan</h2>
-        <p class="section-sub reveal" style="margin-bottom: 0;">Kamu tahu berapa yang didapat sebelum ambil order. Tidak ada target paksa. Tidak ada kejutan potongan aneh-aneh.</p>
-        <div class="driver-perks">
-          <div class="driver-perk reveal">
-            <div class="driver-perk-icon" aria-hidden="true">🏆</div>
-            <div>
-              <h4>Poin & Bonus Nyata</h4>
-              <p>Setiap order kamu poin. Kumpulkan, tukarkan jadi uang tunai. Ada bonus surge, bonus referral, bonus tier.</p>
-            </div>
-          </div>
-          <div class="driver-perk reveal" style="transition-delay: 0.1s">
-            <div class="driver-perk-icon" aria-hidden="true">🕐</div>
-            <div>
-              <h4>Bebas Atur Jadwal</h4>
-              <p>Online kapan mau, offline kapan mau. Tidak ada sistem poin kehadiran atau hukuman kalau tidak aktif sehari.</p>
-            </div>
-          </div>
-          <div class="driver-perk reveal" style="transition-delay: 0.2s">
-            <div class="driver-perk-icon" aria-hidden="true">🤝</div>
-            <div>
-              <h4>Aturan Transparan & Adil</h4>
-              <p>Syarat suspend tertulis dan jelas. Kalau ada masalah, ada mekanisme banding. Admin lokal yang kamu kenal.</p>
-            </div>
-          </div>
-        </div>
-        <a href="https://instagram.com/cocourir" class="btn-green reveal" target="_blank" rel="noopener noreferrer">
-          Hubungi Kami di Instagram
+        <a href="merchant.html" class="btn-green reveal">
+          Lihat Peluang untuk Merchant
           <span aria-hidden="true">→</span>
         </a>
       </div>
@@ -1351,7 +1240,7 @@
         <a href="/" class="logo" aria-label="Cocourir - Beranda">
           <div class="logo-icon"><img src="cocourir_food_logo.svg" alt="Cocourir"></div>
         </a>
-        <p>Platform pengiriman makanan untuk warga Lombok. Adil untuk customer, merchant, dan driver.</p>
+        <p>Platform pengiriman makanan untuk warga Lombok. Adil untuk customer dan merchant.</p>
       </div>
       <nav aria-label="Tautan platform">
         <div class="footer-col">
@@ -1368,9 +1257,8 @@
         <div class="footer-col">
           <h5>Mitra</h5>
           <ul>
-            <li><a href="#merchant">Buka Toko</a></li>
-            <li><a href="#driver">Jadi Driver</a></li>
-            <li><a href="#">Download App</a></li>
+            <li><a href="merchant.html">Buka Toko</a></li>
+            <li><a href="https://app.cocourir.com">Buka Aplikasi</a></li>
           </ul>
         </div>
       </nav>

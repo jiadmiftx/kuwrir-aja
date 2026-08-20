@@ -22,4 +22,4 @@ jobs:
             set -e
             cd ~/kuwrir-aja
             git pull
-            sudo cp landing/*.html landing/*.svg landing/*.png /var/www/cocourir/landing/
+            sudo cp landing/*.html landing/*.svg landing/*.png landing/*.txt landing/*.xml /var/www/cocourir/landing/
