@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Invoice01Icon, Store01Icon } from "@hugeicons/core-free-icons";
+import { Invoice01Icon, Motorbike01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
-import { getMyOrders } from "@/lib/api/endpoints";
+import { getChatUnreadCount, getMyOrders } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
-import { orderStatusLabel, orderStatusToneClasses, isActiveOrder } from "@/lib/order-status";
+import { canChatDriver, canChatMerchant, orderStatusLabel, orderStatusToneClasses, isActiveOrder } from "@/lib/order-status";
 import type { Order } from "@/lib/api/types";
 
 function OrdersContent() {
-  const router = useRouter();
   const orders = useQuery({
     queryKey: ["orders"],
     queryFn: getMyOrders,
@@ -22,6 +20,14 @@ function OrdersContent() {
   const list = orders.data?.orders ?? [];
   const active = list.filter((o) => isActiveOrder(o.status));
   const past = list.filter((o) => !isActiveOrder(o.status));
+  const anyChattable = list.some((o) => canChatMerchant(o.status) || canChatDriver(o));
+
+  const unread = useQuery({
+    queryKey: ["chat-unread"],
+    queryFn: getChatUnreadCount,
+    enabled: anyChattable,
+    refetchInterval: anyChattable ? 30_000 : false,
+  });
 
   return (
     <div className="mx-auto max-w-(--content-width) px-4 pb-6 md:px-8">
@@ -49,7 +55,12 @@ function OrdersContent() {
           <p className="mb-3 text-sm font-medium text-(--color-ink-soft)">Sedang Berlangsung</p>
           <div className="flex flex-col gap-2.5 md:grid md:grid-cols-2">
             {active.map((o) => (
-              <OrderCard key={o.id} onClick={() => router.push(`/orders/${o.id}`)} order={o} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                merchantUnread={unread.data?.orders?.[o.id]?.merchant ?? 0}
+                driverUnread={unread.data?.orders?.[o.id]?.driver ?? 0}
+              />
             ))}
           </div>
         </section>
@@ -60,7 +71,12 @@ function OrdersContent() {
           <p className="mb-3 text-sm font-medium text-(--color-ink-soft)">Riwayat</p>
           <div className="flex flex-col gap-2.5 md:grid md:grid-cols-2">
             {past.map((o) => (
-              <OrderCard key={o.id} onClick={() => router.push(`/orders/${o.id}`)} order={o} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                merchantUnread={unread.data?.orders?.[o.id]?.merchant ?? 0}
+                driverUnread={unread.data?.orders?.[o.id]?.driver ?? 0}
+              />
             ))}
           </div>
         </section>
@@ -90,40 +106,106 @@ function relativeDate(iso: string) {
 
 /// Informative order card, web equivalent of customer_app's _OrderCard:
 /// store icon/logo, name + order number + relative date, status badge,
-/// then a divider and an item-summary/total footer row — instead of the
-/// old bare number/status/total stack that told a customer nothing about
-/// what they actually ordered.
-function OrderCard({ order, onClick }: { order: Order; onClick: () => void }) {
+/// a divider, an item-summary/total row, and — mirroring the same change
+/// on customer_app — two labeled chat chips that deep-link straight into
+/// the right thread on the detail page instead of making the customer
+/// open the order first and hunt for a plain, unlabeled chat icon.
+function OrderCard({
+  order,
+  merchantUnread,
+  driverUnread,
+}: {
+  order: Order;
+  merchantUnread: number;
+  driverUnread: number;
+}) {
   const summary = itemSummary(order);
+  const chatMerchant = canChatMerchant(order.status);
+  const chatDriver = canChatDriver(order);
+
   return (
-    <button
-      onClick={onClick}
-      className="flex flex-col gap-3 rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-3.5 text-left transition-shadow hover:shadow-md"
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-(--color-accent-soft)">
-          {order.merchant?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={order.merchant.logo_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <HugeiconsIcon icon={Store01Icon} size={18} strokeWidth={1.5} className="text-(--color-accent)" />
+    <div className="flex flex-col rounded-2xl border border-(--color-border) bg-(--color-surface-raised) transition-shadow hover:shadow-md">
+      <Link href={`/orders/${order.id}`} className="flex flex-col gap-3 p-3.5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-(--color-accent-soft)">
+            {order.merchant?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={order.merchant.logo_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <HugeiconsIcon icon={Store01Icon} size={18} strokeWidth={1.5} className="text-(--color-accent)" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-(--color-ink)">{order.merchant?.name ?? order.order_number}</p>
+            <p className="text-xs text-(--color-ink-faint)">
+              #{order.order_number} · {relativeDate(order.created_at)}
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${orderStatusToneClasses(order.status)}`}>
+            {orderStatusLabel(order.status)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-(--color-border-soft) pt-2.5">
+          <p className="truncate text-xs text-(--color-ink-soft)">{summary ?? " "}</p>
+          <p className="shrink-0 text-sm font-bold text-(--color-accent)">{formatIDR(order.total)}</p>
+        </div>
+      </Link>
+      {(chatMerchant || chatDriver) && (
+        <div className="flex gap-2 border-t border-(--color-border-soft) p-2.5 pt-2">
+          {chatMerchant && (
+            <ChatChip
+              href={`/orders/${order.id}?openChat=merchant`}
+              icon={Store01Icon}
+              label="Chat Toko"
+              color="text-(--color-accent)"
+              bg="bg-(--color-accent-soft)"
+              unread={merchantUnread}
+            />
+          )}
+          {chatDriver && (
+            <ChatChip
+              href={`/orders/${order.id}?openChat=driver`}
+              icon={Motorbike01Icon}
+              label="Chat Driver"
+              color="text-(--color-info)"
+              bg="bg-(--color-info-soft)"
+              unread={driverUnread}
+            />
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-(--color-ink)">{order.merchant?.name ?? order.order_number}</p>
-          <p className="text-xs text-(--color-ink-faint)">
-            #{order.order_number} · {relativeDate(order.created_at)}
-          </p>
-        </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${orderStatusToneClasses(order.status)}`}>
-          {orderStatusLabel(order.status)}
+      )}
+    </div>
+  );
+}
+
+function ChatChip({
+  href,
+  icon,
+  label,
+  color,
+  bg,
+  unread,
+}: {
+  href: string;
+  icon: typeof Store01Icon;
+  label: string;
+  color: string;
+  bg: string;
+  unread: number;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold ${bg} ${color}`}
+    >
+      <HugeiconsIcon icon={icon} size={14} strokeWidth={1.5} />
+      <span className="truncate">{label}</span>
+      {unread > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-(--color-danger) px-1 text-[9px] font-bold text-(--color-accent-contrast)">
+          {unread > 9 ? "9+" : unread}
         </span>
-      </div>
-      <div className="flex items-center justify-between gap-2 border-t border-(--color-border-soft) pt-2.5">
-        <p className="truncate text-xs text-(--color-ink-soft)">{summary ?? " "}</p>
-        <p className="shrink-0 text-sm font-bold text-(--color-accent)">{formatIDR(order.total)}</p>
-      </div>
-    </button>
+      )}
+    </Link>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -36,7 +36,7 @@ import {
   sendOrderMerchantChat,
 } from "@/lib/api/endpoints";
 import { formatIDR } from "@/lib/format";
-import { canOrderChat, orderStatusLabel, orderStatusToneClasses, isActiveOrder } from "@/lib/order-status";
+import { canChatDriver, canChatMerchant, orderStatusLabel, orderStatusToneClasses, isActiveOrder } from "@/lib/order-status";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useCartStore } from "@/lib/stores/cart";
 import { ApiError } from "@/lib/api/client";
@@ -75,9 +75,18 @@ type DialogState = {
 function OrderDetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const userId = useAuthStore((s) => s.user?.id);
-  const [activeChat, setActiveChat] = useState<ChatChannel | null>(null);
+  // Deep-link from the order list card's chat chips (?openChat=merchant|driver)
+  // straight into the right panel on first render — read once via the lazy
+  // initializer rather than an effect+setState (which the linter flags as
+  // a cascading-render footgun); eligibility is re-checked below via
+  // `effectiveChat` once the order itself has loaded.
+  const [activeChat, setActiveChat] = useState<ChatChannel | null>(() => {
+    const requested = searchParams.get("openChat");
+    return requested === "merchant" || requested === "driver" ? requested : null;
+  });
   const [chatText, setChatText] = useState("");
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundReason, setRefundReason] = useState("");
@@ -109,6 +118,19 @@ function OrderDetailContent() {
   // only worth polling while the order is in a status where that can
   // happen (confirmed/preparing); a 404 here just means nothing pending.
   const o0 = order.data?.order;
+
+  // The ?openChat= deep-link (read into initial state above) shouldn't win
+  // over reality once the order's loaded — e.g. a stale link to a driver
+  // thread for an order whose driver hasn't accepted yet. Clamped here
+  // rather than in an effect+setState (unnecessary, and a cascading-render
+  // footgun); `activeChat` itself still tracks manual toggling.
+  const chatMerchantEligible = !!o0 && canChatMerchant(o0.status);
+  const chatDriverEligible = !!o0 && canChatDriver(o0);
+  const effectiveChat: ChatChannel | null =
+    (activeChat === "merchant" && !chatMerchantEligible) || (activeChat === "driver" && !chatDriverEligible)
+      ? null
+      : activeChat;
+
   const modificationEnabled = o0?.status === "confirmed" || o0?.status === "preparing";
   const modification = useQuery({
     queryKey: ["order-modification", params.id],
@@ -167,14 +189,14 @@ function OrderDetailContent() {
   const driverChat = useQuery({
     queryKey: ["order-chat-driver", params.id],
     queryFn: () => getOrderDriverChat(params.id),
-    enabled: activeChat === "driver",
-    refetchInterval: activeChat === "driver" ? 60_000 : false,
+    enabled: effectiveChat === "driver",
+    refetchInterval: effectiveChat === "driver" ? 60_000 : false,
   });
   const merchantChat = useQuery({
     queryKey: ["order-chat-merchant", params.id],
     queryFn: () => getOrderMerchantChat(params.id),
-    enabled: activeChat === "merchant",
-    refetchInterval: activeChat === "merchant" ? 60_000 : false,
+    enabled: effectiveChat === "merchant",
+    refetchInterval: effectiveChat === "merchant" ? 60_000 : false,
   });
   const onDriverChatSignal = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["order-chat-driver", params.id] });
@@ -184,11 +206,11 @@ function OrderDetailContent() {
     queryClient.invalidateQueries({ queryKey: ["order-chat-merchant", params.id] });
     queryClient.invalidateQueries({ queryKey: ["chat-unread"] });
   }, [queryClient, params.id]);
-  useSseSignal(`/orders/${params.id}/chat/stream`, "chat_message", activeChat === "driver", onDriverChatSignal);
+  useSseSignal(`/orders/${params.id}/chat/stream`, "chat_message", effectiveChat === "driver", onDriverChatSignal);
   useSseSignal(
     `/orders/${params.id}/merchant-chat/stream`,
     "chat_message",
-    activeChat === "merchant",
+    effectiveChat === "merchant",
     onMerchantChatSignal
   );
 
@@ -199,15 +221,22 @@ function OrderDetailContent() {
       queryClient.invalidateQueries({ queryKey: ["order-chat-driver", params.id] });
     },
   });
+  const [merchantChatError, setMerchantChatError] = useState("");
   const sendMerchantChat = useMutation({
     mutationFn: () => sendOrderMerchantChat(params.id, chatText),
     onSuccess: () => {
       setChatText("");
+      setMerchantChatError("");
       queryClient.invalidateQueries({ queryKey: ["order-chat-merchant", params.id] });
     },
+    // The client-side lock (see merchantHasReplied) normally prevents this,
+    // but it's only a UX nicety — the backend is the real gate (403 if the
+    // merchant hasn't sent the first message yet), so surface it for real
+    // rather than swallowing it.
+    onError: (err) => setMerchantChatError(err instanceof ApiError ? err.message : "Gagal mengirim pesan"),
   });
 
-  const chatChattable = !!o0 && canOrderChat(o0.status);
+  const chatChattable = !!o0 && (canChatMerchant(o0.status) || canChatDriver(o0));
   const unread = useQuery({
     queryKey: ["chat-unread"],
     queryFn: getChatUnreadCount,
@@ -243,7 +272,7 @@ function OrderDetailContent() {
     REFUND_ACTION_ENABLED && (o.status === "delivered" || o.status === "cancelled");
   const isDelivered = o.status === "delivered";
   const hasReview = order.data?.has_review ?? false;
-  const canChat = canOrderChat(o.status);
+  const merchantHasReplied = merchantChat.data?.messages.some((m) => m.sender_role === "merchant") ?? false;
 
   function toggleChat(channel: ChatChannel) {
     setActiveChat((cur) => (cur === channel ? null : channel));
@@ -472,20 +501,24 @@ function OrderDetailContent() {
           </div>
         </section>
 
-        {canChat && (
+        {(chatMerchantEligible || chatDriverEligible) && (
           <div className="flex gap-2">
-            <ChatToggleButton
-              label="Chat Toko"
-              active={activeChat === "merchant"}
-              unread={merchantUnread}
-              onClick={() => toggleChat("merchant")}
-            />
-            <ChatToggleButton
-              label="Chat Driver"
-              active={activeChat === "driver"}
-              unread={driverUnread}
-              onClick={() => toggleChat("driver")}
-            />
+            {chatMerchantEligible && (
+              <ChatToggleButton
+                label="Chat Toko"
+                active={activeChat === "merchant"}
+                unread={merchantUnread}
+                onClick={() => toggleChat("merchant")}
+              />
+            )}
+            {chatDriverEligible && (
+              <ChatToggleButton
+                label="Chat Driver"
+                active={activeChat === "driver"}
+                unread={driverUnread}
+                onClick={() => toggleChat("driver")}
+              />
+            )}
           </div>
         )}
 
@@ -573,19 +606,27 @@ function OrderDetailContent() {
           </section>
         )}
 
-        {activeChat && (
+        {effectiveChat && (
           <ChatPanel
-            title={activeChat === "merchant" ? "Chat dengan Toko" : "Chat dengan Driver"}
+            title={effectiveChat === "merchant" ? "Chat dengan Toko" : "Chat dengan Driver"}
             userId={userId}
-            messages={(activeChat === "merchant" ? merchantChat.data : driverChat.data)?.messages ?? []}
-            loaded={!!(activeChat === "merchant" ? merchantChat.data : driverChat.data)}
+            messages={(effectiveChat === "merchant" ? merchantChat.data : driverChat.data)?.messages ?? []}
+            loaded={!!(effectiveChat === "merchant" ? merchantChat.data : driverChat.data)}
+            emptyHint={
+              effectiveChat === "merchant"
+                ? "Toko akan menghubungi kamu di sini jika ada info soal pesananmu."
+                : undefined
+            }
             chatText={chatText}
             onChangeText={setChatText}
             onSend={() => {
               if (!chatText.trim()) return;
-              (activeChat === "merchant" ? sendMerchantChat : sendDriverChat).mutate();
+              (effectiveChat === "merchant" ? sendMerchantChat : sendDriverChat).mutate();
             }}
-            sending={(activeChat === "merchant" ? sendMerchantChat : sendDriverChat).isPending}
+            sending={(effectiveChat === "merchant" ? sendMerchantChat : sendDriverChat).isPending}
+            locked={effectiveChat === "merchant" && !merchantHasReplied}
+            lockedHint={effectiveChat === "merchant" ? "Menunggu toko membalas dulu..." : undefined}
+            error={effectiveChat === "merchant" ? merchantChatError : ""}
           />
         )}
       </div>
@@ -666,20 +707,29 @@ function ChatPanel({
   userId,
   messages,
   loaded,
+  emptyHint,
   chatText,
   onChangeText,
   onSend,
   sending,
+  locked,
+  lockedHint,
+  error,
 }: {
   title: string;
   userId: string | undefined;
   messages: { id: string; sender_id: string; text: string }[];
   loaded: boolean;
+  emptyHint?: string;
   chatText: string;
   onChangeText: (v: string) => void;
   onSend: () => void;
   sending: boolean;
+  locked?: boolean;
+  lockedHint?: string;
+  error?: string;
 }) {
+  const disabled = sending || !!locked;
   return (
     <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
       <p className="mb-3 text-sm font-medium text-(--color-ink)">{title}</p>
@@ -697,9 +747,10 @@ function ChatPanel({
           </div>
         ))}
         {loaded && messages.length === 0 && (
-          <p className="text-center text-xs text-(--color-ink-faint)">Belum ada percakapan.</p>
+          <p className="text-center text-xs text-(--color-ink-faint)">{emptyHint ?? "Belum ada percakapan."}</p>
         )}
       </div>
+      {error && <p className="mb-2 text-xs text-(--color-danger)">{error}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -710,13 +761,14 @@ function ChatPanel({
         <input
           value={chatText}
           onChange={(e) => onChangeText(e.target.value)}
-          placeholder="Tulis pesan..."
-          className="flex-1 rounded-full border border-(--color-border) px-4 py-2.5 text-sm outline-none focus:border-(--color-ink-faint)"
+          disabled={disabled}
+          placeholder={locked ? (lockedHint ?? "") : "Tulis pesan..."}
+          className="flex-1 rounded-full border border-(--color-border) px-4 py-2.5 text-sm outline-none focus:border-(--color-ink-faint) disabled:opacity-60"
         />
         <button
           type="submit"
-          disabled={sending}
-          className="rounded-full bg-(--color-accent) px-4 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
+          disabled={disabled}
+          className="rounded-full bg-(--color-accent) px-4 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover) disabled:opacity-50"
         >
           Kirim
         </button>

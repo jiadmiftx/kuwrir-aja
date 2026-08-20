@@ -75,10 +75,22 @@ export function orderProgressStepIndex(status: string): number {
   }
 }
 
-// Chat only makes sense once the merchant has actually accepted the order
-// (and until it's finished) — matches order_tracking_screen.dart's `canChat`.
+// Merchant chat opens once the merchant has accepted the order (there's
+// someone on the other end to reply) and stays open through delivery —
+// mirrors customer_app's Order.canChatMerchant. The backend's SendMerchantChat
+// enforces the real rule (merchant must send the first message); this just
+// controls whether the button/panel shows at all.
 const CHATTABLE_STATUSES = ["confirmed", "preparing", "ready", "picked_up"];
 
-export function canOrderChat(status: string) {
+export function canChatMerchant(status: string) {
   return CHATTABLE_STATUSES.includes(status);
+}
+
+// Driver chat only makes sense once a driver has actually accepted the job —
+// driver_id alone isn't enough, since admin can pre-assign a driver who
+// hasn't confirmed yet (driver_id set, accepted_at still null). Mirrors
+// customer_app's Order.canChatDriver and Gojek/Grab only surfacing driver
+// contact once a real driver is en route.
+export function canChatDriver(order: { driver_id?: string; accepted_at?: string; status: string }) {
+  return !!order.driver_id && !!order.accepted_at && isActiveOrder(order.status);
 }
