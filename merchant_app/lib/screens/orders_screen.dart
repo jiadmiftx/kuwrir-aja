@@ -309,6 +309,12 @@ class _OrderCard extends StatelessWidget {
     final customerName = customer?['name'] as String? ?? 'Customer';
     final orderNumber = order['order_number'] as String? ?? '-';
     final total = (order['total'] as num?)?.toDouble() ?? 0;
+    // What the merchant actually receives — base item price only, already
+    // net of platform markup/delivery/tax. `total` (used for chat context
+    // above) is the customer-facing full amount and would overstate this
+    // card's number, which is the one merchants check to reconcile payout.
+    final merchantPayout =
+        (order['merchant_payout'] as num?)?.toDouble() ?? total;
     final deliveryType = order['delivery_type'] as String? ?? 'platform';
     final lastModification =
         order['last_modification'] as Map<String, dynamic>?;
@@ -510,14 +516,14 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total',
+                      'Pendapatan',
                       style: TextStyle(
                         fontSize: 12,
                         color: KuwrirColors.textSecondary,
                       ),
                     ),
                     Text(
-                      'IDR ${_fmt(total)}',
+                      'IDR ${_fmt(merchantPayout)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
