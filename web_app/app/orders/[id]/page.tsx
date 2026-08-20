@@ -4,12 +4,21 @@ import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, ArrowLeft01Icon, ArrowRight01Icon, Message01Icon } from "@hugeicons/core-free-icons";
+import {
+  Alert02Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Message01Icon,
+  Refresh01Icon,
+  StarIcon,
+} from "@hugeicons/core-free-icons";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ReplacementPickerSheet } from "@/components/ReplacementPickerSheet";
+import { ReviewSheet } from "@/components/ReviewSheet";
 import {
   cancelOrder,
   cancelViaModificationRequest,
+  getMerchantProducts,
   getModificationRequest,
   getOrder,
   getOrderChat,
@@ -20,6 +29,7 @@ import {
 import { formatIDR } from "@/lib/format";
 import { orderStatusLabel, isActiveOrder } from "@/lib/order-status";
 import { useAuthStore } from "@/lib/stores/auth";
+import { useCartStore } from "@/lib/stores/cart";
 import { ApiError } from "@/lib/api/client";
 import { usePaymentStream } from "@/lib/hooks/usePaymentStream";
 import { useOrderStatusStream } from "@/lib/hooks/useOrderStatusStream";
@@ -54,6 +64,11 @@ function OrderDetailContent() {
   const [refundReason, setRefundReason] = useState("");
   const [refundResult, setRefundResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const cartAddItem = useCartStore((s) => s.addItem);
+  const cartMerchantId = useCartStore((s) => s.merchantId);
+  const cartLines = useCartStore((s) => s.lines);
 
   const order = useQuery({
     queryKey: ["order", params.id],
@@ -171,6 +186,51 @@ function OrderDetailContent() {
   const canCancel = o.status === "pending";
   const canRefund =
     REFUND_ACTION_ENABLED && (o.status === "delivered" || o.status === "cancelled");
+  const isDelivered = o.status === "delivered";
+  const hasReview = order.data?.has_review ?? false;
+
+  // Re-adds this order's items to the cart from the merchant's *current*
+  // live menu (not a blind replay of the old snapshot) — an item may have
+  // since gone unavailable or been removed entirely, so each is matched by
+  // product id against a fresh menu fetch and silently skipped (with a
+  // summary alert) rather than added stale. Mirrors customer_app's reorder.
+  async function handleReorder() {
+    const merchantId = o!.merchant_id;
+    if (!merchantId) return;
+
+    if (cartMerchantId && cartMerchantId !== merchantId && cartLines.length > 0) {
+      const ok = confirm(
+        `Keranjang kamu saat ini berisi pesanan dari toko lain. Memesan lagi dari ${
+          o!.merchant?.name ?? "toko ini"
+        } akan mengganti isi keranjang.`
+      );
+      if (!ok) return;
+    }
+
+    setReordering(true);
+    try {
+      const { categories } = await getMerchantProducts(merchantId);
+      const liveProducts = new Map<string, Product>();
+      for (const cat of categories) for (const p of cat.products) liveProducts.set(p.id, p);
+
+      let skipped = 0;
+      for (const item of o!.items ?? []) {
+        const product = item.product_id ? liveProducts.get(item.product_id) : undefined;
+        if (!product || !product.is_available) {
+          skipped++;
+          continue;
+        }
+        cartAddItem(merchantId, o!.merchant?.name ?? "", product, [], item.quantity, "");
+      }
+
+      if (skipped > 0) alert(`${skipped} item tidak lagi tersedia dan dilewati`);
+      router.push("/cart");
+    } catch {
+      alert("Gagal memuat menu toko");
+    } finally {
+      setReordering(false);
+    }
+  }
 
   return (
     <div className="pb-6">
@@ -314,6 +374,28 @@ function OrderDetailContent() {
           )}
         </div>
 
+        {isDelivered && (
+          <div className="flex flex-col gap-2">
+            {!hasReview && (
+              <button
+                onClick={() => setShowReview(true)}
+                className="flex items-center justify-center gap-2 rounded-full bg-(--color-accent) py-2.5 text-sm font-semibold text-(--color-accent-contrast) transition-colors hover:bg-(--color-accent-hover)"
+              >
+                <HugeiconsIcon icon={StarIcon} size={16} strokeWidth={1.5} />
+                Beri Rating
+              </button>
+            )}
+            <button
+              onClick={handleReorder}
+              disabled={reordering}
+              className="flex items-center justify-center gap-2 rounded-full border border-(--color-accent) py-2.5 text-sm font-semibold text-(--color-accent) disabled:opacity-50"
+            >
+              <HugeiconsIcon icon={Refresh01Icon} size={16} strokeWidth={1.5} />
+              {reordering ? "Memuat menu..." : "Pesan Lagi"}
+            </button>
+          </div>
+        )}
+
         {refundResult && (
           <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-raised) p-4">
             <p className={`text-xs ${refundResult.ok ? "text-(--color-accent)" : "text-(--color-danger)"}`}>
@@ -388,6 +470,18 @@ function OrderDetailContent() {
           </section>
         )}
       </div>
+
+      {showReview && (
+        <ReviewSheet
+          orderId={o.id}
+          hasDriver={!!o.driver_id}
+          onClose={() => setShowReview(false)}
+          onSubmitted={() => {
+            setShowReview(false);
+            queryClient.invalidateQueries({ queryKey: ["order", params.id] });
+          }}
+        />
+      )}
 
       {showPicker && o.merchant?.id && (
         <ReplacementPickerSheet

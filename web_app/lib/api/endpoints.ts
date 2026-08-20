@@ -92,7 +92,11 @@ export const quoteOrder = (body: QuoteRequest) =>
 export const placeOrder = (body: PlaceOrderRequest) =>
   apiFetch<{ order: Order }>("/orders", { method: "POST", body });
 export const getMyOrders = () => apiFetch<{ orders: Order[] }>("/orders");
-export const getOrder = (id: string) => apiFetch<{ order: Order }>(`/orders/${id}`);
+export const getOrder = (id: string) => apiFetch<{ order: Order; has_review: boolean }>(`/orders/${id}`);
+export const submitOrderReview = (
+  orderId: string,
+  body: { merchant_rating?: number; driver_rating?: number; comment?: string }
+) => apiFetch<{ message: string }>(`/orders/${orderId}/review`, { method: "POST", body });
 export const cancelOrder = (id: string) => apiFetch<{ order: Order }>(`/orders/${id}/cancel`, { method: "POST" });
 export const getOrderChat = (id: string) => apiFetch<{ messages: ChatMessage[] }>(`/orders/${id}/chat`);
 export const sendOrderChat = (id: string, text: string) =>

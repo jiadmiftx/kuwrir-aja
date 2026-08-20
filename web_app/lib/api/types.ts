@@ -197,6 +197,7 @@ export interface Order {
   created_at: string;
   merchant_id?: string;
   merchant?: Merchant;
+  driver_id?: string;
   items?: OrderItem[];
 }
 
