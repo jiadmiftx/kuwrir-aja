@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Home01Icon, Search01Icon, ShoppingBag02Icon, Invoice01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Home01Icon, ShoppingBag02Icon, Invoice01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { useCartStore, cartItemCount } from "@/lib/stores/cart";
 
+// No dedicated search tab — the homepage's own search bar (app/page.tsx)
+// is already a one-tap link to /search, and Beranda itself is always one
+// tap away from every other tab, so a 5th tab just for that was redundant.
 const TABS = [
   { href: "/", label: "Beranda", icon: Home01Icon },
-  { href: "/search", label: "Cari", icon: Search01Icon },
   { href: "/cart", label: "Keranjang", icon: ShoppingBag02Icon },
   { href: "/orders", label: "Pesanan", icon: Invoice01Icon },
   { href: "/profile", label: "Profil", icon: UserIcon },
