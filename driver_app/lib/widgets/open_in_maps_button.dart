@@ -41,14 +41,34 @@ Future<void> openInGoogleMaps({
 }
 
 /// Small pill button — "open in Google Maps" as a discoverable, one-tap CTA.
-/// Shared by the job board's order cards and the active-delivery detail map.
+/// Used floating over the active-delivery map, where a raised pill against
+/// varying map tile colors earns its elevation. [iconOnly] drops the pill
+/// and label entirely for contexts already dense with actions (job board
+/// cards) — just the icon, no shadow.
 class OpenInMapsButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool filled;
-  const OpenInMapsButton({super.key, required this.onTap, this.filled = false});
+  final bool iconOnly;
+  const OpenInMapsButton({
+    super.key,
+    required this.onTap,
+    this.filled = false,
+    this.iconOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (iconOnly) {
+      return IconButton(
+        tooltip: 'Buka di Google Maps',
+        onPressed: onTap,
+        icon: HugeIcon(
+          icon: HugeIcons.strokeRoundedMaps,
+          size: 20,
+          color: KuwrirColors.primary,
+        ),
+      );
+    }
     return Material(
       color: filled
           ? KuwrirColors.primary.withValues(alpha: 0.1)
@@ -63,7 +83,11 @@ class OpenInMapsButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              HugeIcon(icon: HugeIcons.strokeRoundedMaps, size: 16, color: KuwrirColors.primary),
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedMaps,
+                size: 16,
+                color: KuwrirColors.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 'Buka di Google Maps',

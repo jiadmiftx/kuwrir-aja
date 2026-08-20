@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:geolocator/geolocator.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,6 +11,7 @@ import '../widgets/open_in_maps_button.dart';
 import '../widgets/whatsapp_launcher.dart';
 import '../widgets/driver_drawer.dart';
 import 'active_delivery_screen.dart';
+import 'chat_screen.dart';
 
 class JobBoardScreen extends StatefulWidget {
   const JobBoardScreen({super.key});
@@ -289,6 +291,8 @@ String _fmtMoney(double v) => v
       (m) => '${m[1]}.',
     );
 
+String _fmtKm(double km) => '${km.toStringAsFixed(1)} km';
+
 /// Card for an order the driver has already accepted and is carrying — shows
 /// the 1-tap Google Maps route CTA plus a "Lihat Detail" button that opens
 /// the full map/status-update screen for just that order. The board stays
@@ -303,6 +307,35 @@ class _ActiveOrderCard extends StatefulWidget {
 
 class _ActiveOrderCardState extends State<_ActiveOrderCard> {
   bool _updating = false;
+  double? _merchantKm;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMerchantDistance();
+  }
+
+  /// Straight-line driver -> merchant distance, computed on-device from the
+  /// last known GPS fix (instant, no permission prompt — this app already
+  /// holds location permission for the accept/pickup/deliver location pings)
+  /// rather than a fresh live fix, since a card on the board doesn't need to
+  /// block on GPS lock. Left null (chip just omitted) if unavailable — this
+  /// is a display-only nicety, not worth surfacing an error for.
+  Future<void> _loadMerchantDistance() async {
+    try {
+      final pos = await Geolocator.getLastKnownPosition();
+      if (pos == null || !mounted) return;
+      final meters = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        _lat(widget.order, 'pickup'),
+        _lng(widget.order, 'pickup'),
+      );
+      setState(() => _merchantKm = meters / 1000);
+    } catch (_) {
+      // Best-effort — see doc comment above.
+    }
+  }
 
   Future<void> _markPickedUp() async {
     final orderId = widget.order['id'] as String? ?? '';
@@ -461,55 +494,63 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
             _TripStageBar(isPickedUp: isPickedUp),
             const SizedBox(height: 12),
 
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                HugeIcon(
-                  icon: isPickedUp
-                      ? HugeIcons.strokeRoundedUser
-                      : HugeIcons.strokeRoundedStore01,
-                  size: 16,
-                  color: isPickedUp ? KuwrirColors.error : KuwrirColors.warning,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isPickedUp
-                            ? (receiverName.isNotEmpty
-                                  ? receiverName
-                                  : 'Customer')
-                            : merchantName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.5,
+            _ActiveAddressRow(
+              icon: HugeIcons.strokeRoundedStore01,
+              iconColor: KuwrirColors.warning,
+              label: 'Ambil di',
+              name: merchantName,
+              address: pickupAddress,
+              distanceLabel: _merchantKm != null ? _fmtKm(_merchantKm!) : null,
+              dimmed: isPickedUp,
+            ),
+            const SizedBox(height: 12),
+            _ActiveAddressRow(
+              icon: HugeIcons.strokeRoundedUser,
+              iconColor: KuwrirColors.error,
+              label: 'Antar ke',
+              name: isPickedUp
+                  ? (receiverName.isNotEmpty ? receiverName : 'Customer')
+                  : '',
+              address: dropoffAddress,
+              distanceLabel: _fmtKm(
+                (order['distance_km'] as num?)?.toDouble() ?? 0,
+              ),
+              dimmed: !isPickedUp,
+              trailing: !isPickedUp
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Chat',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                orderId: order['id'] as String? ?? '',
+                                orderNumber: orderNumber,
+                              ),
+                            ),
+                          ),
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedMessage01,
+                            color: KuwrirColors.info,
+                            size: 20,
+                          ),
                         ),
-                      ),
-                      Text(
-                        isPickedUp ? dropoffAddress : pickupAddress,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: KuwrirColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isPickedUp && receiverPhone.isNotEmpty)
-                  IconButton(
-                    tooltip: 'Chat WhatsApp',
-                    onPressed: () => openWhatsApp(context, receiverPhone),
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedWhatsapp,
-                      color: KuwrirColors.success,
-                      size: 20,
+                        if (receiverPhone.isNotEmpty)
+                          IconButton(
+                            tooltip: 'Chat WhatsApp',
+                            onPressed: () =>
+                                openWhatsApp(context, receiverPhone),
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedWhatsapp,
+                              color: KuwrirColors.success,
+                              size: 20,
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-              ],
             ),
 
             if (paymentType == 'cash' && isPickedUp) ...[
@@ -586,6 +627,7 @@ class _ActiveOrderCardState extends State<_ActiveOrderCard> {
             Row(
               children: [
                 OpenInMapsButton(
+                  iconOnly: true,
                   onTap: () => openInGoogleMaps(
                     context: context,
                     merchantLat: _lat(order, 'pickup'),
@@ -985,6 +1027,101 @@ class _JobCardState extends State<_JobCard> {
     await context.read<JobBoardCubit>().acceptJob(orderId);
     if (!mounted) return;
     setState(() => _accepting = false);
+  }
+}
+
+/// Address row for the already-accepted card — like [_AddressRow] but with
+/// an inline distance chip and an optional trailing action cluster (chat,
+/// WhatsApp), and a [dimmed] state for the leg the driver isn't on yet.
+class _ActiveAddressRow extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final Color iconColor;
+  final String label;
+  final String name;
+  final String address;
+  final String? distanceLabel;
+  final bool dimmed;
+  final Widget? trailing;
+
+  const _ActiveAddressRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.name,
+    required this.address,
+    this.distanceLabel,
+    this.dimmed = false,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: dimmed ? 0.55 : 1,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: HugeIcon(icon: icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: KuwrirColors.textHint,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    if (distanceLabel != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '· $distanceLabel',
+                        style: TextStyle(
+                          color: KuwrirColors.textHint,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (name.isNotEmpty)
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                Text(
+                  address,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: KuwrirColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
   }
 }
 
