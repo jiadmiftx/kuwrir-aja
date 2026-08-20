@@ -1,5 +1,6 @@
 class OrderItem {
   final String id;
+  final String? productId;
   final String itemName;
   final int quantity;
   final double basePrice;
@@ -9,6 +10,7 @@ class OrderItem {
 
   const OrderItem({
     required this.id,
+    this.productId,
     required this.itemName,
     required this.quantity,
     required this.basePrice,
@@ -19,6 +21,7 @@ class OrderItem {
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
     id: json['id'] as String? ?? '',
+    productId: json['product_id'] as String?,
     itemName: json['item_name'] as String? ?? '',
     quantity: (json['quantity'] as num?)?.toInt() ?? 1,
     basePrice: (json['base_price'] as num?)?.toDouble() ?? 0,
@@ -61,7 +64,9 @@ class Order {
   final String? merchantId;
   final String? merchantName;
   final String? merchantLogoUrl;
+  final String? driverId;
   final String? cancellationReason;
+  final bool hasReview;
   final List<OrderItem> items;
   final DateTime? createdAt;
 
@@ -95,7 +100,9 @@ class Order {
     this.merchantId,
     this.merchantName,
     this.merchantLogoUrl,
+    this.driverId,
     this.cancellationReason,
+    this.hasReview = false,
     this.items = const [],
     this.createdAt,
   });
@@ -134,7 +141,9 @@ class Order {
       merchantId: json['merchant_id'] as String?,
       merchantName: merchant?['name'] as String?,
       merchantLogoUrl: merchant?['logo_url'] as String?,
+      driverId: json['driver_id'] as String?,
       cancellationReason: json['cancellation_reason'] as String?,
+      hasReview: json['has_review'] as bool? ?? false,
       items:
           (json['items'] as List<dynamic>?)
               ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))

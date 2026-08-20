@@ -11,6 +11,7 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> {
   double _rating = 5.0;
+  int _totalReviews = 0;
   int _totalDelivered = 0;
   double _totalEarned = 0;
   bool _loading = true;
@@ -30,6 +31,7 @@ class _StatsScreenState extends State<StatsScreen> {
       ]);
       final application = results[0];
       _rating = (application['rating'] as num?)?.toDouble() ?? 5.0;
+      _totalReviews = (application['total_reviews'] as num?)?.toInt() ?? 0;
       _totalDelivered = (application['total_delivered'] as num?)?.toInt() ?? 0;
       final wallet = results[1]['wallet'] as Map<String, dynamic>?;
       _totalEarned = (wallet?['total_earned'] as num?)?.toDouble() ?? 0;
@@ -65,7 +67,9 @@ class _StatsScreenState extends State<StatsScreen> {
                       child: _StatCard(
                         icon: HugeIcons.strokeRoundedStar,
                         iconColor: KuwrirColors.warning,
-                        label: 'Rating',
+                        label: _totalReviews > 0
+                            ? 'Rating · $_totalReviews ulasan'
+                            : 'Rating',
                         value: _rating.toStringAsFixed(1),
                       ),
                     ),

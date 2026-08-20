@@ -44,6 +44,7 @@ func (h *Handler) RegisterRoutes(r *gin.RouterGroup) {
 		orders.GET("/:id", h.GetOrder)
 		orders.GET("/:id/stream", h.StreamOrderStatus)
 		orders.POST("/:id/cancel", h.CancelOrder)
+		orders.POST("/:id/review", h.SubmitReview)
 		orders.POST("/:id/refund-request", h.RequestRefund)
 		orders.GET("/:id/chat", h.GetChat)
 		orders.POST("/:id/chat", h.SendChat)
@@ -794,7 +795,10 @@ func (h *Handler) GetOrder(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"order": order})
+	var hasReview bool
+	h.db.Model(&model.Review{}).Where("order_id = ?", order.ID).Select("count(*) > 0").Scan(&hasReview)
+
+	c.JSON(http.StatusOK, gin.H{"order": order, "has_review": hasReview})
 }
 
 // isTerminalOrderStatus reports whether an order's status will never
@@ -885,6 +889,103 @@ func (h *Handler) CancelOrder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Order cancelled"})
+}
+
+// SubmitReview records a customer's post-delivery rating of the merchant
+// and/or driver for one order (one combined Review row per order, per the
+// schema — not a separate rating per line item) and recalculates the
+// merchant's/driver's aggregate Rating + TotalReviews from all Review rows
+// tied to them. Review.OrderID has a DB-level unique index, so a duplicate
+// submission is rejected here as a friendly 409 and would also fail at the
+// DB if this check were ever bypassed.
+func (h *Handler) SubmitReview(c *gin.Context) {
+	userID := c.GetString("user_id")
+	orderID := c.Param("id")
+
+	var req struct {
+		MerchantRating *int   `json:"merchant_rating"`
+		DriverRating   *int   `json:"driver_rating"`
+		Comment        string `json:"comment"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+	if req.MerchantRating == nil && req.DriverRating == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Provide at least one rating"})
+		return
+	}
+
+	var order model.Order
+	if err := h.db.Where("id = ? AND customer_id = ?", orderID, userID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+	if order.Status != model.OrderStatusDelivered {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order belum selesai"})
+		return
+	}
+
+	var existing model.Review
+	if h.db.Where("order_id = ?", order.ID).First(&existing).Error == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Order ini sudah diberi rating"})
+		return
+	}
+
+	custUUID, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
+		return
+	}
+
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		review := model.Review{
+			OrderID:        order.ID,
+			CustomerID:     custUUID,
+			MerchantID:     order.MerchantID,
+			DriverID:       order.DriverID,
+			MerchantRating: req.MerchantRating,
+			DriverRating:   req.DriverRating,
+			Comment:        req.Comment,
+		}
+		if err := tx.Create(&review).Error; err != nil {
+			return err
+		}
+
+		if order.MerchantID != nil {
+			var agg struct {
+				Avg   float64
+				Count int
+			}
+			tx.Model(&model.Review{}).
+				Where("merchant_id = ? AND merchant_rating IS NOT NULL", *order.MerchantID).
+				Select("AVG(merchant_rating) AS avg, COUNT(*) AS count").
+				Scan(&agg)
+			tx.Model(&model.Merchant{}).Where("id = ?", *order.MerchantID).
+				Updates(map[string]interface{}{"rating": agg.Avg, "total_reviews": agg.Count})
+		}
+
+		if order.DriverID != nil {
+			var agg struct {
+				Avg   float64
+				Count int
+			}
+			tx.Model(&model.Review{}).
+				Where("driver_id = ? AND driver_rating IS NOT NULL", *order.DriverID).
+				Select("AVG(driver_rating) AS avg, COUNT(*) AS count").
+				Scan(&agg)
+			tx.Model(&model.Driver{}).Where("id = ?", *order.DriverID).
+				Updates(map[string]interface{}{"rating": agg.Avg, "total_reviews": agg.Count})
+		}
+
+		return nil
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit review"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Review submitted"})
 }
 
 // --- Merchant Order Handlers (for merchant app) ---

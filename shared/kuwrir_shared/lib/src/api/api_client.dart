@@ -444,11 +444,30 @@ class ApiClient {
 
   Future<Order> getOrder(String id) async {
     final data = await get('/orders/$id');
-    return Order.fromJson(data['order'] as Map<String, dynamic>);
+    final orderJson = data['order'] as Map<String, dynamic>;
+    orderJson['has_review'] = data['has_review'] as bool? ?? false;
+    return Order.fromJson(orderJson);
   }
 
   Future<void> cancelOrder(String id) async {
     await post('/orders/$id/cancel', {});
+  }
+
+  /// Submits the customer's post-delivery rating for one order — a single
+  /// combined Review row per order (merchant/product quality + driver),
+  /// not a separate review per line item. Either rating may be omitted
+  /// (e.g. no driver on the order) but not both.
+  Future<void> submitOrderReview(
+    String orderId, {
+    int? merchantRating,
+    int? driverRating,
+    String? comment,
+  }) async {
+    await post('/orders/$orderId/review', {
+      if (merchantRating != null) 'merchant_rating': merchantRating,
+      if (driverRating != null) 'driver_rating': driverRating,
+      if (comment != null && comment.isNotEmpty) 'comment': comment,
+    });
   }
 
   // ── Merchant: Store Management ────────────────────────────────────────────

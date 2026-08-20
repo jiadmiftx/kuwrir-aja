@@ -174,6 +174,7 @@ func (h *Handler) GetApplicationStatus(c *gin.Context) {
 	if h.db.Where("user_id = ?", userID).First(&driver).Error == nil {
 		resp["rating"] = driver.Rating
 		resp["total_delivered"] = driver.TotalDelivered
+		resp["total_reviews"] = driver.TotalReviews
 	}
 
 	c.JSON(http.StatusOK, resp)

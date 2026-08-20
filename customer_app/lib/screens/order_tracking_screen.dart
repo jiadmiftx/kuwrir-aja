@@ -5,8 +5,10 @@ import 'package:kuwrir_shared/kuwrir_shared.dart';
 import 'chat_screen.dart';
 import 'order_modification_screen.dart';
 import 'payment_webview_screen.dart';
+import '../cubits/cart_cubit.dart';
 import '../cubits/chat_cubit.dart' show ChatChannel;
 import '../cubits/order_tracking_cubit.dart';
+import '../widgets/review_sheet.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -20,6 +22,7 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   bool _payingNow = false;
   bool _cancelling = false;
+  bool _reordering = false;
 
   @override
   void initState() {
@@ -114,6 +117,105 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       }
     } finally {
       if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  Future<void> _rateOrder(BuildContext context, Order order) async {
+    final submitted = await showReviewSheet(
+      context,
+      orderId: order.id,
+      hasDriver: order.driverId != null,
+    );
+    if (submitted && context.mounted) {
+      context.read<OrderTrackingCubit>().refreshNow(order.id);
+    }
+  }
+
+  /// Re-adds this order's items to the cart from the merchant's *current*
+  /// live menu (not a blind replay of the old snapshot) — an item may have
+  /// since gone unavailable, left its visibility window, or been removed
+  /// entirely, so each is matched by product id against a fresh menu fetch
+  /// and silently skipped (with a summary snackbar) rather than added stale.
+  Future<void> _reorder(BuildContext context, Order order) async {
+    final merchantId = order.merchantId;
+    if (merchantId == null) return;
+
+    final cart = context.read<CartCubit>();
+    if (cart.state.merchantId != null &&
+        cart.state.merchantId != merchantId &&
+        cart.state.items.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text('Ganti keranjang?'),
+          content: Text(
+            'Keranjang kamu saat ini berisi pesanan dari toko lain. '
+            'Memesan lagi dari ${order.merchantName ?? "toko ini"} akan '
+            'mengganti isi keranjang.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Ganti'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    setState(() => _reordering = true);
+    try {
+      final categories = await context.read<ApiClient>().getMerchantMenu(
+        merchantId,
+      );
+      final liveProducts = {
+        for (final cat in categories)
+          for (final p in cat.products) p.id: p,
+      };
+
+      var skipped = 0;
+      for (final item in order.items) {
+        final product = item.productId != null
+            ? liveProducts[item.productId]
+            : null;
+        if (product == null || !product.isAvailable || !product.isVisibleNow) {
+          skipped++;
+          continue;
+        }
+        cart.addItem(
+          product,
+          merchantId: merchantId,
+          merchantName: order.merchantName,
+          merchantImageUrl: order.merchantLogoUrl,
+          quantity: item.quantity,
+        );
+      }
+
+      if (!context.mounted) return;
+      if (skipped > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$skipped item tidak lagi tersedia dan dilewati'),
+          ),
+        );
+      }
+      Navigator.pushNamed(context, '/cart');
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Gagal memuat menu toko')));
+      }
+    } finally {
+      if (mounted) setState(() => _reordering = false);
     }
   }
 
@@ -498,6 +600,41 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             : const Text('Batalkan Pesanan'),
                       ),
                     ),
+
+                  if (isDelivered) ...[
+                    if (!order.hasReview)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => _rateOrder(context, order),
+                          icon: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedStar,
+                          ),
+                          label: const Text('Beri Rating'),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _reordering
+                            ? null
+                            : () => _reorder(context, order),
+                        icon: _reordering
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const HugeIcon(
+                                icon: HugeIcons.strokeRoundedRefresh01,
+                              ),
+                        label: const Text('Pesan Lagi'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),

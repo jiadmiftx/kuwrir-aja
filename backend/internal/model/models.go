@@ -334,6 +334,7 @@ type Driver struct {
 	IsOnline          bool       `gorm:"default:false" json:"is_online"`
 	IsAvailable       bool       `gorm:"default:true" json:"is_available"`
 	Rating            float64    `gorm:"default:5.0" json:"rating"`
+	TotalReviews      int        `gorm:"default:0" json:"total_reviews"`
 	TotalDelivered    int        `gorm:"default:0" json:"total_delivered"`
 	CodHolding        float64    `gorm:"default:0" json:"cod_holding"` // Total COD cash physically with driver, not yet deposited
 
