@@ -363,26 +363,42 @@
     .app-cta .section-title, .app-cta .section-sub { margin-inline: auto; }
     .install-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 1.25rem;
-      max-width: 760px;
+      max-width: 980px;
       margin: 0 auto 2.5rem;
       text-align: left;
+      align-items: stretch;
     }
     .install-card {
       background: #fff;
       border-radius: var(--radius-lg);
       padding: 1.75rem;
       box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
     }
     .install-icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
     .install-card h3 { font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.9rem; }
     .install-card ol { padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
     .install-card li { font-size: 0.9rem; color: var(--ink-mid); line-height: 1.55; }
     .install-card strong { color: var(--ink); }
+    .install-card p { font-size: 0.9rem; color: var(--ink-mid); line-height: 1.55; }
+    .install-store-btn {
+      margin-top: auto;
+      padding-top: 1.25rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--g700);
+    }
+    .install-store-btn span[aria-hidden] { transition: transform 0.2s; }
+    .install-card:hover .install-store-btn span[aria-hidden] { transform: translateX(3px); }
     .app-cta-btn { display: inline-flex; }
-    @media (max-width: 640px) {
-      .install-grid { grid-template-columns: 1fr; }
+    @media (max-width: 820px) {
+      .install-grid { grid-template-columns: 1fr; max-width: 420px; }
     }
 
     /* ── How it works ─────────────────────────────────────── */
@@ -665,12 +681,21 @@
     .coverage .section-label { color: var(--g400); }
     .coverage .section-title { color: #fff; margin-bottom: 0.75rem; }
     .coverage .section-sub { color: oklch(1 0 0 / 0.65); margin-inline: auto; }
+    .area-group { margin-top: 2.5rem; }
+    .area-group + .area-group { margin-top: 1.75rem; }
+    .area-group-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: oklch(1 0 0 / 0.45);
+      margin-bottom: 0.9rem;
+    }
     .area-grid {
       display: flex;
       flex-wrap: wrap;
       gap: 0.75rem;
       justify-content: center;
-      margin-top: 2.5rem;
     }
     .area-chip {
       padding: 0.55rem 1.25rem;
@@ -680,11 +705,19 @@
       color: #fff;
       font-size: 0.88rem;
       font-weight: 600;
-      transition: background 0.2s, border-color 0.2s;
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
     }
-    .area-chip:hover, .area-chip.active {
-      background: var(--g600);
-      border-color: var(--g600);
+    .area-chip:hover { transform: translateY(-2px); }
+    .area-chip.active {
+      background: var(--amber);
+      border-color: var(--amber);
+      color: var(--g950);
+      font-weight: 700;
+    }
+    .area-chip.soon {
+      background: transparent;
+      border-style: dashed;
+      color: oklch(1 0 0 / 0.55);
     }
 
     /* ── CTA Merchant ─────────────────────────────────────── */
@@ -860,12 +893,12 @@
       🌴 Halo, Semeton Lombok!
     </div>
     <h1 id="hero-heading">
-      Cocourir Hadir<br>
-      <em>di Lombok</em><br>
-      untuk Antar Makanan Favoritmu
+      Makanan Favoritmu,<br>
+      <em>Sekali Tap</em><br>
+      Sampai Depan Pintu
     </h1>
     <p class="hero-sub">
-      Sekarang pesan dari resto atau warung makan kesukaanmu tinggal sekali tap. Ongkir flat Rp 10.000, tidak surge, tanpa biaya tersembunyi. Beneran adil, dari dan untuk warga Lombok.
+      Pesan dari resto dan warung kesukaanmu di Lombok. Ongkir flat Rp 10.000 aja, nggak pernah naik pas hujan atau jam ramai, dan nggak ada biaya siluman. Cocourir emang dibikin buat orang Lombok, bukan sekadar numpang lewat.
     </p>
     <div class="hero-actions">
       <a href="#app" class="btn-primary">Buka Cocourir Sekarang</a>
@@ -892,14 +925,22 @@
   </div>
 </section>
 
-<!-- ── Buka di Browser / Install ke Homescreen ──────────────── -->
+<!-- ── Download / Buka di Browser ───────────────────────────── -->
 <section class="app-cta" id="app" aria-labelledby="app-heading">
   <div class="container">
-    <p class="section-label reveal">Buka di Browser</p>
-    <h2 class="section-title reveal" id="app-heading">Coba Cocourir langsung dari browser,<br>tanpa install dari store</h2>
-    <p class="section-sub reveal">Buka <strong>app.cocourir.com</strong>, pesan seperti biasa, lalu simpan ke layar utama HP kamu — rasanya seperti aplikasi asli, tanpa harus antre download dari Play Store atau App Store.</p>
+    <p class="section-label reveal">Mulai Pesan</p>
+    <h2 class="section-title reveal" id="app-heading">Pilih caramu, semua sampai ke resto favoritmu</h2>
+    <p class="section-sub reveal">Punya Android? Download appnya. Pakai iPhone? Simpan ke layar utama, sekali tap langsung buka. Males install sama sekali? Langsung pesan dari browser juga bisa.</p>
     <div class="install-grid">
       <article class="install-card reveal">
+        <div class="install-icon" aria-hidden="true">🤖</div>
+        <h3>Android</h3>
+        <p>Aplikasi resmi Cocourir sudah ada di Play Store. Sekali install, tinggal buka kapan lapar datang.</p>
+        <a href="https://play.google.com/store/apps/details?id=com.kuwrir.customer" class="install-store-btn" target="_blank" rel="noopener noreferrer">
+          Download di Play Store <span aria-hidden="true">→</span>
+        </a>
+      </article>
+      <article class="install-card reveal" style="transition-delay: 0.08s">
         <div class="install-icon" aria-hidden="true">📱</div>
         <h3>iPhone (Safari)</h3>
         <ol>
@@ -908,20 +949,15 @@
           <li>Pilih <strong>"Tambah ke Layar Utama"</strong></li>
         </ol>
       </article>
-      <article class="install-card reveal" style="transition-delay: 0.1s">
-        <div class="install-icon" aria-hidden="true">🤖</div>
-        <h3>Android (Chrome)</h3>
-        <ol>
-          <li>Buka <strong>app.cocourir.com</strong> di Chrome</li>
-          <li>Ketuk menu titik tiga di pojok kanan atas</li>
-          <li>Pilih <strong>"Install app"</strong> / <strong>"Tambahkan ke layar Utama"</strong></li>
-        </ol>
+      <article class="install-card reveal" style="transition-delay: 0.16s">
+        <div class="install-icon" aria-hidden="true">🌐</div>
+        <h3>Langsung dari Browser</h3>
+        <p>Nggak mau install apa-apa dulu? Nggak masalah. Buka <strong>app.cocourir.com</strong>, pesan seperti biasa, selesai. Tetap bisa disimpan ke layar utama kapan saja kalau berubah pikiran.</p>
+        <a href="https://app.cocourir.com" class="install-store-btn">
+          Buka di Browser <span aria-hidden="true">→</span>
+        </a>
       </article>
     </div>
-    <a href="https://app.cocourir.com" class="btn-primary app-cta-btn reveal">
-      Buka Cocourir Sekarang
-      <span aria-hidden="true">→</span>
-    </a>
   </div>
 </section>
 
@@ -979,48 +1015,7 @@
     <p class="section-label reveal">Kuliner Lombok</p>
     <h2 class="section-title reveal" id="food-heading">Dari resto favorit<br>sampai warung makan kesukaanmu</h2>
     <p class="section-sub reveal">Merchant Cocourir menjual dengan harga asli mereka. Tidak ada markup gila-gilaan. Yang kamu bayar adalah harga jujur.</p>
-    <div class="food-grid reveal">
-      <div class="food-cell">
-        <img
-          src="https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=800&q=80"
-          alt="Pilihan menu lengkap dari berbagai merchant Cocourir Lombok"
-          loading="lazy"
-        >
-        <div class="food-cell-label">Menu Pilihan Hari Ini</div>
-      </div>
-      <div class="food-cell">
-        <img
-          src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80"
-          alt="Ayam bakar dan makanan panggang khas Lombok"
-          loading="lazy"
-        >
-        <div class="food-cell-label">Ayam Bakar Lokal</div>
-      </div>
-      <div class="food-cell">
-        <img
-          src="https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=80"
-          alt="Mie dan hidangan berkuah segar dari resto dan warung makan Lombok"
-          loading="lazy"
-        >
-        <div class="food-cell-label">Soto & Mie Kuah</div>
-      </div>
-      <div class="food-cell">
-        <img
-          src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80"
-          alt="Makanan siap saji dari merchant Cocourir"
-          loading="lazy"
-        >
-        <div class="food-cell-label">Siap Antar</div>
-      </div>
-      <div class="food-cell">
-        <img
-          src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=600&q=80"
-          alt="Sarapan dan menu pagi dari merchant Cocourir"
-          loading="lazy"
-        >
-        <div class="food-cell-label">Menu Pagi</div>
-      </div>
-    </div>
+    <div class="food-grid reveal" id="food-grid"></div>
   </div>
 </section>
 
@@ -1174,21 +1169,29 @@
 <section class="coverage" id="coverage" aria-labelledby="coverage-heading">
   <div class="container">
     <p class="section-label reveal">Area Layanan</p>
-    <h2 class="section-title reveal" id="coverage-heading">Melayani seluruh Wilayah Lombok</h2>
-    <p class="section-sub reveal">Dari kota Mataram sampai pantai Kuta, dari Senggigi sampai Selong. Platform yang lahir dan tumbuh di Lombok, untuk warga Lombok.</p>
-    <div class="area-grid reveal" role="list">
-      <span class="area-chip active" role="listitem">Mataram</span>
-      <span class="area-chip" role="listitem">Senggigi</span>
-      <span class="area-chip" role="listitem">Cakranegara</span>
-      <span class="area-chip" role="listitem">Praya</span>
-      <span class="area-chip" role="listitem">Kuta Lombok</span>
-      <span class="area-chip" role="listitem">Selong</span>
-      <span class="area-chip" role="listitem">Selong Belanak</span>
-      <span class="area-chip" role="listitem">Gerung</span>
-      <span class="area-chip" role="listitem">Lembar</span>
-      <span class="area-chip" role="listitem">Tanjung</span>
-      <span class="area-chip" role="listitem">Pemenang</span>
-      <span class="area-chip" role="listitem">& terus berkembang</span>
+    <h2 class="section-title reveal" id="coverage-heading">Dari Mataram sampai ujung Lombok</h2>
+    <p class="section-sub reveal">Bukan platform nasional yang numpang lewat. Cocourir lahir di Lombok, dan wilayah layanannya terus kami perluas dari pusat kota ke pelosok.</p>
+    <div class="area-group">
+      <p class="area-group-label reveal">Sudah Aktif</p>
+      <div class="area-grid reveal" role="list">
+        <span class="area-chip active" role="listitem">Mataram</span>
+        <span class="area-chip active" role="listitem">Cakranegara</span>
+        <span class="area-chip active" role="listitem">Senggigi</span>
+        <span class="area-chip active" role="listitem">Kuta Lombok</span>
+        <span class="area-chip" role="listitem">Praya</span>
+        <span class="area-chip" role="listitem">Selong</span>
+        <span class="area-chip" role="listitem">Gerung</span>
+        <span class="area-chip" role="listitem">Lembar</span>
+      </div>
+    </div>
+    <div class="area-group">
+      <p class="area-group-label reveal">Segera Menyusul</p>
+      <div class="area-grid reveal" role="list">
+        <span class="area-chip soon" role="listitem">Selong Belanak</span>
+        <span class="area-chip soon" role="listitem">Tanjung</span>
+        <span class="area-chip soon" role="listitem">Pemenang</span>
+        <span class="area-chip soon" role="listitem">& terus berkembang</span>
+      </div>
     </div>
   </div>
 </section>
@@ -1294,6 +1297,24 @@
   const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
+
+  // Food/promo banner photos — one place to edit instead of hunting through
+  // grid markup. First entry fills the tall left cell (see .food-cell:first-child
+  // in CSS), the other four fill the 2x2 grid beside it.
+  // TODO: ganti src di bawah ini dengan foto asli menu/merchant Cocourir.
+  const BANNER_PHOTOS = [
+    { src: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=800&q=80', alt: 'Pilihan menu lengkap dari berbagai merchant Cocourir Lombok', label: 'Menu Pilihan Hari Ini' },
+    { src: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=600&q=80', alt: 'Ayam bakar dan makanan panggang khas Lombok', label: 'Ayam Bakar Lokal' },
+    { src: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=80', alt: 'Mie dan hidangan berkuah segar dari resto dan warung makan Lombok', label: 'Soto & Mie Kuah' },
+    { src: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80', alt: 'Makanan siap saji dari merchant Cocourir', label: 'Siap Antar' },
+    { src: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=600&q=80', alt: 'Sarapan dan menu pagi dari merchant Cocourir', label: 'Menu Pagi' },
+  ];
+  document.getElementById('food-grid').innerHTML = BANNER_PHOTOS.map(p => `
+    <div class="food-cell">
+      <img src="${p.src}" alt="${p.alt}" loading="lazy">
+      <div class="food-cell-label">${p.label}</div>
+    </div>
+  `).join('');
 
   // Tab switching
   function switchTab(id, btn) {
