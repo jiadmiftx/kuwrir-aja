@@ -47,3 +47,15 @@ nominatim_data/
 *.jks
 *.keystore
 key.properties
+
+## Local skill tooling (npx skills add, per-directory Claude Code config)
+.agents/
+.claude/
+skills-lock.json
+
+## Local Flutter/Dart tooling state (not functional, no need to sync)
+devtools_options.yaml
+
+## Local Python tooling (venv/cache)
+.pdfenv/
+__pycache__/
