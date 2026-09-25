@@ -36,9 +36,10 @@ services:
     volumes:
       - redis_data:/data
 
-  # Go backend API — redeployed by CI/CD on every push to backend/**
+  # Go backend API — redeployed by CI/CD on every push to backend/** (backend
+  # source now lives in the cocourir-admin-landing repo, see deploy-backend.yml there)
   backend:
-    image: ghcr.io/jiadmiftx/kuwrir-aja/backend:latest
+    image: ghcr.io/jiadmiftx/cocourir-admin-landing/backend:latest
     container_name: kuwrir-backend
     restart: unless-stopped
     env_file:
