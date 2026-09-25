@@ -20,11 +20,12 @@ import (
 const detailRecentLimit = 50
 
 // GetMerchantDetail returns a single merchant's full profile: store info,
-// wallet + recent wallet transactions (online-order earnings credited via
-// CreditWalletsForOnlineOrder), pending platform payout (same computation
-// as GetMerchantSettlements, scoped to this merchant) plus past settlement
-// records, POS receivables/payables (merchant's own tab/supplier-credit
-// bookkeeping), and recent orders.
+// wallet + recent wallet transactions (order earnings credited in
+// DriverOrderHandler.MarkDelivered, for both COD and online orders),
+// pending platform payout (same computation as GetMerchantSettlements,
+// scoped to this merchant) plus past settlement records, POS
+// receivables/payables (merchant's own tab/supplier-credit bookkeeping),
+// and recent orders.
 func (h *Handler) GetMerchantDetail(c *gin.Context) {
 	id := c.Param("id")
 

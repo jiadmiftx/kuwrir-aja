@@ -1451,7 +1451,19 @@ func (h *RestaurantOrderHandler) transitionOrder(c *gin.Context, from, to model.
 		updates[timestampField] = &now
 	}
 
-	h.db.Model(&order).Updates(updates)
+	// Re-check status in the WHERE clause rather than updating the already-
+	// loaded `order` by primary key alone — closes a TOCTOU gap where a
+	// concurrent request (e.g. a double-tap) could pass the earlier
+	// `First()` read before either write commits, letting both go through.
+	result := h.db.Model(&model.Order{}).Where("id = ? AND status = ?", order.ID, from).Updates(updates)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order"})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Order not found or not in '%s' status", from)})
+		return
+	}
 	service.PublishOrderStatusEvent(order.ID.String(), string(to))
 
 	// Push notifications to customer on key status changes
@@ -1797,8 +1809,12 @@ func (h *DriverOrderHandler) MarkPickedUp(c *gin.Context) {
 }
 
 // MarkDelivered transitions: picked_up → delivered.
-// For COD: credits driver and merchant wallets immediately, tracks cash holding.
-// For online payment: wallets already credited at payment confirmation, no extra action.
+// Credits driver and merchant wallets here, at delivery, for both payment
+// types — not at payment confirmation. For COD also tracks the cash the
+// driver is now physically holding. (CreditWalletsForOnlineOrder in
+// payment/handler.go is dead code, never called — don't use it as a
+// reference for "how online orders get credited"; this function is the
+// only place either payment type's wallets actually get credited.)
 func (h *DriverOrderHandler) MarkDelivered(c *gin.Context) {
 	orderID := c.Param("id")
 	userID := c.GetString("user_id")

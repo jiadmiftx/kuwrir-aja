@@ -1750,6 +1750,29 @@ func (h *Handler) AdminCancelOrder(c *gin.Context) {
 
 	now := time.Now()
 	tx := h.db.Begin()
+
+	// Restock items — the customer/merchant/SLA-sweeper cancel paths all go
+	// through service.CancelOrderAndRefund, which restocks; this admin path
+	// used to skip it, silently understating merchant stock on every
+	// admin-cancelled order.
+	var items []model.OrderItem
+	if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load order items"})
+		return
+	}
+	for _, item := range items {
+		if item.ProductID == nil {
+			continue
+		}
+		if err := tx.Model(&model.Product{}).Where("id = ?", *item.ProductID).
+			UpdateColumn("stock_quantity", gorm.Expr("stock_quantity + ?", item.Quantity)).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restock item"})
+			return
+		}
+	}
+
 	tx.Model(&order).Updates(map[string]interface{}{
 		"status":       model.OrderStatusCancelled,
 		"cancelled_at": &now,

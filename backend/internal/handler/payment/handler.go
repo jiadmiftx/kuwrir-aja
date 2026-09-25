@@ -380,38 +380,6 @@ func (h *Handler) SimulatePaid(c *gin.Context) {
 	})
 }
 
-// creditWalletsForOnlineOrder is called after an online-paid order is delivered.
-// For COD this is handled in MarkDelivered; online payments credit here.
-func CreditWalletsForOnlineOrder(db *gorm.DB, order model.Order) error {
-	if order.PaymentType == "cash" {
-		return nil // COD handled at delivery
-	}
-	if order.PaymentStatus != "paid" {
-		return nil
-	}
-
-	orderUUID := order.ID
-	tx := db.Begin()
-
-	merchantNote := fmt.Sprintf("Online payment order %s delivered", order.OrderNumber)
-	driverNote := fmt.Sprintf("Online payment earning order %s", order.OrderNumber)
-
-	if err := service.CreditMerchantWallet(tx, *order.MerchantID, order.Subtotal, "order_earning", &orderUUID, merchantNote); err != nil {
-		tx.Rollback()
-		return err
-	}
-	if order.DriverID != nil {
-		var driver model.Driver
-		if db.Where("id = ?", *order.DriverID).First(&driver).Error == nil {
-			if err := service.CreditWallet(tx, driver.UserID, model.RoleDriver, order.DriverEarning, "order_earning", &orderUUID, driverNote); err != nil {
-				tx.Rollback()
-				return err
-			}
-		}
-	}
-	return tx.Commit().Error
-}
-
 // GetDuitkuClientFromConfig builds a DuitkuClient from app config.
 func GetDuitkuClientFromConfig(cfg *config.Config) *service.DuitkuClient {
 	return &service.DuitkuClient{
