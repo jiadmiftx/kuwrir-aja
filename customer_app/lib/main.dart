@@ -101,13 +101,15 @@ class KuwrirCustomerApp extends StatelessWidget {
       pushSignal: NotificationService.onPushData,
     )..start();
     // When the merchant flags an item as unavailable, the backend sends a push
-    // with type 'item_change_request'. Navigate to the tracking screen so the
-    // customer sees the modification request without having to find it manually.
-    // Handles both foreground arrival and tap-to-open (onMessageOpenedApp also
-    // publishes to onPushData — see NotificationService.setupForegroundHandler).
+    // with type 'item_change_requested' (see customer/handler.go's
+    // OrderModificationRequest creation). Navigate to the tracking screen so
+    // the customer sees the modification request without having to find it
+    // manually. Handles both foreground arrival and tap-to-open
+    // (onMessageOpenedApp also publishes to onPushData — see
+    // NotificationService.setupForegroundHandler).
     NotificationService.onPushData.addListener(() {
       final data = NotificationService.onPushData.value;
-      if (data?['type'] != 'item_change_request') return;
+      if (data?['type'] != 'item_change_requested') return;
       final orderId = data?['order_id'] as String?;
       if (orderId == null) return;
       navigatorKey.currentState?.pushNamed(
