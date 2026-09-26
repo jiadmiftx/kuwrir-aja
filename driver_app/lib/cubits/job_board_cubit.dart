@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:kuwrir_shared/kuwrir_shared.dart';
 import '../services/location_service.dart';
+import '../services/notification_service.dart';
 
 abstract class JobBoardState {}
 
@@ -38,6 +39,18 @@ class JobBoardCubit extends Cubit<JobBoardState> {
 
   JobBoardCubit(this._api) : super(JobBoardOffline()) {
     _resumeIfActive();
+    NotificationService.onPushData.addListener(_onPush);
+  }
+
+  /// Refreshes the board the moment admin assigns this driver an order,
+  /// instead of waiting up to 10s for the next poll tick — the push itself
+  /// (see backend AssignDriverToOrder) is what makes the driver aware a
+  /// mission exists at all while the app is backgrounded; this just keeps
+  /// the board in sync once they open it.
+  void _onPush() {
+    final data = NotificationService.onPushData.value;
+    if (data?['type'] != 'driver_assigned' || !_isOnline) return;
+    loadJobs();
   }
 
   /// On app start, if the driver already has in-progress deliveries, treat
@@ -63,6 +76,7 @@ class JobBoardCubit extends Cubit<JobBoardState> {
   Future<void> close() {
     _pollTimer?.cancel();
     _locationTimer?.cancel();
+    NotificationService.onPushData.removeListener(_onPush);
     return super.close();
   }
 

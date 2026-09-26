@@ -30,4 +30,6 @@ export 'src/widgets/app_lock_gate.dart';
 export 'src/widgets/delete_account_dialog.dart';
 export 'src/widgets/agreement_review_screen.dart';
 export 'src/widgets/unread_badge.dart';
+export 'src/widgets/reliable_notifications_panel.dart';
 export 'src/services/chat_unread_service.dart';
+export 'src/services/power_permission_service.dart';

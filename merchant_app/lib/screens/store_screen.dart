@@ -380,6 +380,8 @@ class _StoreScreenState extends State<StoreScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 28),
+                  const ReliableNotificationsPanel(),
                 ]),
               ),
             ),

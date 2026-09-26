@@ -35,7 +35,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await NotificationService.handleBackgroundMessage(message);
 }
 
-void main() async {
+// Shared by both entrypoints (lib/main.dart = prod, lib/main_dev.dart = dev)
+// so the two flavors never diverge in bootstrap logic — only the Android/iOS
+// build-time flavor (see --flavor dev|prod) and Flutter's `appFlavor` differ.
+Future<void> bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -43,6 +46,8 @@ void main() async {
   await NotificationService.init();
   NotificationService.setupForegroundHandler();
 }
+
+void main() => bootstrapApp();
 
 /// App-wide navigator key so the incoming-order alarm screen can be pushed
 /// from NotificationService's push listener, which fires outside any

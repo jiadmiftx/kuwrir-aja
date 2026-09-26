@@ -5,8 +5,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Lets MainActivity's requestIgnoreBatteryOptimizations open the
+         system dialog directly (Reliable-Notifications panel) instead of
+         only being able to send the driver to Settings manually. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application
-        android:label="Cocourir Driver"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -31,6 +35,17 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Routes pushes Android auto-displays while the app is backgrounded
+             or killed (any FCM message with a `notification` block, e.g. the
+             driver-assigned push — see AssignDriverToOrder) onto the same
+             high-importance "kuwrir_driver" channel NotificationService.init()
+             creates for foreground-built ones, so heads-up behavior is
+             consistent regardless of app state. Without this, Android falls
+             back to its own default channel (default importance, no
+             heads-up). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="kuwrir_driver" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

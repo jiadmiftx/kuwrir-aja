@@ -38,6 +38,23 @@ android {
         versionName = flutter.versionName
     }
 
+    // dev/prod share the same applicationId on purpose: google-services.json
+    // only lists Firebase clients for com.kuwrir.customer, so an
+    // applicationIdSuffix like ".dev" would make the Firebase plugin fail
+    // with "No matching client found". They're distinguished by app label
+    // (below) and Flutter's own `appFlavor` constant instead.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            resValue("string", "app_name", "Cocourir (Dev)")
+        }
+        create("prod") {
+            dimension = "environment"
+            resValue("string", "app_name", "Cocourir")
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = if (System.getenv("KEYSTORE_PATH") != null)
