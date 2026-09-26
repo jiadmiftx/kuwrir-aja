@@ -34,6 +34,11 @@ import 'cubits/session_cubit.dart';
 import 'cubits/address_cubit.dart';
 import 'cubits/wallet_cubit.dart';
 
+/// App-wide navigator key so the item-change-request push can route straight
+/// to OrderTrackingScreen from anywhere in the app, matching the same pattern
+/// used in merchant_app (its navigatorKey serves the incoming-order alarm).
+final navigatorKey = GlobalKey<NavigatorState>();
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -67,7 +72,10 @@ ThemeData _customerTheme(ThemeData base) {
   );
 }
 
-void main() async {
+// Shared by both entrypoints (lib/main.dart = prod, lib/main_dev.dart = dev)
+// so the two flavors never diverge in bootstrap logic — only the Android/iOS
+// build-time flavor (see --flavor dev|prod) and Flutter's `appFlavor` differ.
+Future<void> bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -77,6 +85,8 @@ void main() async {
   await NotificationService.init();
   NotificationService.setupForegroundHandler();
 }
+
+void main() => bootstrapApp();
 
 class KuwrirCustomerApp extends StatelessWidget {
   const KuwrirCustomerApp({super.key});
@@ -90,6 +100,22 @@ class KuwrirCustomerApp extends StatelessWidget {
       fetch: apiClient.getChatUnreadCount,
       pushSignal: NotificationService.onPushData,
     )..start();
+    // When the merchant flags an item as unavailable, the backend sends a push
+    // with type 'item_change_request'. Navigate to the tracking screen so the
+    // customer sees the modification request without having to find it manually.
+    // Handles both foreground arrival and tap-to-open (onMessageOpenedApp also
+    // publishes to onPushData — see NotificationService.setupForegroundHandler).
+    NotificationService.onPushData.addListener(() {
+      final data = NotificationService.onPushData.value;
+      if (data?['type'] != 'item_change_request') return;
+      final orderId = data?['order_id'] as String?;
+      if (orderId == null) return;
+      navigatorKey.currentState?.pushNamed(
+        '/tracking',
+        arguments: {'order_id': orderId},
+      );
+    });
+
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<ApiClient>.value(value: apiClient),
@@ -108,6 +134,7 @@ class KuwrirCustomerApp extends StatelessWidget {
           BlocProvider(create: (_) => CustomerWalletCubit(apiClient)),
         ],
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Cocourir',
           debugShowCheckedModeBanner: false,
           theme: _customerTheme(KuwrirTheme.light),
